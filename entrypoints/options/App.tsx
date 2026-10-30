@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { motion, MotionConfig } from 'motion/react';
 import {
@@ -63,10 +62,6 @@ function routeToHash(route: Route): string {
   return `#/${route.name}`;
 }
 
-function prefersReducedMotion(): boolean {
-  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-}
-
 function useHashRoute() {
   const [route, setRoute] = useState<Route>(parseHash);
 
@@ -77,27 +72,11 @@ function useHashRoute() {
   }, []);
 
   const navigate = useCallback((next: Route) => {
-    const hash = routeToHash(next);
-    const commit = () => {
-      window.location.hash = hash;
-      setRoute(next);
-    };
-
-    // View Transitions give the content swap a physical continuity that a CSS
-    // fade cannot: the old page and the new page are the *same* surface. Falls
-    // through to an instant swap where the API is missing or reduced motion is
-    // requested — the navigation must never wait on an animation.
-    const doc = document as Document & {
-      startViewTransition?: (callback: () => void) => { finished: Promise<void> };
-    };
-    if (doc.startViewTransition && !prefersReducedMotion()) {
-      // React batches state updates, which would land after the transition has
-      // already snapshotted the DOM. `flushSync` keeps the mutation inside the
-      // callback, which is the documented React + View Transition pairing.
-      doc.startViewTransition(() => flushSync(commit));
-    } else {
-      commit();
-    }
+    // Route changes commit synchronously: no cross-fade, no ghost snapshot. The
+    // old page is never visible on top of the new one, so a page that loads its
+    // own data cannot appear to "flash back" mid-navigation.
+    window.location.hash = routeToHash(next);
+    setRoute(next);
   }, []);
 
   return { route, navigate };
@@ -274,7 +253,6 @@ export default function App() {
             <main className="min-h-0 min-w-0 flex-1 overflow-y-auto scrollbar-lumo scroll-container">
               <div
                 key={route.name}
-                style={{ viewTransitionName: 'page-content' }}
                 className={route.name === 'editor' ? 'h-full' : 'min-h-full'}
               >
                 {content}

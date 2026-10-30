@@ -515,26 +515,14 @@
     animation: lumo-fade-out 90ms var(--ease-exit);
   }
 
-  /* Route transitions (options page). View Transitions are available in
-     Chrome 111+, and this project targets 138+. The old snapshot fades down,
-     the new one fades up 6px — enough to read as "the page moved", not enough
-     to delay reading. */
-  ::view-transition-old(page-content) {
-    animation: lumo-fade-out 90ms var(--ease-exit);
-  }
-  ::view-transition-new(page-content) {
-    animation: lumo-fade-in 160ms var(--ease-standard);
-  }
+  /* Route changes are instant: switching options sections must never leave the
+     previous page visible (even as a fading snapshot) on top of the new one. */
 
   @media (prefers-reduced-motion: reduce) {
     .dialog-overlay,
     .dialog-content,
     .popover-panel {
       animation-duration: 1ms !important;
-    }
-    ::view-transition-old(page-content),
-    ::view-transition-new(page-content) {
-      animation-duration: 1ms;
     }
     html {
       scroll-behavior: auto;

@@ -290,13 +290,13 @@ DARK_THEME_OPTIONS  = dark | midnight
 | Toast | 底部上移 8px + 淡入；列表用 `layout` 推动 | 出现不遮挡主内容 |
 | 折叠 | 高度 + 透明度；`ease-standard` | 关闭时高度归零，后续元素上移 |
 | 导航指示器 | motion `layoutId` + spring(520, 40) | 一个物体滑动，而非两个按钮闪烁 |
-| 页面切换 | View Transitions（`page-content`） | 旧页淡出 90ms，新页淡入 160ms；React 用 `flushSync` 保证 DOM 在回调内提交 |
+| 页面切换 | 无动效（同步提交路由） | 切换必须是即时硬切：旧页不得以快照形式盖在新页上 |
 | 批量条 | 从底部 16px 推入 | 与「从底部出现」的方向一致 |
 
 ### 5.3 降级
 
-- `prefers-reduced-motion: reduce`：CSS 动画全部 1ms；`MotionConfig reducedMotion="user"` 关闭布局动画；View Transitions 直接跳过。
-- 动画**永不阻塞导航**：`startViewTransition` 缺失时同步提交。
+- `prefers-reduced-motion: reduce`：CSS 动画全部 1ms；`MotionConfig reducedMotion="user"` 关闭布局动画。
+- 路由切换一律即时生效，不启用 View Transitions，也永不阻塞导航。
 
 ---
 
