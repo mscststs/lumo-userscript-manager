@@ -71,7 +71,6 @@ export const en = {
     moreActions: 'More actions',
     searchPlaceholder: 'Filter scripts',
     installScript: 'Install script',
-    reloadHint: 'Reload the page to apply changes.',
     total: '{{count}} scripts',
   },
   options: {

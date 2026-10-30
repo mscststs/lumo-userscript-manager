@@ -73,7 +73,6 @@ export const zh: TranslationSchema = {
     moreActions: '更多操作',
     searchPlaceholder: '筛选脚本',
     installScript: '安装脚本',
-    reloadHint: '刷新页面以应用更改。',
     total: '{{count}} 个脚本',
   },
   options: {

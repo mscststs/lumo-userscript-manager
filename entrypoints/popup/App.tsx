@@ -8,7 +8,6 @@ import {
   Play,
   Plus,
   RefreshCw,
-  RotateCw,
   Settings,
   SlidersHorizontal,
 } from 'lucide-react';
@@ -54,7 +53,6 @@ export default function App() {
   const [menus, setMenus] = useState<RuntimeMenuCommand[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [needsReload, setNeedsReload] = useState(false);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setInitialLoading(true);
@@ -116,14 +114,12 @@ export default function App() {
     const previous = data;
     const nextSettings = { ...data.settings, scriptsEnabled: enabled };
     setData({ ...data, settings: nextSettings });
-    setNeedsReload(true);
     setError(null);
 
     try {
       await storage.setUISettings(nextSettings);
     } catch (e) {
       setData(previous);
-      setNeedsReload(false);
       setError(errorMessage(e));
       return;
     }
@@ -146,13 +142,11 @@ export default function App() {
         item.uuid === script.uuid ? { ...item, enabled } : item,
       ),
     });
-    setNeedsReload(true);
     setError(null);
     try {
       await sendBg('scripts:toggle', { uuid: script.uuid, enabled });
     } catch (e) {
       setData(previous);
-      setNeedsReload(false);
       setError(errorMessage(e));
     }
   };
@@ -175,16 +169,6 @@ export default function App() {
         id: command.id,
       });
       if (!delivered) throw new Error(t('popup.commandUnavailable'));
-      window.close();
-    } catch (e) {
-      setError(errorMessage(e));
-    }
-  };
-
-  const reloadPage = async () => {
-    if (!data || data.tabId < 0) return;
-    try {
-      await chrome.tabs.reload(data.tabId);
       window.close();
     } catch (e) {
       setError(errorMessage(e));
@@ -299,22 +283,6 @@ export default function App() {
         </main>
 
         <footer className="shrink-0 border-t border-border">
-          {needsReload && (
-            <div className="flex items-center gap-2 border-b border-border bg-muted/40 px-3 py-1.5">
-              <RotateCw className="h-3 w-3 shrink-0 text-muted-foreground" />
-              <span className="min-w-0 flex-1 text-[11px] leading-snug text-muted-foreground">
-                {t('popup.reloadHint')}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="h-6 shrink-0 px-1.5 text-[11px]"
-                onClick={() => void reloadPage()}
-              >
-                {t('common.refresh')}
-              </Button>
-            </div>
-          )}
           <div className="flex items-center gap-1.5 px-2 py-2">
             <Button
               size="sm"
