@@ -14,12 +14,14 @@ type RouteName = 'scripts' | 'editor' | 'settings' | 'logs' | 'about';
 interface Route {
   name: RouteName;
   uuid?: string;
+  /** Optional editor panel opened by a deep link from the popup. */
+  panel?: string;
 }
 
 function parseHash(): Route {
   const hash = window.location.hash.replace(/^#\/?/, '');
-  const [name, id] = hash.split('/');
-  if (name === 'script') return { name: 'editor', uuid: id };
+  const [name, id, panel] = hash.split('/');
+  if (name === 'script') return { name: 'editor', uuid: id, panel };
   if (name === 'settings' || name === 'logs' || name === 'about') return { name };
   return { name: 'scripts' };
 }
@@ -34,7 +36,7 @@ function useHashRoute() {
   const navigate = useCallback((next: Route) => {
     const hash =
       next.name === 'editor'
-        ? `#/script/${next.uuid ?? 'new'}`
+        ? `#/script/${next.uuid ?? 'new'}${next.panel ? `/${next.panel}` : ''}`
         : next.name === 'scripts'
           ? '#/scripts'
           : `#/${next.name}`;
@@ -107,6 +109,7 @@ export default function App() {
         {route.name === 'editor' && (
           <EditorPage
             uuid={route.uuid}
+            initialPanel={route.panel}
             onBack={() => navigate({ name: 'scripts' })}
             onSaved={(uuid) => navigate({ name: 'editor', uuid })}
           />

@@ -25,11 +25,19 @@ interface ScriptDetail {
 
 interface EditorPageProps {
   uuid?: string;
+  /** Panel to focus when opened from a deep link (e.g. the popup). */
+  initialPanel?: string;
   onBack: () => void;
   onSaved: (uuid: string) => void;
 }
 
 type Panel = 'metadata' | 'values' | 'resources' | 'info';
+
+const PANEL_IDS: Panel[] = ['metadata', 'values', 'resources', 'info'];
+
+function isPanel(value: string | undefined): value is Panel {
+  return PANEL_IDS.includes(value as Panel);
+}
 
 function linesToMeta(key: string, text: string): string[] | undefined {
   const values = text
@@ -47,7 +55,7 @@ function splitSelfMetadata(metadata: ScriptMetadata): ScriptMetadata {
   return Object.fromEntries(Object.entries(metadata).filter(([, value]) => value !== undefined));
 }
 
-export function EditorPage({ uuid, onBack, onSaved }: EditorPageProps) {
+export function EditorPage({ uuid, initialPanel, onBack, onSaved }: EditorPageProps) {
   const { t, i18n } = useTranslation();
   const isNew = !uuid || uuid === 'new';
   const [code, setCode] = useState(() => newScriptTemplate());
@@ -56,7 +64,9 @@ export function EditorPage({ uuid, onBack, onSaved }: EditorPageProps) {
   const [selfMetadata, setSelfMetadata] = useState<ScriptMetadata>({});
   const [resources, setResources] = useState<StoredResource[]>([]);
   const [values, setValues] = useState<Record<string, unknown>>({});
-  const [panel, setPanel] = useState<Panel>('metadata');
+  const [panel, setPanel] = useState<Panel>(() =>
+    isPanel(initialPanel) ? initialPanel : 'metadata',
+  );
   const [loading, setLoading] = useState(!isNew);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -100,6 +110,10 @@ export function EditorPage({ uuid, onBack, onSaved }: EditorPageProps) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (isPanel(initialPanel)) setPanel(initialPanel);
+  }, [initialPanel]);
 
   useEffect(() => {
     if (!dirty) return;
@@ -248,7 +262,7 @@ export function EditorPage({ uuid, onBack, onSaved }: EditorPageProps) {
 
         <aside className="flex min-h-0 flex-col rounded-lg border border-border bg-card">
           <div className="flex gap-1 overflow-x-auto border-b border-border p-1.5 scrollbar-lumo">
-            {(['metadata', 'values', 'resources', 'info'] as Panel[]).map((item) => (
+            {PANEL_IDS.map((item) => (
               <button
                 key={item}
                 type="button"
