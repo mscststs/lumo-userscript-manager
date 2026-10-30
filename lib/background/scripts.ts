@@ -31,14 +31,15 @@ import {
   splitTags,
   resolveMetadataUrls,
 } from '@/lib/script/metadata';
-import { compileUrlRules, urlMatches } from '@/lib/script/url-rules';
 import { getPageAccess, isFileUrl, type PageAccess } from '@/lib/page-access';
 import { byteLength, sha256Hex } from '@/lib/script/hash';
 import { getStorageName } from '@/lib/script/storage-name';
 import { unsupportedGrants } from '@/lib/script/grants';
 import { storage } from '@/store/storage';
+import { evaluateScripts } from './matching';
 import { refreshScriptResources } from './resources';
 import { getValuesForScript } from './values';
+import { cacheScriptIcon, resolveScriptIcons } from './icons';
 import { requestRegistration } from './registry';
 import { getRuntimeStatus } from './registry';
 
@@ -187,6 +188,9 @@ export async function saveScriptFromCode(
   const record = await makeScriptRecord(metadata, code, existing, sourceUrl || existing?.origin || '');
   await saveScript(record, code);
   await refreshScriptResources(record.uuid, metadata);
+  // Identity icon: warm the cache now so the popup paints a real favicon on
+  // first open instead of paying for the request itself.
+  void cacheScriptIcon(record.uuid, record.icon);
   await requestRegistration();
   broadcast('scripts-changed');
   return record;
@@ -253,6 +257,7 @@ export async function updateSelfMetadata(uuid: string, selfMetadata: ScriptMetad
   if (code === undefined) throw new Error('Script code missing.');
   await saveScript(next, code, { snapshot: false });
   await refreshScriptResources(uuid, effective);
+  void cacheScriptIcon(uuid, next.icon);
   await requestRegistration();
   broadcast('scripts-changed');
   return next;
@@ -418,6 +423,7 @@ export async function commitInstall(
   );
   if (options.enabled !== undefined) record.enabled = options.enabled;
   await saveScript(record, draft.code);
+  void cacheScriptIcon(record.uuid, record.icon);
   if (draft.resourceRecords?.length) {
     await replaceResources(
       record.uuid,
@@ -450,6 +456,8 @@ export interface PopupScriptInfo {
   excluded: boolean;
   lastError?: string;
   grant: string[];
+  /** Cached data URL when warm, otherwise the remote `@icon`, if any. */
+  icon?: string;
 }
 
 /**
@@ -481,31 +489,35 @@ export async function getPopupData(tabId: number, url: string | undefined) {
   const access = await resolvePageAccess(url);
   const scripts = await listScripts(true);
   const runtime = getRuntimeStatus();
-  const matching = scripts.map((script) => {
-    const effective = mergeMetadata(script.metadata, script.selfMetadata);
-    const rules = compileUrlRules(effective);
-    return {
-      uuid: script.uuid,
-      name: script.name,
-      namespace: script.namespace,
-      version: script.version,
-      enabled: script.enabled && !script.removedAt,
-      matchesCurrent: url ? urlMatches(url, rules) : false,
-      excluded: script.removedAt !== undefined,
-      lastError: script.lastError,
-      grant: effective.grant ?? ['none'],
-    } satisfies PopupScriptInfo;
-  });
+  // One shared evaluator with the toolbar badge, so a row that reads "enabled"
+  // here is exactly one of the scripts the badge counted.
+  const evaluated = evaluateScripts(scripts, access.injectable ? url : undefined);
+  const matching = evaluated.map(({ script, metadata, active, matchesCurrent }) => ({
+    uuid: script.uuid,
+    name: script.name,
+    namespace: script.namespace,
+    version: script.version,
+    enabled: active,
+    matchesCurrent,
+    excluded: script.removedAt !== undefined,
+    lastError: script.lastError,
+    grant: metadata.grant ?? ['none'],
+  }));
   const current = access.injectable
     ? matching.filter((script) => script.matchesCurrent && !script.excluded)
     : [];
+  // Only the rows on screen need icons; resolving the full library would fetch
+  // favicons for scripts this page will never show.
+  const icons = await resolveScriptIcons(
+    scripts.filter((script) => current.some((row) => row.uuid === script.uuid)),
+  );
   return {
     tabId,
     url,
     access,
     settings,
     runtime,
-    scripts: current,
+    scripts: current.map((script) => ({ ...script, icon: icons.get(script.uuid) })),
     total: matching.filter((script) => !script.excluded).length,
   };
 }

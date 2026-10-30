@@ -94,6 +94,24 @@ export interface ScriptVersion {
   createdAt: number;
 }
 
+/**
+ * Cached identity icon for a script.
+ *
+ * Icons are fetched once (install/save/popup) and stored as a data URL in
+ * IndexedDB: the popup must paint instantly and keep working offline, and a
+ * remote favicon URL in `chrome.storage` would grow without bound. `source`
+ * pins the cache to the current `@icon` value so an edited icon refetches.
+ */
+export interface ScriptIconCache {
+  uuid: string;
+  source: string;
+  /** Present only for a successful fetch. */
+  dataUrl?: string;
+  /** Last attempt (success or failure); drives TTL and retry backoff. */
+  fetchedAt: number;
+  failed?: boolean;
+}
+
 export interface StoredResource {
   uuid: string;
   url: string;

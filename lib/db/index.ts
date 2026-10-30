@@ -1,6 +1,7 @@
 import type {
   InstallDraftSummary,
   LogEntry,
+  ScriptIconCache,
   ScriptMetadata,
   ScriptVersion,
   StoredResource,
@@ -8,7 +9,7 @@ import type {
 } from '@/types';
 
 const DB_NAME = 'lumo-us';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -58,6 +59,11 @@ export function openDb(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains('drafts')) {
         const store = db.createObjectStore('drafts', { keyPath: 'token' });
         store.createIndex('expiresAt', 'expiresAt');
+      }
+
+      // v2: identity icons live beside the script records they belong to.
+      if (!db.objectStoreNames.contains('icons')) {
+        db.createObjectStore('icons', { keyPath: 'uuid' });
       }
     };
 
@@ -202,11 +208,12 @@ export async function restoreScript(uuid: string): Promise<void> {
 
 export async function purgeScript(uuid: string): Promise<void> {
   const db = await openDb();
-  const tx = db.transaction(['scripts', 'code', 'versions', 'resources'], 'readwrite');
+  const tx = db.transaction(['scripts', 'code', 'versions', 'resources', 'icons'], 'readwrite');
   tx.objectStore('scripts').delete(uuid);
   tx.objectStore('code').delete(uuid);
   tx.objectStore('versions').delete(uuid);
   tx.objectStore('resources').delete(IDBKeyRange.bound([uuid, ''], [uuid, '\uffff']));
+  tx.objectStore('icons').delete(uuid);
   await txDone(tx);
 }
 
@@ -273,6 +280,30 @@ export async function deleteValuesForStorage(storageName: string): Promise<void>
   const tx = db.transaction('values', 'readwrite');
   tx.objectStore('values').delete(IDBKeyRange.bound([storageName, ''], [storageName, '\uffff']));
   await txDone(tx);
+}
+
+// ---------------------------------------------------------------------------
+// Script icons
+// ---------------------------------------------------------------------------
+
+export async function getScriptIcon(uuid: string): Promise<ScriptIconCache | undefined> {
+  return getRecord<ScriptIconCache>('icons', uuid);
+}
+
+export async function listScriptIcons(): Promise<ScriptIconCache[]> {
+  return getAll<ScriptIconCache>('icons');
+}
+
+export async function putScriptIcon(icon: ScriptIconCache): Promise<void> {
+  await putRecord('icons', icon);
+}
+
+export async function deleteScriptIcon(uuid: string): Promise<void> {
+  await deleteRecord('icons', uuid);
+}
+
+export async function clearScriptIcons(): Promise<void> {
+  await clearStore('icons');
 }
 
 // ---------------------------------------------------------------------------

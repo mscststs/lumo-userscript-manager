@@ -4,14 +4,14 @@ import { Children, type ReactNode } from 'react';
  * Wrap bare text children in a span that optically centres CJK labels against
  * an adjacent icon.
  *
- * Why this exists: an SVG icon is centred on its own geometry, but Chinese
- * glyphs sit roughly 0.16em above the centre of the line box (their ink box is
- * centred on the ideographic box, while the line box is centred on the font's
- * ascent/descent). At 12–13px that is a visible 2px: the label reads as "high"
- * next to a plus, pencil or folder icon.
+ * An SVG icon is centred on its own geometry, but a line box centres ink
+ * asymmetrically by an amount that depends on the font's ascent/descent versus
+ * its ideographic ink box. `lib/optical.ts` measures that difference with the
+ * font actually painting the label and publishes it as a CSS variable, so this
+ * class carries no magic number of its own.
  *
  * Only bare strings/numbers are wrapped; elements (icons, badges, truncation
- * spans) are left untouched so their layout is unchanged. The nudge itself is
+ * spans) are left untouched so their layout is unchanged. The nudge is
  * language-scoped in CSS (`:lang(zh)`), so English labels are not moved.
  */
 export function opticalLabels(children: ReactNode): ReactNode {

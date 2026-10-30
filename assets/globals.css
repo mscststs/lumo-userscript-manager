@@ -370,16 +370,20 @@
 }
 
 /* ─── CJK optical centring ───────────────────────────────────────────────── */
-/* SVG icons are centred on their own geometry; CJK ink sits ~0.16em above the
-   centre of the line box, so an icon + Chinese label pair reads as "label high".
-   The nudge is language-scoped: English labels are already centred and must not
-   move. `translate` is used instead of `transform` so it cannot fight a utility
-   that composes transform on the same element. */
+/* SVG icons are centred on their own geometry, while a line box centres ink
+   asymmetrically — by a font-specific amount. `lib/optical.ts` measures that
+   difference with the font that actually renders labels and publishes it as
+   `--text-optical-shift`; without JS (tests, static harnesses) the fallback is
+   plain geometric centring.
+
+   The nudge is language-scoped: Latin ink is already where the eye expects it.
+   `translate` is used instead of `transform` so it cannot fight a utility that
+   composes transform on the same element. */
 .text-optical {
   display: inline-block;
 }
 :lang(zh) .text-optical {
-  translate: 0 0.16em;
+  translate: 0 var(--text-optical-shift, 0em);
 }
 
 /* ─── Scrollbar ──────────────────────────────────────────────────────────── */

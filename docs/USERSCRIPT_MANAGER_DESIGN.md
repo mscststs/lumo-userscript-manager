@@ -88,14 +88,15 @@ Service Worker（唯一数据/权限中心）
 | 存储 | 内容 | 约束 |
 | --- | --- | --- |
 | `chrome.storage.local` | `uiSettings`（外观、语言、执行偏好）、`runtimeSecret` | 有界小数据，可被各上下文监听 |
-| IndexedDB | `scripts`、`code`、`versions`、`values`、`resources`、`logs`、`drafts` | 会增长的数据，禁止塞进单个 storage key |
+| IndexedDB | `scripts`、`code`、`versions`、`values`、`resources`、`logs`、`drafts`、`icons` | 会增长的数据，禁止塞进单个 storage key |
 
 备份导出为 JSON 或 ZIP，包含脚本、代码、覆盖、值与资源；不导出 `runtimeSecret`。
 
 ## 8. 界面结构
 
-- **Popup**：全局注入开关 → 当前页面只读条（域名 / 本页脚本数）→ 脚本行。作用域分离是硬规则。不可注入页面显示权限空态，不给虚假的脚本列表。
-- **Options**：`#/scripts`、`#/script/:uuid`、`#/logs`、`#/settings/:section`、`#/appearance`、`#/about`。
+- **Popup**：全局注入开关 → 当前页面只读条（域名 / 本页脚本数）→ 脚本行。作用域分离是硬规则。不可注入页面显示权限空态，不给虚假的脚本列表。脚本行首是脚本自己的 `@icon`（后台缓存，缺失时用矢量兜底）。
+- **工具栏角标**：扩展图标上显示当前页面生效的脚本数（与 popup 里读作启用的行一致；0 时不画，>99 为 `99+`；跟随主题色）。可在 外观 → 界面 关闭（`showBadge`）。判定与 popup 共用 `lib/background/matching.ts`。
+- **Options**：导航顺序为 `#/scripts`、`#/settings/:section`、`#/appearance`、`#/logs`、`#/about`（日志紧靠关于：两者都是诊断/构建信息面），编辑器为 `#/script/:uuid`。
 - 脚本编辑器用标签页切换代码 / 元数据 / 值 / 资源 / 信息，不左右分栏。
 - 组件与令牌规范见 [`DESIGN.md`](DESIGN.md)。
 

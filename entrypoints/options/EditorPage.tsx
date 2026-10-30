@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, Save } from 'lucide-react';
 import type { ScriptMetadata, ScriptVersion, StoredResource, UserScript } from '@/types';
 import { sendBg } from '@/lib/messages';
+import { isMacPlatform } from '@/lib/utils';
 import { parseMetadata } from '@/lib/script/metadata';
 import { newScriptTemplate } from '@/lib/script/template';
 import { CodeEditor } from '@/components/editor/CodeEditor';
@@ -10,7 +11,9 @@ import { SectionNav } from '@/components/layout/SectionNav';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Kbd } from '@/components/ui/kbd';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/components/ui/toast';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { MetadataPanel } from './editor/MetadataPanel';
@@ -72,6 +75,11 @@ function sameMetadata(a: ScriptMetadata, b: ScriptMetadata): boolean {
  * rewrites the script source, `Save overrides` patches the override map. Only
  * the override action is tab-scoped, and it stays disabled until something is
  * actually overridden.
+ *
+ * `Mod+S` follows the same rule: it always triggers whichever primary save is
+ * on screen at that moment (overrides while the metadata tab has unsaved
+ * overrides, the script otherwise), so the keyboard does exactly what the
+ * highlighted button promises.
  */
 export function EditorPage({ uuid, initialPanel, onBack, onSaved }: EditorPageProps) {
   const { t } = useTranslation();
@@ -145,6 +153,9 @@ export function EditorPage({ uuid, initialPanel, onBack, onSaved }: EditorPagePr
   }, [unsaved]);
 
   const save = async () => {
+    // While an existing record is still loading there is no identity to save
+    // against; a save here would silently create a duplicate script.
+    if (loading || (!isNew && !script)) return;
     if (parsed.errors.length) {
       setError(parsed.errors.join('\n'));
       return;
@@ -218,6 +229,37 @@ export function EditorPage({ uuid, initialPanel, onBack, onSaved }: EditorPagePr
     });
   };
 
+  // The save the shortcut should fire right now. `metadata` with dirty
+  // overrides is the only state where the primary button is not `Save`.
+  const overrideIsPrimary = tab === 'metadata' && overridesDirty;
+
+  // Rebuilt on every commit so the listener never reads a stale closure. The
+  // listener itself is installed once: the gesture is global to the page, and
+  // CodeMirror does not bind `Mod-s`, so it bubbles here untouched.
+  const shortcutSave = useRef<() => void>(() => undefined);
+  useEffect(() => {
+    shortcutSave.current = () => {
+      if (loading || saving || confirmDiscard) return;
+      if (overrideIsPrimary) void saveOverrides();
+      else void save();
+    };
+  });
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      // `Mod+Shift+S` is the browser's "save page as"; leave it alone.
+      if (event.altKey || event.shiftKey) return;
+      if (!event.metaKey && !event.ctrlKey) return;
+      if (event.key.toLowerCase() !== 's') return;
+      event.preventDefault();
+      shortcutSave.current();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
+
+  const saveShortcutLabel = isMacPlatform() ? '\u2318S' : 'Ctrl+S';
+
   const requestBack = () => {
     if (unsaved) {
       setConfirmDiscard(true);
@@ -269,19 +311,35 @@ export function EditorPage({ uuid, initialPanel, onBack, onSaved }: EditorPagePr
             </div>
             <div className="flex shrink-0 items-center gap-1.5">
               {tab === 'metadata' && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void saveOverrides()}
-                  disabled={!script || saving || !overridesDirty}
-                >
-                  {t('editor.saveMetadata')}
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void saveOverrides()}
+                      disabled={!script || saving || !overridesDirty}
+                    >
+                      {t('editor.saveMetadata')}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" className="flex items-center gap-1.5">
+                    {t('editor.saveMetadata')}
+                    <Kbd>{saveShortcutLabel}</Kbd>
+                  </TooltipContent>
+                </Tooltip>
               )}
-              <Button size="sm" onClick={() => void save()} disabled={saving}>
-                <Save className="h-3.5 w-3.5" />
-                {saving ? t('editor.saving') : t('editor.save')}
-              </Button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button size="sm" onClick={() => void save()} disabled={saving}>
+                    <Save className="h-3.5 w-3.5" />
+                    {saving ? t('editor.saving') : t('editor.save')}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="flex items-center gap-1.5">
+                  {t('editor.save')}
+                  <Kbd>{saveShortcutLabel}</Kbd>
+                </TooltipContent>
+              </Tooltip>
             </div>
           </div>
 

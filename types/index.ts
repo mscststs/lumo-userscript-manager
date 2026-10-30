@@ -54,6 +54,8 @@ export interface UISettings {
 
   /** Master switch for script injection. */
   scriptsEnabled: boolean;
+  /** Show the number of active scripts on the toolbar icon. */
+  showBadge: boolean;
   /** Used when a script does not declare @run-at. */
   defaultRunAt: DefaultRunAt;
   /** Used when a script does not declare @inject-into. */

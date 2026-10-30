@@ -78,6 +78,7 @@ export const DEFAULT_UI_SETTINGS: UISettings = {
   accent: DEFAULT_ACCENT,
   fontSize: DEFAULT_FONT_SIZE,
   scriptsEnabled: true,
+  showBadge: true,
   defaultRunAt: 'document-idle',
   defaultInjectInto: 'auto',
   forceSandbox: false,
@@ -132,6 +133,8 @@ export const STORAGE_FIELDS: { [K in StorageKey]: StorageFieldDef<K> } = {
       accent: normalizeAccent(raw?.accent),
       fontSize: normalizeFontSize(raw?.fontSize),
       scriptsEnabled: raw?.scriptsEnabled !== false,
+      // Opt-out added after the first release: an absent value means "on".
+      showBadge: raw?.showBadge !== false,
       defaultRunAt:
         typeof raw?.defaultRunAt === 'string' && RUN_AT_VALUES.has(raw.defaultRunAt)
           ? raw.defaultRunAt

@@ -109,9 +109,11 @@ const NAV: {
   icon: ReactNode;
 }[] = [
   { name: 'scripts', labelKey: 'options.nav.scripts', icon: <FileCode2 className="h-4 w-4" /> },
-  { name: 'logs', labelKey: 'options.nav.logs', icon: <ScrollText className="h-4 w-4" /> },
   { name: 'settings', labelKey: 'options.nav.settings', icon: <Settings className="h-4 w-4" /> },
   { name: 'appearance', labelKey: 'options.nav.appearance', icon: <Palette className="h-4 w-4" /> },
+  // Diagnostics sit next to the page that owns the build info: both answer
+  // "what is going on inside the extension", unlike the settings above them.
+  { name: 'logs', labelKey: 'options.nav.logs', icon: <ScrollText className="h-4 w-4" /> },
   { name: 'about', labelKey: 'options.nav.about', icon: <Info className="h-4 w-4" /> },
 ];
 

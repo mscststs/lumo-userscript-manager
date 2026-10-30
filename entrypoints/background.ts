@@ -51,6 +51,7 @@ import {
   getRuntimeStatus,
   requestRegistration,
 } from '@/lib/background/registry';
+import { forgetBadge, refreshBadge } from '@/lib/background/badge';
 
 const INSTALL_RULE_ID = 1;
 
@@ -382,6 +383,32 @@ export default defineBackground(() => {
     onTabRemoved(tabId);
     clearMenuCommands(tabId);
     clearHostPortsForTab(tabId);
+    forgetBadge(tabId);
+  });
+
+  // ─── Toolbar badge ────────────────────────────────────────────────────────
+  // The badge answers "how many scripts are active on the page in front of
+  // me", so it is recomputed when that page changes and when the script set
+  // changes (`requestRegistration`). Chrome keeps badges per tab, so a
+  // background tab is simply recomputed when it becomes active.
+  chrome.tabs?.onActivated?.addListener(({ tabId }) => {
+    void refreshBadge(tabId);
+  });
+  chrome.tabs?.onUpdated?.addListener((tabId, changeInfo, tab) => {
+    // `onUpdated` fires for titles, favicons and load states too. Only a real
+    // navigation (new URL) or a finished load can change the answer.
+    if (!changeInfo.url && changeInfo.status !== 'complete') return;
+    void refreshBadge(tabId, tab.url);
+  });
+  chrome.windows?.onFocusChanged?.addListener((windowId) => {
+    if (windowId === chrome.windows.WINDOW_ID_NONE) return;
+    void refreshBadge();
+  });
+  // The count depends on settings (`showBadge`, the master injection switch)
+  // and on the accent used for the badge's colour.
+  chrome.storage?.onChanged?.addListener((changes, area) => {
+    if (area !== 'local' || !changes.uiSettings) return;
+    void refreshBadge();
   });
 
   chrome.webNavigation?.onCommitted?.addListener((details) => {

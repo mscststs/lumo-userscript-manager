@@ -30,6 +30,7 @@ describe('storage schema', () => {
       accent: DEFAULT_ACCENT,
       fontSize: DEFAULT_FONT_SIZE,
       scriptsEnabled: true,
+      showBadge: true,
       defaultRunAt: 'document-idle',
       defaultInjectInto: 'auto',
       forceSandbox: false,
@@ -37,6 +38,12 @@ describe('storage schema', () => {
       updateIntervalHours: 6,
       logLevel: 'info',
     });
+  });
+
+  it('defaults the toolbar badge on, and keeps an explicit opt-out', () => {
+    const defaults = STORAGE_FIELDS.uiSettings.defaultValue;
+    expect(normalizeUI(defaults).showBadge).toBe(true);
+    expect(normalizeUI({ ...defaults, showBadge: false }).showBadge).toBe(false);
   });
 
   it('repairs values written by an unknown build or hand-edited config', () => {

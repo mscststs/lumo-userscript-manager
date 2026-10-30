@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CircleAlert,
   FileCode2,
@@ -22,6 +22,7 @@ import { ThemeInit } from '@/lib/theme';
 import { FontSizeInit } from '@/lib/font-size';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ScriptIcon } from '@/components/script/ScriptIcon';
 import {
   Tooltip,
   TooltipContent,
@@ -43,6 +44,48 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/**
+ * Freeze the row order for the lifetime of this popup.
+ *
+ * Enabled scripts belong above disabled ones, but that grouping is computed when
+ * the popup opens — never on a toggle. Re-sorting a live list would make the row
+ * the user just clicked jump away from the pointer and push every row below it
+ * down, which costs the user their place for no information gain: the row they
+ * are looking at already shows its own state.
+ *
+ * `prev` is the order the popup has been showing. Existing rows keep it; a row
+ * that appeared mid-session (installed from another tab) slots in at the end of
+ * its own group rather than reshuffling anything else.
+ */
+function mergeRowOrder(prev: string[], scripts: PopupScriptInfo[]): PopupScriptInfo[] {
+  if (prev.length === 0) {
+    return [
+      ...scripts.filter((script) => script.enabled),
+      ...scripts.filter((script) => !script.enabled),
+    ];
+  }
+
+  const byUuid = new Map(scripts.map((script) => [script.uuid, script]));
+  const kept = prev.flatMap((uuid) => {
+    const script = byUuid.get(uuid);
+    return script ? [script] : [];
+  });
+  if (kept.length === scripts.length) return kept;
+
+  const seen = new Set(kept.map((script) => script.uuid));
+  const ordered = [...kept];
+  for (const script of scripts.filter((item) => !seen.has(item.uuid))) {
+    if (!script.enabled) {
+      ordered.push(script);
+      continue;
+    }
+    const lastEnabled = ordered.findLastIndex((item) => item.enabled);
+    if (lastEnabled >= 0) ordered.splice(lastEnabled + 1, 0, script);
+    else ordered.unshift(script);
+  }
+  return ordered;
+}
+
 /** `https://example.com/path` → `example.com`. Falls back to the raw string. */
 function hostnameOf(url: string | undefined): string | null {
   if (!url) return null;
@@ -54,20 +97,18 @@ function hostnameOf(url: string | undefined): string | null {
   }
 }
 
-/** Single glyph used as the row's identity tile until scripts ship real icons. */
-function monogramOf(name: string): string {
-  const first = name.trim().charAt(0);
-  return first ? first.toUpperCase() : '•';
-}
-
 /**
  * Popup.
  *
  * Modelled on the browser's own extension panel rather than on a web app: one
  * flat list of 40px rows, one line of text per row, actions pinned to the row's
  * trailing edge, hover as the only chrome. Rows are *destinations* — clicking
- * anywhere on a row opens that script — and the trailing glyph is the only
+ * anywhere on a row toggles that script — and the trailing glyph is the only
  * other target, so a 300px row never hides a second, different action.
+ *
+ * Each row leads with the script's own `@icon` (cached by the background) rather
+ * than with a power symbol: the identity of the script is what the user scans
+ * for, while on/off is read from the ink and the tile's saturation.
  *
  * Attribution (version, namespace, grants) is deliberately not on screen: it is
  * identical for every row's owner and only interesting once you are inside the
@@ -85,6 +126,8 @@ export default function App() {
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  // Row order snapshot: uuid list computed on the first load, reused silently.
+  const orderRef = useRef<string[]>([]);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setInitialLoading(true);
@@ -98,7 +141,9 @@ export default function App() {
       });
       const nextMenus =
         tab.id === undefined ? [] : await sendBg<RuntimeMenuCommand[]>('menus:list', { tabId: tab.id });
-      setData(next);
+      const ordered = mergeRowOrder(orderRef.current, next.scripts);
+      orderRef.current = ordered.map((script) => script.uuid);
+      setData({ ...next, scripts: ordered });
       setMenus(nextMenus);
     } catch (e) {
       setError(errorMessage(e));
@@ -345,13 +390,16 @@ export default function App() {
               on={scriptsEnabled}
               className={scriptsEnabled ? 'text-primary' : 'text-muted-foreground'}
             />
+            {/* The label states the *state*, like the per-script rows do; the
+                glyph carries what the switch controls. `aria-label` keeps the
+                full "script injection" name for assistive tech. */}
             <span
               className={cn(
                 'min-w-0 flex-1 truncate text-sm transition-colors duration-150 ease-standard',
                 scriptsEnabled ? 'text-foreground' : 'text-muted-foreground',
               )}
             >
-              {t('popup.injection')}
+              {t(scriptsEnabled ? 'common.enabled' : 'common.disabled')}
             </span>
           </button>
           <button
@@ -396,7 +444,8 @@ function ScriptRow({ script, commands, onToggle, onInvoke, onEdit }: ScriptRowPr
       <div className="flex h-10 items-center rounded-control pl-2 pr-1 transition-colors duration-150 ease-standard hover:bg-accent focus-within:bg-accent">
         {/* The row is the switch. Its hit area is the full row minus the edit
             button, so enabling and disabling never requires hitting a widget —
-            the state is read at a glance from the glyph and the ink. */}
+            the state is read at a glance from the tile's saturation and the
+            label's ink. */}
         <button
           type="button"
           onClick={() => onToggle(!script.enabled)}
@@ -405,7 +454,7 @@ function ScriptRow({ script, commands, onToggle, onInvoke, onEdit }: ScriptRowPr
           title={label}
           className="flex h-full min-w-0 flex-1 items-center gap-2.5 text-left"
         >
-          <StateGlyph on={script.enabled} className={script.enabled ? 'text-primary' : 'text-muted-foreground'} />
+          <ScriptIcon src={script.icon} dimmed={!script.enabled} />
           <span
             className={cn(
               'min-w-0 flex-1 truncate text-sm transition-colors duration-150 ease-standard',

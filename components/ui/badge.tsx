@@ -1,6 +1,7 @@
 import * as React from 'react';
 import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
+import { opticalLabels } from '@/components/ui/optical';
 
 /**
  * Compact status/metadata pill.
@@ -8,6 +9,10 @@ import { cn } from '@/lib/utils';
  * Tints are 10–12% of the semantic colour with a matching border, which keeps
  * a badge readable as a *category* rather than as a button. Variants map 1:1 to
  * meaning so log levels and script states cannot accidentally share a colour.
+ *
+ * Labels go through `opticalLabels` for the same reason buttons do: a badge
+ * that carries a leading icon must centre that icon on the text ink, not on the
+ * line box.
  */
 const badgeVariants = cva(
   'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-2xs font-medium leading-tight',
@@ -38,8 +43,12 @@ export interface BadgeProps
   extends React.HTMLAttributes<HTMLSpanElement>,
     VariantProps<typeof badgeVariants> {}
 
-function Badge({ className, variant, ...props }: BadgeProps) {
-  return <span className={cn(badgeVariants({ variant }), className)} {...props} />;
+function Badge({ className, variant, children, ...props }: BadgeProps) {
+  return (
+    <span className={cn(badgeVariants({ variant }), className)} {...props}>
+      {opticalLabels(children)}
+    </span>
+  );
 }
 
 export { Badge, badgeVariants };

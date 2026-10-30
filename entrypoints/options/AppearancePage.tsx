@@ -21,6 +21,7 @@ import { PageLayout } from '@/components/layout/PageLayout';
 import { SettingRow } from '@/components/settings/SettingRow';
 import { SettingsGroup } from '@/components/settings/SettingsGroup';
 import { Segmented } from '@/components/ui/segmented';
+import { Switch } from '@/components/ui/switch';
 import {
   Select,
   SelectContent,
@@ -181,6 +182,22 @@ export function AppearancePage() {
           })}
         </div>
       </section>
+
+      <SettingsGroup title={t('options.appearance.groupInterface')}>
+        <SettingRow
+          label={t('options.appearance.showBadge')}
+          htmlFor="appearance-badge"
+          description={t('options.appearance.showBadgeHint')}
+          control={
+            <Switch
+              id="appearance-badge"
+              checked={settings?.showBadge !== false}
+              onCheckedChange={(checked) => void update({ showBadge: checked })}
+              aria-label={t('options.appearance.showBadge')}
+            />
+          }
+        />
+      </SettingsGroup>
 
       <SettingsGroup title={t('options.appearance.groupTypography')}>
         <SettingRow
