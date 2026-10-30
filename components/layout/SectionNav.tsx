@@ -5,6 +5,12 @@ interface SectionNavProps<T extends string> {
   value: T;
   onChange: (value: T) => void;
   ariaLabel: string;
+  /**
+   * Extra classes for the strip. Callers that live inside a padded header pass
+   * a negative bottom margin so the active underline lands *on* the header rule
+   * instead of floating above it.
+   */
+  className?: string;
 }
 
 /**
@@ -23,6 +29,7 @@ export function SectionNav<T extends string>({
   value,
   onChange,
   ariaLabel,
+  className,
 }: SectionNavProps<T>) {
   const index = Math.max(
     0,
@@ -33,7 +40,7 @@ export function SectionNav<T extends string>({
     <div
       role="tablist"
       aria-label={ariaLabel}
-      className="flex items-center gap-5 overflow-x-auto"
+      className={cn('flex items-center gap-5 overflow-x-auto', className)}
       onKeyDown={(event) => {
         if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
         event.preventDefault();

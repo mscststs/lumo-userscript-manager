@@ -27,10 +27,12 @@ import {
   parseMetadata,
   getMeta,
   getMetaList,
+  hasMeta,
   splitTags,
   resolveMetadataUrls,
 } from '@/lib/script/metadata';
 import { compileUrlRules, urlMatches } from '@/lib/script/url-rules';
+import { getPageAccess, isFileUrl, type PageAccess } from '@/lib/page-access';
 import { byteLength, sha256Hex } from '@/lib/script/hash';
 import { getStorageName } from '@/lib/script/storage-name';
 import { unsupportedGrants } from '@/lib/script/grants';
@@ -141,9 +143,9 @@ async function makeScriptRecord(
 
     runAt,
     injectInto,
-    noFrames: metadata.noframes !== undefined,
-    unwrap: metadata.unwrap !== undefined,
-    topLevelAwait: metadata['top-level-await'] !== undefined,
+    noFrames: hasMeta(metadata, 'noframes'),
+    unwrap: hasMeta(metadata, 'unwrap'),
+    topLevelAwait: hasMeta(metadata, 'top-level-await'),
 
     codeHash: await sha256Hex(code),
     codeSize: byteLength(code),
@@ -223,9 +225,9 @@ export async function updateSelfMetadata(uuid: string, selfMetadata: ScriptMetad
     resource: (effective.resource ?? [])
       .map((value) => value.trim().split(/\s+/, 1)[0])
       .filter((value): value is string => Boolean(value)),
-    noFrames: effective.noframes !== undefined,
-    unwrap: effective.unwrap !== undefined,
-    topLevelAwait: effective['top-level-await'] !== undefined,
+    noFrames: hasMeta(effective, 'noframes'),
+    unwrap: hasMeta(effective, 'unwrap'),
+    topLevelAwait: hasMeta(effective, 'top-level-await'),
     downloadUrl: firstMeta(effective, 'downloadurl') || script.downloadUrl,
     updateUrl: firstMeta(effective, 'updateurl') || script.updateUrl,
     updatedAt: Date.now(),
@@ -450,8 +452,33 @@ export interface PopupScriptInfo {
   grant: string[];
 }
 
+/**
+ * Page access for the popup. The scheme/protected-site decision is pure; file
+ * URLs additionally depend on Chrome's "Allow access to file URLs" toggle,
+ * without which registrations silently never run.
+ */
+async function resolvePageAccess(url: string | undefined): Promise<PageAccess> {
+  const access = getPageAccess(url);
+  if (!access.injectable || !isFileUrl(url)) return access;
+
+  try {
+    const extensionApi = chrome.extension;
+    if (!extensionApi || typeof extensionApi.isAllowedFileSchemeAccess !== 'function') {
+      return access;
+    }
+    const allowed = await extensionApi.isAllowedFileSchemeAccess();
+    if (allowed) return access;
+    return { injectable: false, reason: 'file-access', label: 'file://' };
+  } catch {
+    // Older builds may not expose the check; the browser still refuses the
+    // injection, but guessing here would hide scripts on valid pages.
+    return access;
+  }
+}
+
 export async function getPopupData(tabId: number, url: string | undefined) {
   const settings = await storage.getUISettings();
+  const access = await resolvePageAccess(url);
   const scripts = await listScripts(true);
   const runtime = getRuntimeStatus();
   const matching = scripts.map((script) => {
@@ -469,10 +496,13 @@ export async function getPopupData(tabId: number, url: string | undefined) {
       grant: effective.grant ?? ['none'],
     } satisfies PopupScriptInfo;
   });
-  const current = matching.filter((script) => script.matchesCurrent && !script.excluded);
+  const current = access.injectable
+    ? matching.filter((script) => script.matchesCurrent && !script.excluded)
+    : [];
   return {
     tabId,
     url,
+    access,
     settings,
     runtime,
     scripts: current,

@@ -1,5 +1,6 @@
 import type { ScriptMetadata, UrlRule } from '@/types';
 import { isValidMatchPattern } from './metadata';
+import { isInjectableUrl } from '@/lib/page-access';
 
 export interface RegistrationPatterns {
   matches: string[];
@@ -176,6 +177,11 @@ export function hasPositiveRules(rules: UrlRule[]): boolean {
 }
 
 export function urlMatches(url: string, rules: UrlRule[]): boolean {
+  // Privileged browser surfaces can never receive an injected script. Returning
+  // false here keeps every caller (popup, host RPC guard, launcher) honest even
+  // when a script has no positive rule and would otherwise match every URL.
+  if (!isInjectableUrl(url)) return false;
+
   const positives = rules.filter((rule) => rule.kind.endsWith('include'));
   const negatives = rules.filter((rule) => rule.kind.endsWith('exclude'));
 

@@ -84,7 +84,8 @@ export function AppearancePage() {
           description={t('options.appearance.description')}
         />
       }
-      contentClassName="max-w-3xl space-y-7"
+      contentClassName="space-y-7"
+      width="form"
     >
       <section>
         <h2 className="text-2xs font-semibold uppercase tracking-wider text-muted-foreground">

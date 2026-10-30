@@ -40,6 +40,8 @@ Service Worker（唯一数据/权限中心）
 
 启动器只负责把 payload 交给引擎；引擎未就绪时进入队列，引擎加载后统一 drain。注册表按签名对比，内容未变化时跳过重建，避免页面加载期间无谓的拆装。
 
+`lib/page-access.ts` 是「页面能否注入」的唯一判定：`chrome://`、`chrome-extension://`、`devtools://`、`view-source:`、Web Store 等特权页面一律不可注入。`urlMatches()` 在匹配规则前先做该判定，因此 popup 列表、host RPC 守卫与运行时启动器不会出现「列表说有、实际不执行」的分歧。`file://` 还需扩展具备「允许访问文件网址」，由 `getPopupData()` 异步确认。
+
 ## 3. 世界选择与运行时机
 
 | 条件（按优先级） | 结果 |
@@ -92,7 +94,7 @@ Service Worker（唯一数据/权限中心）
 
 ## 8. 界面结构
 
-- **Popup**：全局注入开关 → 当前页面只读条（域名 / 本页脚本数）→ 脚本行。作用域分离是硬规则。
+- **Popup**：全局注入开关 → 当前页面只读条（域名 / 本页脚本数）→ 脚本行。作用域分离是硬规则。不可注入页面显示权限空态，不给虚假的脚本列表。
 - **Options**：`#/scripts`、`#/script/:uuid`、`#/logs`、`#/settings/:section`、`#/appearance`、`#/about`。
 - 脚本编辑器用标签页切换代码 / 元数据 / 值 / 资源 / 信息，不左右分栏。
 - 组件与令牌规范见 [`DESIGN.md`](DESIGN.md)。

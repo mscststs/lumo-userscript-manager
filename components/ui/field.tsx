@@ -27,6 +27,14 @@ export interface FieldControlProps {
 
 interface FieldProps {
   label: React.ReactNode;
+  /**
+   * Rendered after the label, outside the `<label>` element.
+   *
+   * Metadata fields carry a raw `@tag` chip whose tooltip explains the field;
+   * the chip must not live inside the label, or clicking it would focus the
+   * control instead of reading the tooltip.
+   */
+  labelAccessory?: React.ReactNode;
   /** Static guidance, rendered below the control. Replaced by `error` when set. */
   hint?: React.ReactNode;
   /** Validation message. Its presence marks the control invalid. */
@@ -37,7 +45,15 @@ interface FieldProps {
   children: (props: FieldControlProps) => React.ReactNode;
 }
 
-export function Field({ label, hint, error, required, className, children }: FieldProps) {
+export function Field({
+  label,
+  labelAccessory,
+  hint,
+  error,
+  required,
+  className,
+  children,
+}: FieldProps) {
   const reactId = React.useId();
   const controlId = `field-${reactId}`;
   const hintId = `${controlId}-hint`;
@@ -46,10 +62,13 @@ export function Field({ label, hint, error, required, className, children }: Fie
 
   return (
     <div className={cn('flex flex-col gap-1.5', className)}>
-      <Label htmlFor={controlId} className="text-xs text-muted-foreground">
-        {label}
-        {required && <span className="ml-0.5 text-destructive">*</span>}
-      </Label>
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+        <Label htmlFor={controlId} className="text-xs text-muted-foreground">
+          {label}
+          {required && <span className="ml-0.5 text-destructive">*</span>}
+        </Label>
+        {labelAccessory}
+      </div>
 
       {children({
         id: controlId,
@@ -80,11 +99,14 @@ export function Field({ label, hint, error, required, className, children }: Fie
  */
 export function FieldToggleRow({
   label,
+  labelAccessory,
   description,
   children,
   className,
 }: {
   label: React.ReactNode;
+  /** Rendered after the label, outside the `<label>` (see `Field`). */
+  labelAccessory?: React.ReactNode;
   description?: React.ReactNode;
   /** Receives the generated id so the control can be `htmlFor`-linked. */
   children: (props: { id: string }) => React.ReactNode;
@@ -96,9 +118,12 @@ export function FieldToggleRow({
   return (
     <div className={cn('flex items-start justify-between gap-3', className)}>
       <div className="min-w-0">
-        <Label htmlFor={controlId} className="text-sm">
-          {label}
-        </Label>
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <Label htmlFor={controlId} className="text-sm">
+            {label}
+          </Label>
+          {labelAccessory}
+        </div>
         {description && (
           <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground break-words">
             {description}

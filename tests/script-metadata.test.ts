@@ -3,6 +3,7 @@ import {
   mergeMetadata,
   parseMetadata,
   getLocalizedMeta,
+  hasMeta,
   resolveMetadataUrls,
 } from '@/lib/script/metadata';
 import { compileUrlRules, toRegistrationPatterns, urlMatches } from '@/lib/script/url-rules';
@@ -62,6 +63,18 @@ describe('metadata parser', () => {
     expect(merged.match).toEqual(['https://other.test/*']);
   });
 
+  it('treats an empty override list as removed', () => {
+    // The editor turns a declared flag off by writing `[]`; presence checks must
+    // follow the value list, not the key.
+    const parsed = parseMetadata(
+      '// ==UserScript==\n// @name X\n// @noframes\n// ==/UserScript==',
+    );
+    expect(hasMeta(parsed.metadata, 'noframes')).toBe(true);
+    expect(hasMeta(mergeMetadata(parsed.metadata, { noframes: [] }), 'noframes')).toBe(false);
+    expect(hasMeta(mergeMetadata(parsed.metadata, { noframes: [''] }), 'noframes')).toBe(true);
+    expect(hasMeta(parsed.metadata, 'unwrap')).toBe(false);
+  });
+
   it('resolves relative metadata URLs against the install URL', () => {
     const metadata = resolveMetadataUrls(
       {
@@ -108,6 +121,17 @@ describe('URL rules', () => {
     const patterns = toRegistrationPatterns(all);
     expect(patterns.matches).toContain('*://*/*');
     expect(patterns.matches).toContain('file:///*');
+  });
+
+  it('never matches pages the browser refuses to inject into', () => {
+    const all = compileUrlRules({});
+    expect(urlMatches('chrome://extensions/', all)).toBe(false);
+    expect(urlMatches('chrome-extension://abc/popup.html', all)).toBe(false);
+    expect(urlMatches('https://chromewebstore.google.com/detail/x', all)).toBe(false);
+
+    // Even an explicit catch-all include must not resurrect them.
+    const everything = compileUrlRules({ include: ['*'] });
+    expect(urlMatches('chrome://newtab/', everything)).toBe(false);
   });
 
   it('keeps match patterns with explicit ports as runtime-checked globs', () => {

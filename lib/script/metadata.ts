@@ -165,6 +165,18 @@ export function getMetaList(metadata: ScriptMetadata, key: string): string[] {
   return metadata[key] ?? [];
 }
 
+/**
+ * Presence check for bare flags (`@noframes`, `@unwrap`, `@top-level-await`).
+ *
+ * Length, not key presence: an override written as `[]` means "remove this tag",
+ * which is the only way the UI can turn a flag off without rewriting the source.
+ * A parsed tag always carries at least one (possibly empty) value, so real
+ * metablocks are unaffected.
+ */
+export function hasMeta(metadata: ScriptMetadata, key: string): boolean {
+  return (metadata[key]?.length ?? 0) > 0;
+}
+
 /** Resolve localized `@name:zh-CN` / `@description:en` values. */
 export function getLocalizedMeta(
   metadata: ScriptMetadata,

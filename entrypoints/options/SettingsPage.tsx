@@ -8,12 +8,14 @@ import { sendBg, onLumoEvent } from '@/lib/messages';
 import { createBackupZip, readBackupZip } from '@/lib/backup';
 import { formatDateTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { DEFAULT_RUN_AT_VALUES, INJECT_INTO_OPTIONS, RUN_AT_OPTIONS } from '@/lib/script/metadata-options';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { SettingRow } from '@/components/settings/SettingRow';
 import { SettingsGroup } from '@/components/settings/SettingsGroup';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { EnumValue } from '@/components/ui/enum';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { SectionNav } from '@/components/layout/SectionNav';
@@ -30,8 +32,8 @@ import {
 
 export type SettingsSection = 'general' | 'updates' | 'data';
 
-const RUN_AT = ['document-idle', 'document-end', 'document-start'] as const;
-const INJECT_INTO = ['auto', 'page', 'content'] as const;
+const RUN_AT = RUN_AT_OPTIONS.filter((option) => DEFAULT_RUN_AT_VALUES.includes(option.value));
+const INJECT_INTO = INJECT_INTO_OPTIONS;
 const LOG_LEVELS = ['error', 'warn', 'info', 'debug'] as const;
 
 interface SettingsPageProps {
@@ -160,6 +162,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
         ariaLabel={t('settings.title')}
         value={section}
         onChange={onNavigate}
+        className="-mb-3.5"
         items={[
           { value: 'general', label: t('settings.sections.general') },
           { value: 'updates', label: t('settings.sections.updates') },
@@ -171,7 +174,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
 
   if (!settings) {
     return (
-      <PageLayout header={header}>
+      <PageLayout header={header} width="form">
         <div className="space-y-3">
           {[0, 1, 2, 3].map((index) => (
             <div key={index} className="rounded-card border border-border bg-card px-4 py-3">
@@ -185,7 +188,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
   }
 
   return (
-    <PageLayout header={header} contentClassName="max-w-3xl space-y-7">
+    <PageLayout header={header} contentClassName="space-y-7" width="form">
       {error && (
         <div
           role="alert"
@@ -224,13 +227,13 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
                     void update({ defaultRunAt: value as UISettings['defaultRunAt'] })
                   }
                 >
-                  <SelectTrigger className="w-44" aria-label={t('settings.defaultRunAt')}>
+                  <SelectTrigger className="w-64" aria-label={t('settings.defaultRunAt')}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {RUN_AT.map((value) => (
-                      <SelectItem key={value} value={value}>
-                        {t(`settings.runAt.${value}`)}
+                    {RUN_AT.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        <EnumValue label={t(option.labelKey)} raw={option.value} />
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -247,13 +250,13 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
                     void update({ defaultInjectInto: value as UISettings['defaultInjectInto'] })
                   }
                 >
-                  <SelectTrigger className="w-44" aria-label={t('settings.defaultInjectInto')}>
+                  <SelectTrigger className="w-64" aria-label={t('settings.defaultInjectInto')}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {INJECT_INTO.map((value) => (
-                      <SelectItem key={value} value={value}>
-                        {t(`settings.injectInto.${value}`)}
+                    {INJECT_INTO.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>
+                        <EnumValue label={t(option.labelKey)} raw={option.value} />
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -331,13 +334,13 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
                     void update({ logLevel: value as UISettings['logLevel'] })
                   }
                 >
-                  <SelectTrigger className="w-44" aria-label={t('settings.logLevel')}>
+                  <SelectTrigger className="w-64" aria-label={t('settings.logLevel')}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {LOG_LEVELS.map((level) => (
                       <SelectItem key={level} value={level}>
-                        {t(`settings.logLevels.${level}`)}
+                        <EnumValue label={t(`settings.logLevels.${level}`)} raw={level} />
                       </SelectItem>
                     ))}
                   </SelectContent>

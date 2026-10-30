@@ -13,6 +13,7 @@ import {
   parseMetadata,
   getMeta,
   getMetaList,
+  hasMeta,
   resolveMetadataUrls,
 } from '@/lib/script/metadata';
 import { compileUrlRules, toRegistrationPatterns } from '@/lib/script/url-rules';
@@ -178,8 +179,8 @@ async function buildPlannedScript(
     resourceNames,
     runAt,
     injectInto: resolved.injectInto,
-    noFrames: effective.noframes !== undefined,
-    unwrap: effective.unwrap !== undefined,
+    noFrames: hasMeta(effective, 'noframes'),
+    unwrap: hasMeta(effective, 'unwrap'),
     contextMenu,
   };
 

@@ -18,6 +18,7 @@ export function AboutPage({ onOpenData }: { onOpenData: () => void }) {
     <PageLayout
       header={<PageHeader title={t('options.about.title')} description={t('options.about.description')} />}
       contentClassName="space-y-6"
+      width="form"
     >
       <Card variant="elevated">
         <CardContent className="pt-4">
