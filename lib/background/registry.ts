@@ -17,6 +17,7 @@ import {
 } from '@/lib/script/metadata';
 import { compileUrlRules, toRegistrationPatterns } from '@/lib/script/url-rules';
 import { compileLauncher } from '@/lib/script/compile';
+import { createRuntimeToken } from '@/lib/background/runtime-token';
 import { getRequireCssSources, getRequireSources } from './resources';
 
 const RUNNER_ID = 'us-runner';
@@ -131,7 +132,12 @@ export async function runScriptOnTab(uuid: string, tabId: number): Promise<void>
     throw new Error('chrome.userScripts.execute is unavailable in this browser.');
   }
   await execute({
-    js: [{ code: compileLauncher(planned.payload, planned.world) }],
+    js: [
+      // A tab opened before this script was installed has no engine injected.
+      // Re-running the engine file is a no-op when it is already live.
+      { file: planned.world === 'MAIN' ? RUNNER_FILE : HOST_FILE },
+      { code: compileLauncher(planned.payload, planned.world) },
+    ],
     target: { tabId },
     world: planned.world,
     injectImmediately: true,
@@ -175,9 +181,7 @@ async function buildPlannedScript(
 
   const payload: RuntimeScriptPayload = {
     uuid: script.uuid,
-    // Stable across service-worker restarts so an unchanged registration does
-    // not have to be torn down while a page host port is bootstrapping.
-    token: `${script.uuid}:${script.codeHash}:${resolved.world}`,
+    runtimeToken: await createRuntimeToken(script.uuid, resolved.world),
     name: getMeta(effective, 'name') ?? script.name,
     namespace: getMeta(effective, 'namespace') ?? script.namespace,
     version: getMeta(effective, 'version') ?? script.version,
@@ -214,9 +218,7 @@ async function buildPlannedScript(
   return {
     payload,
     world: resolved.world,
-    needsHost:
-      resolved.world === 'USER_SCRIPT' ||
-      (payload.grant.length > 0 && !payload.grant.includes('none')),
+    needsHost: resolved.world === 'USER_SCRIPT',
     registration,
   };
 }
@@ -320,26 +322,30 @@ async function performRegistration(): Promise<RuntimeStatus> {
   try {
     // configureWorld is cheap and its settings may not survive an extension
     // reload even when the registered scripts themselves do. Always reapply it
-    // before deciding whether the registration list is already current.
+    // before deciding whether the registration list is already current. The
+    // sandbox world gets an eval-friendly CSP; messaging is intentionally not
+    // enabled because the content-script bridge is the only extension channel.
     if (needsHost) {
       try {
         await chrome.userScripts.configureWorld({
-          messaging: true,
           csp:
             "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: data:; " +
             "style-src * 'unsafe-inline' data: blob:;",
         });
       } catch {
-        await chrome.userScripts.configureWorld({ messaging: true });
+        try {
+          await chrome.userScripts.configureWorld({});
+        } catch {
+          // Older builds may reject the CSP value; the world still runs with
+          // its default CSP.
+        }
       }
     }
     let alreadyRegistered = false;
-    if (!needsHost) {
-      try {
-        alreadyRegistered = sameRegistrations(await chrome.userScripts.getScripts(), registrations);
-      } catch {
-        // Treat an unreadable registration list as stale.
-      }
+    try {
+      alreadyRegistered = sameRegistrations(await chrome.userScripts.getScripts(), registrations);
+    } catch {
+      // Treat an unreadable registration list as stale.
     }
     if (alreadyRegistered) {
       status = {

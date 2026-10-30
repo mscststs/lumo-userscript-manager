@@ -1,36 +1,32 @@
-import type { LogEntry, RuntimeMenuCommand, ScriptMetadata } from '@/types';
+import type { ScriptMetadata } from '@/types';
 import {
   getDraft,
-  getResources,
-  getScript,
-  getValues,
   listLogs,
   clearLogs,
   clearStore,
   replaceResources,
   cleanupDrafts,
 } from '@/lib/db';
-import { getStorageName } from '@/lib/script/storage-name';
-import { mergeMetadata } from '@/lib/script/metadata';
-import { compileUrlRules, urlMatches } from '@/lib/script/url-rules';
 import { storage } from '@/store/storage';
-import { resourcesForRuntime } from '@/lib/background/resources';
 import { getValuesForScript, setValueForScript, deleteValueForScript } from '@/lib/background/values';
-import { recordLog } from '@/lib/background/logs';
-import { registerMenuCommand, unregisterMenuCommand, listMenuCommands, clearMenuCommands } from '@/lib/background/menus';
+import { listMenuCommands, clearMenuCommands } from '@/lib/background/menus';
 import {
   registerHostPort,
   sendToHost,
   clearHostPortsForTab,
 } from '@/lib/background/host-ports';
 import {
-  handleGmApi,
   onDownloadChanged,
   onNotificationButtonClicked,
   onNotificationClicked,
   onNotificationClosed,
   onTabRemoved,
 } from '@/lib/background/gm';
+import {
+  createHostContext,
+  handleHostRequest,
+  HostError,
+} from '@/lib/background/host-service';
 import {
   broadcast,
   commitInstall,
@@ -39,7 +35,6 @@ import {
   getPopupData,
   getScriptDetail,
   prepareInstall,
-  markScriptRun,
   removeScript,
   restoreDeletedScript,
   saveScriptFromCode,
@@ -94,103 +89,17 @@ async function bootstrapRuntime(): Promise<void> {
   await requestRegistration();
 }
 
-function sendBgResult(port: chrome.runtime.Port, id: string, result?: unknown, error?: string) {
-  try {
-    port.postMessage({ type: 'bg:result', id, result, error });
-  } catch {
-    // The host frame navigated away while the request was in flight.
-  }
-}
-
-function hostContext(
-  sender: chrome.runtime.MessageSender | undefined,
-  payload: Record<string, unknown>,
+function sendBgResult(
+  port: chrome.runtime.Port,
+  id: string,
+  result?: unknown,
+  error?: string,
+  code?: string,
 ) {
-  return {
-    tabId: sender?.tab?.id ?? -1,
-    frameId: sender?.frameId ?? 0,
-    url: sender?.url ?? sender?.tab?.url ?? '',
-    uuid: String(payload.uuid ?? ''),
-  };
-}
-
-async function handleHostRequest(
-  type: string,
-  payload: Record<string, unknown>,
-  ctx: ReturnType<typeof hostContext>,
-): Promise<unknown> {
-  {
-      switch (type) {
-        case 'host:ready':
-          return;
-        case 'host:ping':
-          return { time: Date.now() };
-        case 'host:bootstrap': {
-          const script = await getScript(ctx.uuid);
-          if (!script || !script.enabled || script.removedAt) {
-            throw new Error('Script is not active.');
-          }
-          const effective = mergeMetadata(script.metadata, script.selfMetadata);
-          if (ctx.url && !urlMatches(ctx.url, compileUrlRules(effective))) {
-            throw new Error('Script does not match this page.');
-          }
-          const { values, storageName } = await getValuesForScript(ctx.uuid);
-          const resources = resourcesForRuntime(await getResources(ctx.uuid), effective);
-          return { storageName, values, resources };
-        }
-        case 'host:gm':
-          return handleGmApi(String(payload.api ?? ''), (payload.args as unknown[]) ?? [], ctx);
-        case 'host:value:set':
-          await setValueForScript(ctx.uuid, String(payload.key ?? ''), payload.value, {
-            tabId: ctx.tabId,
-            frameId: ctx.frameId,
-          });
-          return undefined;
-        case 'host:value:delete':
-          await deleteValueForScript(ctx.uuid, String(payload.key ?? ''), {
-            tabId: ctx.tabId,
-            frameId: ctx.frameId,
-          });
-          return undefined;
-        case 'host:run':
-          await markScriptRun(
-            ctx.uuid,
-            payload.error ? String(payload.error) : undefined,
-          );
-          return undefined;
-        case 'host:log':
-          await recordLog(
-            (String(payload.level ?? 'info') as LogEntry['level']) ?? 'info',
-            (payload.args as unknown[]) ?? [],
-            ctx.uuid,
-            ctx.url,
-          );
-          return undefined;
-        case 'host:menu:register': {
-          const id = `${ctx.uuid}:${Date.now()}:${Math.random().toString(36).slice(2)}`;
-          const command: RuntimeMenuCommand = {
-            id,
-            uuid: ctx.uuid,
-            title: String(payload.title ?? ''),
-            accessKey:
-              typeof payload.options === 'object' && payload.options
-                ? (payload.options as Record<string, unknown>).accessKey as string | undefined
-                : undefined,
-            tabId: ctx.tabId,
-            frameId: ctx.frameId,
-          };
-          registerMenuCommand(command);
-          broadcast('menus-changed', { tabId: ctx.tabId });
-          return id;
-        }
-        case 'host:menu:unregister': {
-          unregisterMenuCommand(ctx.tabId, ctx.frameId, ctx.uuid, String(payload.id ?? ''));
-          broadcast('menus-changed', { tabId: ctx.tabId });
-          return undefined;
-        }
-        default:
-          throw new Error(`Unknown host message: ${type}`);
-      }
+  try {
+    port.postMessage({ type: 'bg:result', id, result, error, code });
+  } catch {
+    // The bridge frame navigated away while the request was in flight.
   }
 }
 
@@ -201,16 +110,32 @@ function handleHostPort(port: chrome.runtime.Port, sender: chrome.runtime.Messag
   port.onMessage.addListener((message: any) => {
     const type = String(message?.type ?? '');
     const id = String(message?.id ?? '');
+    // The event channel's keep-alive messages are not RPCs and have no id.
+    if (type === 'host:ready') {
+      const url = String((message?.payload ?? {}).url ?? '');
+      if (url) record.url = url;
+      return;
+    }
+    if (!id && type === 'host:ping') return;
     const payload = (message?.payload ?? {}) as Record<string, unknown>;
-    const ctx = {
-      tabId: record.tabId,
-      frameId: record.frameId,
-      url: record.url,
-      uuid: String(payload.uuid ?? ''),
-    };
+    const ctx = createHostContext(
+      {
+        tab: { id: record.tabId, url: record.url } as chrome.tabs.Tab,
+        frameId: record.frameId,
+        url: record.url,
+      },
+      payload,
+    );
     void handleHostRequest(type, payload, ctx).then(
       (result) => sendBgResult(port, id, result),
-      (error) => sendBgResult(port, id, undefined, error instanceof Error ? error.message : String(error)),
+      (error) =>
+        sendBgResult(
+          port,
+          id,
+          undefined,
+          error instanceof Error ? error.message : String(error),
+          error instanceof HostError ? error.code : 'HOST_FAILED',
+        ),
     );
   });
 }
@@ -223,7 +148,7 @@ async function handleRuntimeMessage(
   const payload = (message?.payload ?? {}) as Record<string, any>;
 
   if (type.startsWith('host:') && type !== 'host:wake') {
-    return handleHostRequest(type, payload, hostContext(sender, payload));
+    return handleHostRequest(type, payload, createHostContext(sender, payload));
   }
 
   switch (type) {
@@ -425,14 +350,19 @@ export default defineBackground(() => {
       .catch((error) => console.error('[Lumo Userscripts] Bootstrap failed:', error));
   });
   chrome.runtime.onConnect.addListener((port) => {
-    if (port.name === 'lumo:host') {
+    if (port.name === 'lumo:bridge') {
       handleHostPort(port, port.sender ?? {});
     }
   });
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     void handleRuntimeMessage(message, sender).then(
       (result) => sendResponse({ ok: true, result }),
-      (error) => sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) }),
+      (error) =>
+        sendResponse({
+          ok: false,
+          error: error instanceof Error ? error.message : String(error),
+          code: error instanceof HostError ? error.code : 'HOST_FAILED',
+        }),
     );
     return true;
   });

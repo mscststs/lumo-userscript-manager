@@ -18,7 +18,7 @@
 - `chrome.userScripts` 每脚本注册、MAIN/USER_SCRIPT 双运行时、固定 runner/host 引擎
 - `@match/@include/@exclude/@exclude-match` 编译与运行时二次校验
 - metadata 解析、URL 规则、launcher 编译、`@require`/`@resource` 抓取
-- MAIN ↔ USER_SCRIPT 页面桥、GM API 作用域隔离、值变更广播
+- MAIN / USER_SCRIPT ↔ ISOLATED content bridge、GM API 作用域隔离、值变更广播
 - 常用 GM API：值、XHR、Cookie、下载、通知、菜单、样式、元素、剪贴板、Tab 状态
 - 安装页、DNR `.user.js` 重定向、metadata/权限/代码预览
 - Popup 当前页脚本控制、Options 脚本列表/编辑器/设置/日志/关于
@@ -44,23 +44,27 @@
    - 通过 `chrome.userScripts` 注册到 `world: 'MAIN'`，`document_start`，按脚本的 URL 规则匹配。
    - 在页面 realm 中执行脚本，保证 `window`、页面全局变量、jQuery 等页面对象可直接访问。
    - 提供 `GM_*` 代理对象，但只存在于脚本的 `with` 作用域内，不挂到 `window`，避免页面任意代码直接调用 GM API。
-   - 通过 DOM 事件 / `MessageChannel` 与 USER_SCRIPT Host 通信。
+   - 通过惰性的 `MessageChannel` 直接连接 ISOLATED content bridge；不再经过 USER_SCRIPT Host。
 
 3. **USER_SCRIPT Host（沙箱宿主）**
    - 通过 `chrome.userScripts` 注册到 `world: 'USER_SCRIPT'`，`document_start`。
-   - 拥有 `chrome.runtime` 消息能力（`configureWorld({ messaging: true })`）。
-   - 实现 GM API 的本地部分：值快照、菜单命令、资源、样式、元素、日志。
-   - 把特权请求转发给 SW，把 SW 事件转发给 Runner。
-   - 同时可作为 `@inject-into content` 脚本的执行环境（脚本在 USER_SCRIPT world 中直接运行，页面无法看到 GM 对象）。
+   - **不使用** `chrome.runtime`：Chromium（包括 Chrome 156）在部分版本中即使配置了 `configureWorld({ messaging: true })`，USER_SCRIPT world 的 `runtime.sendMessage/connect` 仍可能返回 `Receiving end does not exist`。
+   - 实现 GM API 的本地部分：值快照、菜单命令、资源、样式、元素、日志；与 MAIN Runner 共用同一套 engine 和 BridgeClient。
+   - 只在实际执行 `@inject-into content` / 强制沙箱脚本时注册，页面无法看到 GM 对象。
 
-4. **每个脚本一个注册项**
-   - `id = us:<uuid>`
+4. **ISOLATED Content Bridge**
+   - 通过普通 `content_scripts` 注入，`document_start`、`all_frames`。
+   - 唯一持有 `chrome.runtime` 的运行时组件：RPC 走 `sendMessage`，事件走一条懒连接、可重连的 `connect` 端口。
+   - 接收 MAIN / USER_SCRIPT 引擎的 `MessageChannel` 握手，校验 nonce，只转发白名单 `host:*` 请求。
+
+5. **每个脚本一个注册项**
+   - `id = us-<uuid>`
    - `matches/includeGlobs/excludeMatches/excludeGlobs` 由脚本 metadata 编译。
    - `runAt`、`allFrames`、`world` 由 metadata 与设置决定。
    - `js: [{ code: wrap(script) }]`，代码是「启动器 + 脚本体」，体积可控。
    - 引擎（Runner/Host）作为固定注册项，按需存在，注册顺序在前；脚本启动器对引擎未就绪做队列兜底。
 
-> 这套结构接近 ScriptCat 的 `chrome.userScripts.register` 每脚本注册 + MAIN/USER_SCRIPT 双运行时，也吸收了 Violentmonkey 的「页面桥 + 值快照 + safe global wrapper」。Greasemonkey 的 MV2 `tabs.executeScript(code)` 方式在 MV3 不可用，但其 metadata 解析和 grant 生成 API 的思路仍可借鉴。
+> 这套结构接近 ScriptCat 的 `chrome.userScripts.register` 每脚本注册 + MAIN/USER_SCRIPT 双运行时，也吸收了 Violentmonkey 的「页面桥 + 值快照 + safe global wrapper」；区别是我们把页面桥的扩展上下文一侧收敛到唯一的 ISOLATED content bridge。Greasemonkey 的 MV2 `tabs.executeScript(code)` 方式在 MV3 不可用，但其 metadata 解析和 grant 生成 API 的思路仍可借鉴。
 
 ### 0.2 为什么不直接照搬 Greasemonkey
 
@@ -147,7 +151,7 @@ Greasemonkey 是 Firefox MV2：
 | API | 能力 | 限制 |
 |---|---|---|
 | `chrome.userScripts.register` | 动态注册用户脚本；支持 `world: MAIN / USER_SCRIPT`、`matches`、`includeGlobs`、`excludeMatches`、`excludeGlobs`、`allFrames`、`runAt` | 需要 `userScripts` 权限；用户可能需要在 `chrome://extensions` 打开 “Allow User Scripts”（Chrome 138+）或开发者模式（更早版本）；`runAt` 只有 `document_start/end/idle` |
-| `chrome.userScripts.configureWorld` | 配置 USER_SCRIPT world 的 CSP 和 `messaging` | `messaging: true` 是 USER_SCRIPT world 使用 `chrome.runtime` 的前提 |
+| `chrome.userScripts.configureWorld` | 配置 USER_SCRIPT world 的 CSP（可选 `messaging`） | 本实现不依赖 `messaging: true`；USER_SCRIPT world 的 runtime 消息在部分 Chromium 版本不可靠，统一走 content bridge |
 | `chrome.userScripts.execute` | 在指定 tab/frame 执行代码 | 版本较新，且不能替代 `document_start` 注册；只作为“在当前页立即运行/调试”的补充 |
 | `chrome.scripting.registerContentScripts` | 注册普通 content script（ISOLATED/MAIN） | 只能注册文件，不能注册动态代码；适合固定 host/诊断脚本，不适合每脚本代码 |
 | `chrome.declarativeNetRequest` | 安装 URL 重定向、请求头/响应头修改 | MV3 没有 `webRequestBlocking`；DNR 的 `responseHeaders` 条件需要较新 Chrome；规则数量/优先级有限 |
@@ -216,7 +220,7 @@ const entry: RegisteredScript = {
 ```
 
 > 引擎只在存在对应 world 的脚本时注册：
-> - 有 grant 脚本 / 需要页面桥 → `RUNNER` + `HOST`
+> - 有 grant 脚本 → `RUNNER`；`@inject-into content` / 强制沙箱 → `HOST`
 > - 只有 `@grant none` 且 `@inject-into content` 不需要 → 不注册引擎
 > - 只有 `@inject-into content` 的脚本 → 只注册 `HOST`
 > 这样可以避免在无关页面注入引擎。
@@ -287,7 +291,7 @@ Host 侧 `@inject-into content` 的启动器同理，调用 `globalThis.__LUMO_H
 | metadata | 注册 `runAt` | 运行时处理 |
 |---|---|---|
 | `document-start` | `document_start` | 直接执行 |
-| `document-body` | `document_start` | Host/Runner 等待 `document.body` 出现后再执行 |
+| `document-body` | `document_end` | Chrome 没有 body-ready 事件，`document_end` 是最接近的时机 |
 | `document-end` / 缺省 | `document_end` | 直接执行 |
 | `document-idle` | `document_idle` | 直接执行 |
 | `context-menu` | `document_idle` | 不自动执行；包装成 `GM_registerMenuCommand(name, () => code)`，由 popup/菜单触发 |
@@ -295,43 +299,63 @@ Host 侧 `@inject-into content` 的启动器同理，调用 `globalThis.__LUMO_H
 
 > 缺省值建议 `document-idle`（ScriptCat 默认），比 `document-end` 更安全；如果希望更贴近 Tampermonkey，可改为 `document-end`。这是需要确认的产品决策。
 
-### 2.7 页面桥协议
+### 2.7 运行时传输协议
 
-Runner（MAIN）与 Host（USER_SCRIPT）不能共享 JS 全局，只能通过 DOM 事件或 `postMessage` 通信。推荐 `MessageChannel` + 随机 channel：
+MAIN / USER_SCRIPT 引擎都不直接访问 `chrome.runtime`，而是通过 ISOLATED
+content bridge 转发。这样跨 world 通信只剩一条可测试的链路：
 
 ```
-Host (USER_SCRIPT)                     Runner (MAIN)
-  create MessageChannel
-  postMessage({type:'lumo:handshake', nonce, port: port2}, '*', [port2])
-  <--------------------------------------  event.source === window
-                                            adopt port1
-                                            port.postMessage({type:'ready', nonce})
-  port.onmessage <------------------------> port.onmessage
+Engine (MAIN / USER_SCRIPT)
+  └─ BridgeClient
+       hello(nonce, clientId, kind) + MessagePort
+       ◀── ready(nonce, bridgeId)
+       ──▶ rpc / result / event / resume
+            │
+Content Bridge (ISOLATED)
+  ├─ chrome.runtime.sendMessage(type, payload)  # 一次性 RPC
+  └─ chrome.runtime.connect({name:'lumo:bridge'}) # 事件通道，懒连接
+            │
+Background Host Service (SW)
+  ├─ runtime token 校验（HMAC，绑定 uuid + world）
+  ├─ sender.tab / sender.frameId 作为唯一可信上下文
+  └─ gm / values / menus / logs / run
 ```
 
-消息类型：
+消息契约（`lib/runtime/protocol.ts`）：
 
 ```ts
-type HostRequest =
-  | { type: 'bootstrap'; uuid: string; runToken: string; href: string }
-  | { type: 'gm:call'; callId: number; uuid: string; runToken: string; api: string; args: unknown[] }
-  | { type: 'gm:valueChanged'; uuid: string; key: string; oldValue: unknown; newValue: unknown; remote: boolean }
-  | { type: 'gm:menuCommand'; uuid: string; commandId: string }
-  | { type: 'gm:run'; uuid: string; runToken: string };
-
-type HostResponse =
-  | { type: 'bootstrap:result'; callId: number; data: ScriptBootstrap }
-  | { type: 'gm:result'; callId: number; result?: unknown; error?: SerializedError }
-  | { type: 'runner:ready' };
+type BridgeMessage =
+  | { __lumo: 'lumo:bridge-hello'; nonce: string; clientId: string; kind: 'main' | 'userscript' }
+  | { __lumo: 'lumo:bridge-ready'; nonce: string; bridgeId: string }
+  | { __lumo: 'lumo:bridge-rpc'; id: string; type: string; payload: Record<string, unknown> }
+  | { __lumo: 'lumo:bridge-result'; id: string; result?: unknown; error?: string; code?: string }
+  | { __lumo: 'lumo:bridge-event'; event: RuntimeEventName; payload: Record<string, unknown> }
+  | { __lumo: 'lumo:bridge-resume' };
 ```
 
 设计要求：
 
-- `event.source === window`、`event.origin === location.origin`。
-- 每个脚本一个 `runToken`；Host 维护 `uuid -> token` 映射，所有 GM 请求必须匹配。
-- 所有参数结构化克隆；DOM 节点不能直接过桥，使用临时 id + Host 侧 `WeakMap` 解析（参考 VM 的 `node` 二次事件 / ScriptCat 的 `relatedTarget` 机制）。
-- 页面可以监听 DOM 事件，但拿不到 `MessagePort`；这是比裸 `CustomEvent` 更强的隔离。
-- 后续若需要抗恶意页面劫持，升级为 VM 的 vault 握手（`injected/content/inject.js` 中的 `injectPageSandbox/startHandshake` 思路）。
+- **懒握手**：引擎只在 `run(payload)` 时发起握手；没有匹配脚本的页面不建立
+  port、不唤醒 SW。
+- **nonce 校验**：`ready` 通过引擎自己的 MessagePort 返回，且必须回显本次
+  `hello` 的 nonce；页面无法用旧握手劫持新客户端。
+- **RPC 与事件分离**：RPC 永远走 `sendMessage`，事件端口断开不会阻塞
+  bootstrap / GM 调用；事件端口按指数退避重连。
+- **token 校验**：`buildPlannedScript()` 为每个 `(uuid, world)` 生成
+  `HMAC(installSecret, uuid:world)`，随 payload 注入。所有 `host:*` 请求必须
+  携带该 token；Background 用 `sender.tab/frameId` 构造上下文，不信任
+  `payload.uuid` 以外的页面字段。
+- **事件恢复**：事件端口重连后发送 `bridge-resume`，引擎重放菜单注册；
+  值监听器是本地状态，无需重放。
+- **值变更语义**：Background 广播 `{uuid, originUuid, storageName, key,
+  oldValue, newValue, remote}`。origin 引擎跳过（它已在 `GM_setValue` 时同步
+  触发 `remote=false`），其他脚本 / frame / tab 收到 `remote=true`。
+- **页面导航**：content bridge 在每个 RPC 中附带当前 `location.href`，避免
+  SPA 软导航后 `sender.url` 过期。
+
+> 页面仍然可以在 `window` 上监听 `message` 事件。对 MAIN 脚本，token 本来
+> 就与脚本同处页面 realm；对 USER_SCRIPT 脚本，token 不离开隔离 world。
+> 两种情况下 Background 都只按 token 授权的 uuid 提供 GM 能力。
 
 ### 2.8 健康检查与重注册
 
@@ -1375,7 +1399,7 @@ lumo-backup/
 ### Phase 3：兼容性与高级能力
 
 1. `@inject-into content` 沙箱完整支持。
-2. `unsafeWindow` 页面桥加固（vault handshake；当前 `@grant unsafeWindow` 已通过 MAIN 世界提供真实页面对象）。
+2. `unsafeWindow` 传输加固（nonce + runtime token；当前 `@grant unsafeWindow` 已通过 MAIN 世界提供真实页面对象）。
 3. `GM_xmlhttpRequest` 进度/二进制/DNR header 修改。
 4. `GM_cookie` / `GM_download` / `GM_notification` 完整语义。
 5. `@require`/`@resource` hash 校验、资源更新。
@@ -1399,7 +1423,7 @@ lumo-backup/
 | `userScripts` 开关未开启 | 所有脚本不运行 | popup/options 常驻状态检查 + 一键跳转；README/onboarding 说明 |
 | `userScripts` API 版本差异 | Chrome 138+ 使用 Allow User Scripts 开关；企业策略可能关闭 | 运行时探测，不硬编码版本；状态提示 |
 | DNR 安装重定向误伤 | 直接打开 `.user.js` 变成安装页 | 响应头条件（Chrome 128+）；host 白名单；失败时 allow 规则回退 |
-| 页面桥被伪造 | 页面调用 GM API | runToken + MessageChannel + origin/source 校验；后续 vault |
+| 页面桥被伪造 | 页面调用 GM API | nonce + MessageChannel + HMAC runtime token（uuid + world）+ sender.tab/frame 校验 |
 | CSP 严格站点 | 页面世界脚本/样式被拦 | USER_SCRIPT 沙箱执行；`configureWorld` CSP；`GM_addStyle` 在沙箱插入 |
 | SW 被挂起 | 端口断开、事件丢失 | 所有状态落 IndexedDB；端口重连；顶层注册监听；alarm 健康检查 |
 | 注册竞态 | 脚本重复/缺失 | 串行队列 + 全量 diff + 失败回退单条注册 |
@@ -1417,7 +1441,7 @@ lumo-backup/
 |---|---|---|---|
 | 1 | 默认 `@run-at` | **1B：`document-idle`** | 与 ScriptCat 一致；需要早执行的脚本显式声明 `document-start/end` |
 | 2 | 有 `@grant` 的脚本默认注入世界 | **2A：页面优先（MAIN + GM 桥）** | 最大兼容性；保留设置项允许强制沙箱 |
-| 3 | `@inject-into page` + `@grant` | **3A：完整支持** | 页面桥是核心组件，不做降级方案 |
+| 3 | `@inject-into page` + `@grant` | **3A：完整支持** | 引擎 → ISOLATED bridge 是核心组件，不做降级方案 |
 | 4 | `GM_cookie` / `GM_download` | **4A：默认申请 `cookies` + `downloads`** | 安装时即声明，减少首次使用时的权限中断 |
 | 5 | 远程 `@require` | **5A：默认允许 + 安装页展示来源/大小/警告** | 不做默认禁止；后续可加严格模式 |
 | 6 | 侧边栏 | **6A：不保留 sidepanel** | 入口为 popup + options；sidepanel 仅作为未来可选调试面板 |
@@ -1426,7 +1450,7 @@ lumo-backup/
 
 ### 决策带来的直接约束
 
-- **1B + 2A + 3A**：注册计划必须同时支持 MAIN 与 USER_SCRIPT world；页面桥、runToken、GM 代理是 Phase 1 的核心，不是可选项。
+- **1B + 2A + 3A**：注册计划必须同时支持 MAIN 与 USER_SCRIPT world；ISOLATED bridge、runtime token、GM 代理是 Phase 1 的核心，不是可选项。
 - **4A**：`wxt.config.ts` 的 `permissions` 直接包含 `cookies`、`downloads`；`GM_cookie` / `GM_download` 仍需在 SW 内做 `@connect` 与用户确认校验。
 - **5A**：安装页必须展示每个 `@require` 的 URL、大小、hash/来源；后续可增加“严格模式”开关，但不作为默认。
 - **6A**：不注册 `sidePanel` 权限、不生成 `sidepanel.html`；`action.default_popup = 'popup.html'`。

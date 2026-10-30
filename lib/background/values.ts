@@ -13,11 +13,19 @@ export async function getValuesForScript(uuid: string): Promise<{
   return { storageName, values: await getValues(storageName) };
 }
 
+/**
+ * Persist a value and broadcast it to every frame.
+ *
+ * The origin engine already emitted its own listener with `remote=false` when
+ * the script called GM_setValue, so engines skip `originUuid`. Everything else
+ * — sibling scripts sharing @storageName, other frames and other tabs —
+ * receives the change with `remote=true`.
+ */
 export async function setValueForScript(
   uuid: string,
   key: string,
   value: unknown,
-  origin?: { tabId: number; frameId: number },
+  options: { originUuid?: string } = {},
 ): Promise<void> {
   const script = await getScript(uuid);
   if (!script) throw new Error('Script not found.');
@@ -33,20 +41,20 @@ export async function setValueForScript(
     event: 'value-changed',
     payload: {
       uuid,
-      origin: uuid,
+      originUuid: options.originUuid ?? '',
       storageName,
       key,
       oldValue,
       newValue: value,
       remote: true,
     },
-  }, origin);
+  });
 }
 
 export async function deleteValueForScript(
   uuid: string,
   key: string,
-  origin?: { tabId: number; frameId: number },
+  options: { originUuid?: string } = {},
 ): Promise<void> {
-  await setValueForScript(uuid, key, undefined, origin);
+  await setValueForScript(uuid, key, undefined, options);
 }

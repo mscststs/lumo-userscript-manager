@@ -132,7 +132,7 @@ describe('launcher compiler', () => {
   const parsed = parseMetadata(SCRIPT);
   const payload: RuntimeScriptPayload = {
     uuid: 'u1',
-    token: 't1',
+    runtimeToken: 'MAIN.test',
     name: 'Example',
     namespace: 'demo',
     version: '1.2.3',

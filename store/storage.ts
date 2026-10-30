@@ -44,6 +44,8 @@ export type AppConfig = Partial<StorageSchema>;
 // Public API
 // ---------------------------------------------------------------------------
 
+let runtimeSecretPromise: Promise<string> | null = null;
+
 export const storage = {
   // ----- UI Settings -----
   async getUISettings(): Promise<UISettings> {
@@ -54,6 +56,28 @@ export const storage = {
   },
 
   // ----- Export / Import (driven by registry) -----
+
+  /**
+   * Read (or lazily create) the per-install secret used to sign userscript
+   * runtime tokens. It lives in local storage because it is a few bytes and
+   * must be readable from a freshly started service worker.
+   */
+  async ensureRuntimeSecret(): Promise<string> {
+    if (!runtimeSecretPromise) {
+      runtimeSecretPromise = (async () => {
+        const existing = await getField('runtimeSecret');
+        if (existing.length >= 32) return existing;
+        const bytes = crypto.getRandomValues(new Uint8Array(32));
+        const secret = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+        await setField('runtimeSecret', secret);
+        return secret;
+      })().catch((error) => {
+        runtimeSecretPromise = null;
+        throw error;
+      });
+    }
+    return runtimeSecretPromise;
+  },
 
   /**
    * Export all settings marked `exportable: true` in the schema registry.

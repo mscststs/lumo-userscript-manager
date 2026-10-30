@@ -35,6 +35,12 @@ import { DEFAULT_LANGUAGE, normalizeLanguage } from '@/lib/language';
 /** The single source of truth for what lives in chrome.storage.local. */
 export interface StorageSchema {
   uiSettings: UISettings;
+  /**
+   * Per-install HMAC secret for userscript runtime tokens.
+   * Small, bounded and never exported; regenerating it invalidates tokens in
+   * already-open pages, which then fail closed until they reload.
+   */
+  runtimeSecret: string;
 }
 
 /** Union of all valid storage key strings. */
@@ -89,6 +95,12 @@ function normalizeNumberInRange(raw: unknown, fallback: number, min: number, max
  * 3. That's it — export/import picks it up automatically.
  */
 export const STORAGE_FIELDS: { [K in StorageKey]: StorageFieldDef<K> } = {
+  runtimeSecret: {
+    key: 'runtimeSecret',
+    defaultValue: '',
+    exportable: false,
+    normalize: (raw) => (typeof raw === 'string' ? raw : ''),
+  },
   uiSettings: {
     key: 'uiSettings',
     defaultValue: DEFAULT_UI_SETTINGS,

@@ -81,6 +81,18 @@ npm run compile
 npm test
 ```
 
+The default test suite is hermetic (no browser). The MV3 transport also has a
+real-Chrome regression suite that exercises both execution worlds, GM values,
+menus, `@require`, and service-worker eviction:
+
+```bash
+npm run build
+LUMO_E2E=1 npm test -- tests/integration
+```
+
+Set `CHROME_PATH` to override the Chrome/Chromium binary. The suite is skipped
+unless `LUMO_E2E=1` is set, so CI runners without Chrome stay green.
+
 ## Project Structure
 
 ```
@@ -96,7 +108,8 @@ components/
   settings/           # SettingsHeader / SettingRow
 lib/
   script/             # metadata parser, URL rules, launcher compiler, semver
-  runtime/            # MAIN runner and USER_SCRIPT host runtimes
+  runtime/            # shared engines + BridgeClient/BridgeServer transport
+  background/         # registration, host RPC service, GM APIs, tokens
   db/                 # IndexedDB layer
   background/         # registration, install, updates, values, GM handlers
   backup.ts           # JSON/ZIP backup helpers
@@ -128,6 +141,31 @@ The Host ↔ Service Worker port is opened lazily, heartbeated while active, and
 - page world (`@grant none`, `@inject-into page`, or any script declaring `@grant unsafeWindow`) exposes the real page `window`;
 - `@grant unsafeWindow` takes precedence over `forceSandbox` and `@inject-into content`, because the isolated world cannot provide a synchronous page object;
 - a USER_SCRIPT script that does not declare `@grant unsafeWindow` gets the isolated world's `window`, matching Violentmonkey/ScriptCat behavior.
+
+## Runtime transport
+
+```text
+userscript engine (MAIN or USER_SCRIPT)
+  └─ BridgeClient — window MessageChannel, nonce handshake
+       └─ content-script bridge (ISOLATED)
+            ├─ chrome.runtime.sendMessage → RPC / bootstrap
+            └─ chrome.runtime.connect    → pushed events (lazy, reconnecting)
+                 └─ background host service
+```
+
+A few consequences worth knowing when debugging:
+
+- The ISOLATED content script is the **only** extension context used by the
+  runtime. Chromium (Chrome 156 included) may not deliver `chrome.runtime`
+  messages from a `USER_SCRIPT` world even with `configureWorld({messaging:true})`,
+  so the engines never call `chrome.runtime` directly.
+- The handshake is lazy: pages with no matching userscript never connect the
+  event port or wake the service worker.
+- Every host RPC carries an HMAC runtime token scoped to the script UUID and
+  world. The background verifies it and derives the tab/frame from the content
+  script sender, so a page cannot call another script's GM APIs.
+- The event port reconnects after service-worker eviction and emits
+  `BRIDGE_RESUME`; engines replay menu registrations.
 
 ## Known limitations
 
