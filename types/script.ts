@@ -1,4 +1,4 @@
-/** Normalized `@run-at` values, plus the two ScriptCat/Tampermonkey extras. */
+/** Normalized `@run-at` values, plus two non-standard extras. */
 export type ScriptRunAt =
   | 'document-start'
   | 'document-body'

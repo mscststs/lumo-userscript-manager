@@ -391,8 +391,8 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
     const style = document.createElement('style');
     style.textContent = String(css);
     (document.head || document.documentElement).appendChild(style);
-    // Violentmonkey-compatible thenable so `await GM_addStyle()` works while
-    // legacy scripts still receive the style element synchronously.
+    // A thenable that resolves to the element, so `await GM_addStyle()` works
+    // while scripts that use the return value synchronously still get it.
     Object.defineProperty(style, 'then', {
       value: (resolve: (value: Element) => unknown) => resolve(style),
       configurable: true,
@@ -778,7 +778,7 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
   };
 
   // Only expose the APIs the script actually requested. `GM_info` is always
-  // available, matching Violentmonkey/ScriptCat.
+  // available.
   const allowed = new Set(grant.includes('none') ? [] : grant);
   const GM_ALIASES: Record<string, string> = {
     'GM.getValue': 'GM_getValue',
@@ -816,8 +816,8 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
   // script cannot reach ungranted APIs through `GM.GM_*` or `GM.GM.*`.
   const scopedGM: Record<string, any> = Object.create(null);
   const scopedGM4: Record<string, any> = Object.create(null);
-  // ScriptCat exposes unsafeWindow unconditionally; doing the same keeps
-  // scripts portable even when they forget to declare @grant unsafeWindow.
+  // Expose unsafeWindow without requiring a grant: many scripts use it
+  // without declaring it, and the engine already resolved the correct world.
   scopedGM.unsafeWindow = unsafeWindow;
 
   let urlChangeHandler: ((event: Event & { url: string }) => void) | null = null;

@@ -158,7 +158,7 @@ export const en = {
       privacyValue: 'All data stays on this device.',
       source: 'Source code',
       license: 'License',
-      licenseValue: 'Independent implementation. Reference projects keep their own licenses.',
+      licenseValue: 'Released under the MIT License.',
     },
   },
   scripts: {

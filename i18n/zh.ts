@@ -159,7 +159,7 @@ export const zh: TranslationSchema = {
       privacyValue: '所有数据都保存在本机。',
       source: '源代码',
       license: '许可',
-      licenseValue: '独立实现；参考项目各自保留其许可证。',
+      licenseValue: '基于 MIT 许可证发布。',
     },
   },
   scripts: {

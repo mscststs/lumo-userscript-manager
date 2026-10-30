@@ -1,193 +1,123 @@
 # Lumo Userscripts
 
-A powerful, well-crafted userscript manager for Chrome. Built on the same WXT + React 19 + Tailwind CSS 4 + shadcn/ui foundation as [Lumo](https://github.com/mscststs/lumo).
+A Chrome MV3 userscript manager built with WXT, React 19 and Tailwind CSS 4.
 
-Chrome MV3 only. Minimum Chrome version: **138** (the “Allow User Scripts” toggle generation).
-
+- Chrome 138+ — requires **Allow User Scripts** for the extension
 - Repository: <https://github.com/mscststs/lumo-userscript-manager>
 - Issues: <https://github.com/mscststs/lumo-userscript-manager/issues>
+- License: [MIT](LICENSE)
 
 ## Features
 
-- Install userscripts from a URL, file, clipboard, or the dashboard
-- `chrome.userScripts`-based injection in the MAIN world or USER_SCRIPT sandbox
-- MAIN ↔ USER_SCRIPT bridge with per-registration tokens
-- `@match` / `@include` / `@exclude` / `@exclude-match` compilation, including glob and regex rules
-- `@grant` support for the common GM API surface:
-  - values, value-change listeners
-  - `GM_xmlhttpRequest`, `GM_cookie`, `GM_download`, `GM_notification`
-  - `GM_closeNotification`, `GM_updateNotification`, `GM_openInTab`, `GM_closeInTab`
-  - `GM_addStyle`, `GM_addElement`, `GM_setClipboard`
-  - `GM_registerMenuCommand`, `GM_getTab` / `GM_saveTab` / `GM_getTabs`
-  - `unsafeWindow`, `window.close` / `window.focus`
-  - `@require`, `@require-css` and `@resource`
-- Relative `@require` / `@resource` / `@icon` / `@updateURL` / `@downloadURL` URLs resolved against the install URL
-- Per-script enable/disable, metadata overrides, values editor, resource viewer
-- CodeMirror 6 editor with metadata diagnostics
+- Install from a URL, a file, or the dashboard
+- `@match` / `@include` / `@exclude` / `@exclude-match`, including glob and regex rules
+- Per-script `chrome.userScripts` registration in the MAIN world or a USER_SCRIPT sandbox
+- GM API: values, `GM_xmlhttpRequest`, cookies, downloads, notifications, menu commands,
+  styles, elements, clipboard, tab state, `unsafeWindow`, and `GM.*` aliases
+- `@require`, `@require-css` and `@resource`, with relative URLs resolved against the install source
+- CodeMirror 6 editor with metadata validation, overrides, values editor and resource viewer
 - Recycle bin, JSON/ZIP backup export and import
 - Update checks with permission-aware auto-update
-- Popup current-page controls and menu commands
-- Logs, runtime health checks and registration diagnostics
-- Light / dark / midnight themes, adjustable UI scale, English & Chinese UI
+- Popup page controls, logs, runtime health and registration diagnostics
+- Three palettes (Paper / Graphite / Midnight) × five accents, adjustable UI scale, English and Chinese
 
-## Tech Stack
-
-| Category | Technologies |
-|----------|--------------|
-| Framework | [WXT](https://wxt.dev) (Chrome Extension MV3) |
-| UI | React 19, Tailwind CSS 4, shadcn/ui, Radix UI |
-| Editor | CodeMirror 6 |
-| Runtime | `chrome.userScripts` MAIN/USER_SCRIPT worlds |
-| State | IndexedDB, Chrome Storage API |
-| i18n | i18next + react-i18next |
-| Build | Vite 7, TypeScript 5.9 |
-
-### Design system
-
-Every surface (popup, options, install) is built from one token layer and one theme
-registry. The rules — type scale, OKLCH palettes, accents, contrast matrix, motion
-curves, component states and the responsive/HiDPI/accessibility invariants — live in
-[`docs/DESIGN.md`](docs/DESIGN.md). Tokens are implemented in
-[`assets/globals.css`](assets/globals.css); palettes and accents are registered in
-[`lib/theme-registry.ts`](lib/theme-registry.ts).
-
-## Getting Started
-
-### Prerequisites
+## Requirements
 
 - Node.js >= 22.22.2
-- npm >= 10 (the lockfile is generated with npm 11; npm 9 fails to resolve this peer graph)
+- npm >= 10
 
-### Install
+## Development
 
 ```bash
 npm install
+npm run dev     # predev builds the runtime bundles first
 ```
 
-### Development
+Load `.output/chrome-mv3` via `chrome://extensions` → Developer mode → Load unpacked,
+then enable **Allow User Scripts** for the extension.
 
 ```bash
-npm run dev
+npm run build   # production build → .output/chrome-mv3
+npm run zip     # distributable archive
+npm run compile # TypeScript check
+npm test        # hermetic test suite
 ```
 
-`predev` builds the page-world runtime bundles (`public/user-scripts/{runner,host}.js`) before WXT starts. Load `.output/chrome-mv3` in Chrome (`chrome://extensions` → Developer mode → Load unpacked), then enable **Allow User Scripts** for the extension.
-
-### Build
+The MV3 transport also has a real-Chrome regression suite:
 
 ```bash
-npm run build
-```
-
-`prebuild` rebuilds the runtime bundles automatically. Output goes to `.output/chrome-mv3`.
-
-### Package
-
-```bash
-npm run zip
-```
-
-### Type Check & Tests
-
-```bash
-npm run compile
-npm test
-```
-
-The default test suite is hermetic (no browser). The MV3 transport also has a
-real-Chrome regression suite that exercises both execution worlds, GM values,
-menus, `@require`, and service-worker eviction:
-
-```bash
-npm run build
 LUMO_E2E=1 npm test -- tests/integration
 ```
 
-Set `CHROME_PATH` to override the Chrome/Chromium binary. The suite is skipped
-unless `LUMO_E2E=1` is set, so CI runners without Chrome stay green.
+Set `CHROME_PATH` to override the Chrome/Chromium binary.
 
-## Project Structure
+## Architecture
+
+```
+Service Worker            registration, storage, updates, privileged GM APIs
+  ├─ us-runner            MAIN world engine
+  ├─ us-host              USER_SCRIPT engine
+  └─ per-script launchers chrome.userScripts
+
+ISOLATED content bridge   the only runtime component that calls chrome.runtime
+```
+
+Pages run one of two engines; both talk to the bridge over a `MessageChannel`
+with a nonce handshake. Every host RPC carries an HMAC token scoped to the script
+UUID and world. See [`docs/USERSCRIPT_MANAGER_DESIGN.md`](docs/USERSCRIPT_MANAGER_DESIGN.md)
+for the full model.
+
+UI tokens, palettes, component rules and the design rationale live in
+[`docs/DESIGN.md`](docs/DESIGN.md).
+
+### Project structure
 
 ```
 entrypoints/
-  background.ts       # service worker: registration, install, updates, GM APIs
-  popup/              # current-page quick controls
-  options/            # script list, editor, settings, logs, about
-  install/            # install confirmation page (DNR redirect target)
-components/
-  ui/                 # shadcn base components
-  editor/             # CodeMirror editor
-  layout/             # PageLayout / PageHeader / EmptyState
-  settings/           # SectionNav / SettingsGroup / SettingRow
+  background.ts   service worker
+  popup/          per-page controls
+  options/        scripts, editor, logs, settings, appearance, about
+  install/        install confirmation (DNR redirect target)
+components/       ui primitives, editor, layout, settings
 lib/
-  theme-registry.ts   # palettes + accent presets (single source of truth)
-  theme.ts            # apply/mirror appearance, first-paint contract
-  script/             # metadata parser, URL rules, launcher compiler, semver
-  runtime/            # shared engines + BridgeClient/BridgeServer transport
-  background/         # registration, host RPC service, GM APIs, tokens
-  db/                 # IndexedDB layer
-  background/         # registration, install, updates, values, GM handlers
-  backup.ts           # JSON/ZIP backup helpers
-i18n/                 # en / zh resources
-store/                # chrome.storage settings
-types/                # shared types
+  script/         metadata parser, URL rules, launcher compiler
+  runtime/        engines, GM API, bridge transport
+  background/     registration, host service, updates, tokens
+  db/             IndexedDB layer
+  theme*.ts       palettes, accents, first-paint contract
+i18n/             en / zh
+store/            chrome.storage settings
+types/            shared types
 ```
 
-### Runtime bundles
-
-`scripts/build-runtime.mjs` builds `lib/runtime/runner.ts` and `lib/runtime/host.ts` as standalone IIFEs into `public/user-scripts/`. They are copied into the extension by WXT and registered with `chrome.userScripts.register({ file })`. They must remain dependency-free classic scripts (no ESM imports).
-
-The Host ↔ Service Worker port is opened lazily, heartbeated while active, and bootstrap requests retry across MV3 worker restarts. Registration is skipped when the current `chrome.userScripts` set already matches, avoiding unnecessary teardown during page loads.
-
-## Permissions
-
-- `userScripts` — dynamic userscript registration
-- `storage`, `unlimitedStorage` — settings and bounded metadata
-- `tabs`, `activeTab`, `webNavigation`, `scripting` — tab/context handling and diagnostics
-- `declarativeNetRequest` — redirect `*.user.js` navigations to the install page
-- `cookies`, `downloads` — `GM_cookie` / `GM_download`
-- `notifications`, `contextMenus`, `alarms`, `clipboardWrite` — GM API support and background jobs
-- `<all_urls>` — userscripts run on pages the user configures
+`scripts/build-runtime.mjs` compiles `lib/runtime/{runner,host}.ts` into standalone
+IIFEs at `public/user-scripts/`; they must stay dependency-free classic scripts.
 
 ## unsafeWindow
 
-`unsafeWindow` is available to every script:
+- `@grant unsafeWindow` forces the MAIN world and exposes the real page `window`.
+- `@inject-into page` and `@grant none` scripts also run in the page world.
+- USER_SCRIPT scripts get the isolated world's `window`; they cannot provide a synchronous page object.
 
-- page world (`@grant none`, `@inject-into page`, or any script declaring `@grant unsafeWindow`) exposes the real page `window`;
-- `@grant unsafeWindow` takes precedence over `forceSandbox` and `@inject-into content`, because the isolated world cannot provide a synchronous page object;
-- a USER_SCRIPT script that does not declare `@grant unsafeWindow` gets the isolated world's `window`, matching Violentmonkey/ScriptCat behavior.
+## Permissions
 
-## Runtime transport
-
-```text
-userscript engine (MAIN or USER_SCRIPT)
-  └─ BridgeClient — window MessageChannel, nonce handshake
-       └─ content-script bridge (ISOLATED)
-            ├─ chrome.runtime.sendMessage → RPC / bootstrap
-            └─ chrome.runtime.connect    → pushed events (lazy, reconnecting)
-                 └─ background host service
-```
-
-A few consequences worth knowing when debugging:
-
-- The ISOLATED content script is the **only** extension context used by the
-  runtime. Chromium (Chrome 156 included) may not deliver `chrome.runtime`
-  messages from a `USER_SCRIPT` world even with `configureWorld({messaging:true})`,
-  so the engines never call `chrome.runtime` directly.
-- The handshake is lazy: pages with no matching userscript never connect the
-  event port or wake the service worker.
-- Every host RPC carries an HMAC runtime token scoped to the script UUID and
-  world. The background verifies it and derives the tab/frame from the content
-  script sender, so a page cannot call another script's GM APIs.
-- The event port reconnects after service-worker eviction and emits
-  `BRIDGE_RESUME`; engines replay menu registrations.
+| Permission | Why |
+| --- | --- |
+| `userScripts` | Dynamic script registration |
+| `storage`, `unlimitedStorage` | Settings and bounded metadata |
+| `tabs`, `activeTab`, `webNavigation`, `scripting` | Tab context and diagnostics |
+| `declarativeNetRequest` | Redirect `.user.js` navigations to the install page |
+| `cookies`, `downloads` | `GM_cookie`, `GM_download` |
+| `notifications`, `contextMenus`, `alarms`, `clipboardWrite` | GM APIs and background jobs |
+| `<all_urls>` | Userscripts run where the user configures them |
 
 ## Known limitations
 
 - Network-rule editing is not implemented.
-- The editor opens one script at a time (multiple options tabs can open different scripts).
+- One script per editor at a time.
 - Cross-device sync is not implemented; use JSON/ZIP backup.
-- `@background`, `@crontab`, and `@run-in` are not executed; the installer shows a warning instead of silently ignoring them.
+- `@background`, `@crontab` and `@run-in` are not executed; the installer warns instead of ignoring them silently.
 
 ## License
 
-This project does not currently include a license file. All rights reserved.
+[MIT](LICENSE)

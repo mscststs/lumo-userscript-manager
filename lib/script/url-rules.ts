@@ -87,7 +87,7 @@ function normalizeInclude(value: string): UrlRule | null {
     candidate = candidate.replace(/\.tld\//g, '.??*/');
   }
 
-  // A bare host/path is accepted by Tampermonkey as *://host/path.
+  // A bare host/path is treated as *://host/path.
   if (!candidate.includes('://')) {
     candidate = `*://${candidate.replace(/^\*\./, '*.')}`;
   }
