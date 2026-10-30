@@ -203,7 +203,7 @@ export default function App() {
             checked={scriptsEnabled}
             disabled={!data}
             onCheckedChange={(checked) => void toggleGlobal(checked)}
-            aria-label={t('popup.allScripts')}
+            aria-label={t('popup.globalSwitch')}
           />
           <span
             className={cn(
@@ -211,7 +211,7 @@ export default function App() {
               scriptsEnabled ? 'text-foreground' : 'text-muted-foreground',
             )}
           >
-            {scriptsEnabled ? t('popup.allScripts') : t('popup.globalDisabled')}
+            {scriptsEnabled ? t('common.enabled') : t('common.disabled')}
           </span>
           {data && (
             <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">

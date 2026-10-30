@@ -56,7 +56,7 @@ export const en = {
     manage: 'Manage scripts',
     scriptsOnPage: 'On this page',
     globalEnabled: 'Scripts enabled',
-    allScripts: 'All scripts',
+    globalSwitch: 'Global switch',
     globalDisabled: 'Scripts paused',
     noScripts: 'No scripts for this page',
     noScriptsDescription: 'Scripts you install or create will appear here.',
