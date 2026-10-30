@@ -125,6 +125,10 @@ export async function buildRuntimePayload(uuid: string): Promise<PlannedScript |
 }
 
 export async function runScriptOnTab(uuid: string, tabId: number): Promise<void> {
+  const settings = await storage.getUISettings();
+  if (!settings.scriptsEnabled) {
+    throw new Error('Scripts are disabled globally.');
+  }
   const planned = await buildRuntimePayload(uuid);
   if (!planned) throw new Error('Script not found.');
   const execute = (chrome.userScripts as any)?.execute;

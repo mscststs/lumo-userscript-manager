@@ -16,7 +16,7 @@ import { useTranslation } from 'react-i18next';
 import type { PopupScriptInfo } from '@/lib/background/scripts';
 import type { RuntimeMenuCommand, RuntimeStatus, UISettings } from '@/types';
 import { sendBg, onLumoEvent } from '@/lib/messages';
-import { hostFromUrl } from '@/lib/format';
+import { storage } from '@/store/storage';
 import { cn } from '@/lib/utils';
 import { ThemeInit } from '@/lib/theme';
 import { FontSizeInit } from '@/lib/font-size';
@@ -102,7 +102,6 @@ export default function App() {
   }, [menus]);
 
   const scriptsEnabled = data?.settings.scriptsEnabled ?? true;
-  const host = hostFromUrl(data?.url);
 
   const openOptions = (hash = '') => {
     void chrome.tabs.create({ url: chrome.runtime.getURL(`options.html${hash}`) });
@@ -110,6 +109,32 @@ export default function App() {
 
   const openExtensions = () => {
     void chrome.tabs.create({ url: `chrome://extensions/?id=${chrome.runtime.id}` });
+  };
+
+  const toggleGlobal = async (enabled: boolean) => {
+    if (!data) return;
+    const previous = data;
+    const nextSettings = { ...data.settings, scriptsEnabled: enabled };
+    setData({ ...data, settings: nextSettings });
+    setNeedsReload(true);
+    setError(null);
+
+    try {
+      await storage.setUISettings(nextSettings);
+    } catch (e) {
+      setData(previous);
+      setNeedsReload(false);
+      setError(errorMessage(e));
+      return;
+    }
+
+    try {
+      await sendBg('runtime:refresh');
+    } catch (e) {
+      // The preference is persisted; keep the optimistic state and let the
+      // user retry from the reload hint or the dashboard.
+      setError(errorMessage(e));
+    }
   };
 
   const toggleScript = async (script: PopupScriptInfo, enabled: boolean) => {
@@ -172,23 +197,28 @@ export default function App() {
         <ThemeInit />
         <FontSizeInit />
 
-        <header className="flex h-12 shrink-0 items-center gap-2.5 border-b border-border px-3">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
-            <FileCode2 className="h-4 w-4" aria-hidden="true" />
-          </div>
-          <div className="min-w-0 flex-1 leading-tight">
-            <p className="truncate text-[13px] font-semibold text-foreground" title={data?.url}>
-              {host || t('popup.unknownPage')}
-            </p>
-            <p className="truncate text-[10px] text-muted-foreground">
-              {t('popup.title')}
-              {data && ` · ${t('popup.total', { count: data.scripts.length })}`}
-              {data && !scriptsEnabled && (
-                <span className="text-destructive"> · {t('popup.globalDisabled')}</span>
-              )}
-            </p>
-          </div>
-        </header>
+        <div className="flex items-center gap-2.5 border-b border-border bg-muted/30 px-3 py-2">
+          <Switch
+            size="sm"
+            checked={scriptsEnabled}
+            disabled={!data}
+            onCheckedChange={(checked) => void toggleGlobal(checked)}
+            aria-label={t('popup.allScripts')}
+          />
+          <span
+            className={cn(
+              'min-w-0 flex-1 truncate text-[13px] font-medium',
+              scriptsEnabled ? 'text-foreground' : 'text-muted-foreground',
+            )}
+          >
+            {scriptsEnabled ? t('popup.allScripts') : t('popup.globalDisabled')}
+          </span>
+          {data && (
+            <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+              {t('popup.scriptsOnPage')} · {data.scripts.length}
+            </span>
+          )}
+        </div>
 
         {data && !data.runtime.userScriptsAvailable && (
           <div className="flex items-start gap-2 border-b border-border bg-destructive/5 px-3 py-2">
@@ -251,8 +281,11 @@ export default function App() {
                 <ScriptRow
                   key={script.uuid}
                   script={script}
+                  scriptsEnabled={scriptsEnabled}
                   commands={
-                    script.enabled ? (commandsByUuid.get(script.uuid) ?? []) : []
+                    script.enabled && scriptsEnabled
+                      ? (commandsByUuid.get(script.uuid) ?? [])
+                      : []
                   }
                   onToggle={(enabled) => void toggleScript(script, enabled)}
                   onRun={() => void runScript(script)}
@@ -318,6 +351,7 @@ export default function App() {
 
 interface ScriptRowProps {
   script: PopupScriptInfo;
+  scriptsEnabled: boolean;
   commands: RuntimeMenuCommand[];
   onToggle: (enabled: boolean) => void;
   onRun: () => void;
@@ -328,6 +362,7 @@ interface ScriptRowProps {
 
 function ScriptRow({
   script,
+  scriptsEnabled,
   commands,
   onToggle,
   onRun,
@@ -355,7 +390,7 @@ function ScriptRow({
             <div className="flex min-w-0 items-center gap-1.5">
               <span
                 className={cn(
-                  'truncate text-[13px] font-medium leading-tight',
+                  'min-w-0 truncate text-[13px] font-medium leading-tight',
                   script.enabled ? 'text-foreground' : 'text-muted-foreground',
                 )}
                 title={title}
@@ -439,7 +474,7 @@ function ScriptRow({
               variant="ghost"
               size="sm"
               className="h-7 gap-1 px-2 text-[11px] text-muted-foreground hover:text-foreground"
-              disabled={!script.enabled}
+              disabled={!script.enabled || !scriptsEnabled}
               onClick={onRun}
             >
               <Play className="h-3 w-3" />

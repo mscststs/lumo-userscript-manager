@@ -252,9 +252,19 @@ export class ExtensionHarness {
   }
 
   async runScript(uuid: string): Promise<void> {
-    await this.extEval(
+    const response = await this.extEval<{ ok: boolean; error?: string }>(
       `chrome.runtime.sendMessage({type:'scripts:run',payload:{uuid:${JSON.stringify(uuid)}}})`,
     );
+    if (!response?.ok) throw new Error(response?.error ?? 'scripts:run failed');
+  }
+
+  async setScriptsEnabled(enabled: boolean): Promise<void> {
+    await this.extEval(`(async()=>{
+      const stored = await chrome.storage.local.get('uiSettings');
+      await chrome.storage.local.set({
+        uiSettings: { ...(stored.uiSettings ?? {}), scriptsEnabled: ${enabled} },
+      });
+    })()`);
   }
 
   async registeredScriptIds(): Promise<string[]> {

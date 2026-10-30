@@ -212,4 +212,16 @@ GM_registerMenuCommand('require menu', () => {
       10_000,
     );
   }, 60_000);
+
+  it('stops registering and running scripts when globally disabled', async () => {
+    await harness.setScriptsEnabled(false);
+    await harness.refresh();
+
+    expect(await harness.registeredScriptIds()).toEqual([]);
+    await expect(harness.runScript(mainScriptUuid)).rejects.toThrow(/disabled/i);
+
+    await harness.setScriptsEnabled(true);
+    await harness.refresh();
+    expect((await harness.registeredScriptIds()).length).toBeGreaterThan(0);
+  }, 60_000);
 });

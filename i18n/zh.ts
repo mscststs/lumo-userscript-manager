@@ -58,6 +58,7 @@ export const zh: TranslationSchema = {
     manage: '管理脚本',
     scriptsOnPage: '此页面',
     globalEnabled: '脚本已启用',
+    allScripts: '全部脚本',
     globalDisabled: '脚本已暂停',
     noScripts: '此页面没有匹配的脚本',
     noScriptsDescription: '安装或新建脚本后，会显示在这里。',
