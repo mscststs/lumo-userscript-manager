@@ -6,9 +6,9 @@ import { cn } from '@/lib/utils';
  * Minimal collapsible primitive.
  *
  * The upstream ai-elements `Tool` builds on `@radix-ui/react-collapsible`, but
- * this project animates disclosure with motion (see options/McpSettings) and
- * globally strips focus rings, so a Radix dependency would add weight without
- * benefit. This keeps the same compound-component API surface.
+ * this project animates disclosure with motion and uses a single global focus
+ * treatment, so a Radix dependency would add weight without benefit. The
+ * compound API is kept identical.
  */
 
 interface CollapsibleContextValue {
@@ -110,7 +110,7 @@ export function CollapsibleContent({
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: 'auto', opacity: 1 }}
           exit={{ height: 0, opacity: 0 }}
-          transition={{ duration: 0.18, ease: 'easeOut' }}
+          transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
           className="overflow-hidden"
         >
           <div className={cn(className)} {...props}>

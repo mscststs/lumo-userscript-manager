@@ -1,200 +1,395 @@
 @import "tailwindcss";
+
+/*
+ * Lumo Userscripts — design tokens
+ *
+ * The single stylesheet behind every extension surface (popup, options,
+ * install). Read `docs/DESIGN.md` before changing anything here: it explains
+ * the ratio behind each scale and the invariants the tests pin down.
+ *
+ * Rules for this file:
+ *  1. Colours are OKLCH. Perceptual lightness is what makes a "50% grey" look
+ *     like 50% in every hue, which is what the contrast matrix relies on.
+ *  2. Only semantic tokens live here. A component may not invent a colour.
+ *  3. Every token declared in `@theme` must be restated by each dark palette,
+ *     otherwise it silently inherits the light value onto a dark surface.
+ *  4. Theme colour is a hue *axis* (`--accent-h`), not a hardcoded value, so
+ *     adding an accent is one selector and no component change.
+ */
+
 @custom-variant dark (&:is(.dark *));
 
+/* ─── Scale ──────────────────────────────────────────────────────────────── */
 @theme {
-  --color-background: hsl(0 0% 100%);
-  --color-foreground: hsl(222.2 84% 4.9%);
-  --color-card: hsl(0 0% 100%);
-  --color-card-foreground: hsl(222.2 84% 4.9%);
-  --color-popover: hsl(0 0% 100%);
-  --color-popover-foreground: hsl(222.2 84% 4.9%);
-  /* Accent-driven primary. The shadcn "slate" default resolves to near-black
-     (#0f172a), which hits 17:1 against a white page — legible but visually a
-     solid black slab. This blue lands at ~5.2:1, still WCAG AA for the button
-     label while reading as a brand accent rather than a hole in the page. */
-  --color-primary: hsl(221.2 83.2% 53.3%);
-  --color-primary-foreground: hsl(210 40% 98%);
-  --color-secondary: hsl(210 40% 96.1%);
-  --color-secondary-foreground: hsl(222.2 47.4% 11.2%);
-  --color-muted: hsl(210 40% 96.1%);
-  --color-muted-foreground: hsl(215.4 16.3% 46.9%);
-  --color-accent: hsl(210 40% 96.1%);
-  --color-accent-foreground: hsl(222.2 47.4% 11.2%);
-  /* Darkened from the shadcn default red-500 (#ef4444), which only reaches
-     3.8:1 on white — below AA for the 12-13px body text the error cards use.
-     red-600 lands at 4.8:1 while keeping white button labels legible. */
-  --color-destructive: hsl(0 72.2% 50.6%);
-  --color-destructive-foreground: hsl(210 40% 98%);
-  --color-border: hsl(214.3 31.8% 91.4%);
-  --color-input: hsl(214.3 31.8% 91.4%);
-  --color-ring: hsl(221.2 83.2% 53.3%);
-  --color-sidebar: hsl(210 40% 97%);
-  --color-sidebar-foreground: hsl(222.2 84% 4.9%);
-  /* Modal scrim. Always a dark wash, never derived from `foreground`: the job
-     of a scrim is to dim what is behind it, and on the dark palettes
-     `foreground` is near-white, which would bleach the page instead. Modals
-     separate from the scrim through their own elevation (border + shadow +
-     `bg-card`), not by inverting it. */
-  --color-overlay: hsl(222.2 47% 4% / 0.45);
-  --radius: 0.5rem;
-  /* Scrollbar tokens (shared by sidepanel & options) */
-  --color-scrollbar-thumb: hsl(215.4 16.3% 46.9% / 0.25);
-  --color-scrollbar-thumb-hover: hsl(215.4 16.3% 46.9% / 0.45);
+  /* Typography. Every size is rem-based, so the user's font-size preference
+     (applied to `<html>`) scales the whole UI without a single media query. */
+  --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text",
+    "Segoe UI", system-ui, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI",
+    "Noto Sans CJK SC", "Source Han Sans SC", sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+
+  /* A compact, tool-scale ramp. Steps are ~1.125–1.2 apart (Bringhurst's
+     modular scale), with an extra 11px stop for metadata that must not compete
+     with body copy. `body` sits at 13px, which is the density a list-and-form
+     product needs; headings jump to 20px so the hierarchy survives the noise. */
+  --text-2xs: 0.6875rem; /* 11 */
+  --text-2xs--line-height: 1rem;
+  --text-2xs--letter-spacing: 0.01em;
+  --text-xs: 0.75rem; /* 12 */
+  --text-xs--line-height: 1.125rem;
+  --text-sm: 0.8125rem; /* 13 */
+  --text-sm--line-height: 1.25rem;
+  --text-base: 0.9375rem; /* 15 */
+  --text-base--line-height: 1.4375rem;
+  --text-lg: 1.0625rem; /* 17 */
+  --text-lg--line-height: 1.5rem;
+  --text-xl: 1.25rem; /* 20 */
+  --text-xl--line-height: 1.625rem;
+  --text-xl--letter-spacing: -0.01em;
+  --text-2xl: 1.5rem; /* 24 */
+  --text-2xl--line-height: 1.875rem;
+  --text-2xl--letter-spacing: -0.015em;
+
+  /* Shapes. Controls and cards get different corners on purpose: matching
+     radius implies shared identity (Gestalt), so a switch must not look like
+     the card it sits in. */
+  --radius-control: 0.5rem;
+  --radius-card: 0.75rem;
+  --radius-popover: 0.75rem;
+  --radius: 0.75rem;
+
+  /* Motion. `standard` is the workhorse (symmetric, product-grade); `emphasis`
+     is a decelerating curve for elements that enter from off-screen; `exit` is
+     deliberately shorter than its enter twin (Disney's slow-in/slow-out read
+     backwards — leaving should never feel heavier than arriving). */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasis: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* ─── Colour: light ("Paper") ────────────────────────────────────────────
+     Warm-neutral paper rather than pure white. `oklch(0.985 0.002 95)` is a
+     hair off #fff, enough to separate a white card from the page without the
+     blue cast that makes long reading sessions feel clinical. */
+  --color-background: oklch(0.985 0.002 95);
+  --color-foreground: oklch(0.205 0.008 285);
+  --color-card: oklch(1 0 0);
+  --color-card-foreground: oklch(0.205 0.008 285);
+  --color-popover: oklch(1 0 0);
+  --color-popover-foreground: oklch(0.205 0.008 285);
+  --color-muted: oklch(0.962 0.003 95);
+  /* 4.9:1 on `--color-background` — metadata stays legible at 11–13px. */
+  --color-muted-foreground: oklch(0.5 0.011 285);
+  --color-secondary: oklch(0.955 0.004 95);
+  --color-secondary-foreground: oklch(0.235 0.008 285);
+  /* Hover/selected surface. One step below `muted` so a selected row and a
+     hovered row are distinguishable when both are on screen. */
+  --color-accent: oklch(0.945 0.005 95);
+  --color-accent-foreground: oklch(0.235 0.008 285);
+  --color-border: oklch(0.902 0.004 95);
+  --color-input: oklch(0.885 0.005 95);
+  --color-sidebar: oklch(0.972 0.003 95);
+  --color-sidebar-foreground: oklch(0.205 0.008 285);
+
+  --color-destructive: oklch(0.535 0.196 26);
+  --color-destructive-foreground: oklch(0.99 0.005 26);
+  --color-success: oklch(0.52 0.13 158);
+  --color-success-foreground: oklch(0.99 0.005 158);
+  /* Dark amber, not the usual yellow: `text-warning` is used for 11–13px state
+     copy on the page *and* on a 10% tint, and a bright yellow fails AA in both
+     places. 0.545 keeps 4.9:1 on paper and 4.5:1 on its own badge tint. */
+  --color-warning: oklch(0.545 0.14 65);
+  --color-warning-foreground: oklch(0.995 0.01 65);
+
+  /* The modal scrim is always a dark wash. It must never derive from
+     `foreground`: on a dark palette that value is near-white, which bleaches
+     the page instead of dimming it. */
+  --color-overlay: oklch(0.2 0.012 285 / 0.42);
+
+  --color-scrollbar-thumb: oklch(0.5 0.02 285 / 0.22);
+  --color-scrollbar-thumb-hover: oklch(0.5 0.02 285 / 0.4);
+  --color-code-bg: oklch(0.975 0.002 95);
+
+  /* ─── Accent axis ────────────────────────────────────────────────────────
+     `--accent-h` and `--accent-c` are the only values an accent preset swaps.
+     Every accent-derived token resolves from them, so the five presets below
+     cost two declarations each and cannot drift out of contrast. */
+  --color-primary: oklch(var(--accent-l) var(--accent-c) var(--accent-h));
+  --color-primary-hover: oklch(calc(var(--accent-l) - 0.045) var(--accent-c) var(--accent-h));
+  --color-primary-foreground: oklch(0.995 0 0);
+  --color-ring: oklch(var(--accent-l) var(--accent-c) var(--accent-h));
+
+  /* shadcn-vocabulary aliases kept so third-party snippets still compile. */
+  --color-chat-user: oklch(var(--accent-l) var(--accent-c) var(--accent-h));
+  --color-chat-user-foreground: oklch(0.995 0 0);
+}
+
+/* ─── Accent presets ─────────────────────────────────────────────────────── */
+@layer base {
+  /* Elevation. Three steps only — more invites shadow soup. Declared as plain
+     custom properties (not `@theme`) because the `shadow-elev*` utilities below
+     read them at runtime: a theme-scale value would be inlined at build time,
+     which would make the dark overrides dead code. */
+  :root {
+    --shadow-elev1: 0 1px 2px -1px oklch(0.24 0.02 270 / 0.1),
+      0 1px 1px oklch(0.24 0.02 270 / 0.04);
+    --shadow-elev2: 0 6px 18px -6px oklch(0.24 0.02 270 / 0.14),
+      0 2px 6px -3px oklch(0.24 0.02 270 / 0.08);
+    --shadow-elev3: 0 24px 56px -16px oklch(0.24 0.02 270 / 0.24),
+      0 6px 16px -8px oklch(0.24 0.02 270 / 0.12);
+  }
+
+  :root,
+  [data-accent="azure"] {
+    --accent-h: 258;
+    --accent-c: 0.17;
+    --accent-l: 0.552;
+  }
+  [data-accent="violet"] {
+    --accent-h: 296;
+    --accent-c: 0.175;
+    --accent-l: 0.552;
+  }
+  /* Emerald sits ~0.015 darker: at the shared lightness, white on green only
+     reaches 4.42:1, just under AA. Per-hue lightness is the honest fix — a
+     single global L cannot serve every hue. */
+  [data-accent="emerald"] {
+    --accent-h: 162;
+    --accent-c: 0.135;
+    --accent-l: 0.535;
+  }
+  /* Amber at full chroma reads as mud at this lightness; dropping chroma keeps
+     it a warm gold instead of a brown. */
+  [data-accent="amber"] {
+    --accent-h: 70;
+    --accent-c: 0.135;
+    --accent-l: 0.552;
+  }
+  [data-accent="rose"] {
+    --accent-h: 18;
+    --accent-c: 0.175;
+    --accent-l: 0.552;
+  }
+}
+
+/* Elevation utilities resolve the custom property at paint time, so `.dark`
+   can swap the value without generating a second utility class. */
+@utility shadow-elev1 {
+  box-shadow: var(--shadow-elev1);
+}
+@utility shadow-elev2 {
+  box-shadow: var(--shadow-elev2);
+}
+@utility shadow-elev3 {
+  box-shadow: var(--shadow-elev3);
 }
 
 @layer base {
+  /* ─── Colour: dark ("Graphite") ─────────────────────────────────────────
+     Near-black at 16.8% lightness — dark enough to read as "black" next to a
+     white browser chrome, but lifted off 0% so text has a surface to sit on.
+     Layers separate by *lightness*, not by tint: page → card → popover →
+     hover each step up. */
   .dark {
-    /* Themes the things CSS tokens cannot reach: native scrollbars, form
-       controls, and the canvas the compositor paints outside `body`. Declared
-       here rather than on a separate `html.dark` rule so `midnight` inherits it
-       through the same specificity chain as the colour tokens. */
     color-scheme: dark;
-    --color-background: hsl(222.2 84% 4.9%);
-    --color-foreground: hsl(210 40% 98%);
-    --color-card: hsl(222.2 84% 4.9%);
-    --color-card-foreground: hsl(210 40% 98%);
-    --color-popover: hsl(222.2 84% 4.9%);
-    --color-popover-foreground: hsl(210 40% 98%);
-    /* Lifted lightness so the accent still separates from the dark surface,
-       paired with a dark label (4.85:1) instead of the old near-white slab. */
-    --color-primary: hsl(217.2 91.2% 59.8%);
-    --color-primary-foreground: hsl(222.2 47.4% 11.2%);
-    --color-secondary: hsl(217.2 32.6% 17.5%);
-    --color-secondary-foreground: hsl(210 40% 98%);
-    --color-muted: hsl(217.2 32.6% 17.5%);
-    --color-muted-foreground: hsl(215 20.2% 65.1%);
-    --color-accent: hsl(217.2 32.6% 17.5%);
-    --color-accent-foreground: hsl(210 40% 98%);
-    /* The shadcn dark default (hsl(0 62.8% 30.6%)) is a *dark* red: as
-       `text-destructive` it hits only ~2.2:1 on this background, and
-       `bg-destructive/10` tints are invisible. Lifted to a light red (7.2:1 as
-       text) with a dark label, mirroring the primary treatment above, so the
-       token works both as foreground and as a solid button fill. */
-    --color-destructive: hsl(0 90.6% 70.8%);
-    --color-destructive-foreground: hsl(222.2 47.4% 11.2%);
-    --color-border: hsl(217.2 32.6% 17.5%);
-    --color-input: hsl(217.2 32.6% 17.5%);
-    --color-ring: hsl(217.2 91.2% 59.8%);
-    --color-sidebar: hsl(222.2 84% 7%);
-    --color-sidebar-foreground: hsl(210 40% 98%);
-    /* Pushed harder than the light palette: a 45% wash over an already dark
-       page reads as barely dimmed, so the modal fails to detach from it. */
-    --color-overlay: hsl(222.2 60% 2% / 0.68);
-      --color-scrollbar-thumb: hsl(215 20.2% 65.1% / 0.22);
-    --color-scrollbar-thumb-hover: hsl(215 20.2% 65.1% / 0.4);
+    --color-background: oklch(0.168 0.004 270);
+    --color-foreground: oklch(0.962 0.002 270);
+    --color-card: oklch(0.205 0.004 270);
+    --color-card-foreground: oklch(0.962 0.002 270);
+    --color-popover: oklch(0.235 0.005 270);
+    --color-popover-foreground: oklch(0.962 0.002 270);
+    --color-muted: oklch(0.243 0.005 270);
+    --color-muted-foreground: oklch(0.714 0.007 270);
+    --color-secondary: oklch(0.258 0.006 270);
+    --color-secondary-foreground: oklch(0.962 0.002 270);
+    --color-accent: oklch(0.284 0.007 270);
+    --color-accent-foreground: oklch(0.972 0.002 270);
+    --color-border: oklch(0.306 0.006 270);
+    --color-input: oklch(0.34 0.007 270);
+    --color-sidebar: oklch(0.148 0.004 270);
+    --color-sidebar-foreground: oklch(0.962 0.002 270);
+
+    --color-destructive: oklch(0.78 0.15 22);
+    --color-destructive-foreground: oklch(0.19 0.02 22);
+    --color-success: oklch(0.74 0.14 158);
+    --color-success-foreground: oklch(0.18 0.02 158);
+    --color-warning: oklch(0.8 0.13 78);
+    --color-warning-foreground: oklch(0.2 0.02 78);
+
+    --color-overlay: oklch(0.05 0.006 270 / 0.66);
+
+    --color-scrollbar-thumb: oklch(0.72 0.008 270 / 0.2);
+    --color-scrollbar-thumb-hover: oklch(0.72 0.008 270 / 0.38);
+    --color-code-bg: oklch(0.185 0.004 270);
+
+    /* Light accents on dark. L=0.78 clears 7:1 against the page, and pairing
+       it with a near-black label keeps solid buttons legible instead of
+       producing a glowing slab. */
+    --color-primary: oklch(0.78 calc(var(--accent-c) * 0.78) var(--accent-h));
+    --color-primary-hover: oklch(0.835 calc(var(--accent-c) * 0.72) var(--accent-h));
+    --color-primary-foreground: oklch(0.185 0.015 var(--accent-h));
+    --color-ring: oklch(0.76 calc(var(--accent-c) * 0.8) var(--accent-h));
+    --color-chat-user: oklch(0.32 0.02 var(--accent-h));
+    --color-chat-user-foreground: oklch(0.962 0.002 270);
+
+    /* Dark elevation needs a tighter, heavier falloff to register at all. */
+    --shadow-elev1: 0 1px 2px -1px oklch(0 0 0 / 0.55), 0 1px 1px oklch(0 0 0 / 0.3);
+    --shadow-elev2: 0 8px 20px -8px oklch(0 0 0 / 0.6), 0 2px 6px -3px oklch(0 0 0 / 0.45);
+    --shadow-elev3: 0 28px 64px -20px oklch(0 0 0 / 0.75), 0 8px 20px -10px oklch(0 0 0 / 0.5);
   }
 
-  /* ─── Midnight: Google/Material-style dark ─────────────────────────────────
-     Layered on top of `.dark` (higher specificity: class + attribute), so it
-     inherits the `dark:` variant and the Shiki dark overrides and only restates
-     the colour tokens.
+  /* ─── Midnight ──────────────────────────────────────────────────────────
+     A cool-blue dark palette for people who find pure grey dreary. Same
+     lightness ladder as Graphite, hue shifted to 262° with enough chroma to
+     register as blue without turning text muddy. */
+  .dark[data-theme="midnight"] {
+    --color-background: oklch(0.196 0.026 262);
+    --color-foreground: oklch(0.958 0.008 262);
+    --color-card: oklch(0.232 0.028 262);
+    --color-card-foreground: oklch(0.958 0.008 262);
+    --color-popover: oklch(0.262 0.03 262);
+    --color-popover-foreground: oklch(0.958 0.008 262);
+    --color-muted: oklch(0.27 0.028 262);
+    --color-muted-foreground: oklch(0.735 0.024 262);
+    --color-secondary: oklch(0.292 0.03 262);
+    --color-secondary-foreground: oklch(0.958 0.008 262);
+    --color-accent: oklch(0.312 0.032 262);
+    --color-accent-foreground: oklch(0.97 0.008 262);
+    --color-border: oklch(0.336 0.03 262);
+    --color-input: oklch(0.366 0.032 262);
+    --color-sidebar: oklch(0.172 0.026 262);
+    --color-sidebar-foreground: oklch(0.958 0.008 262);
 
-     Google's dark surfaces are separated by *lightness*, not by tinting one
-     flat colour: the page sits at 14.9% (#22242a) and every layer floating
-     above it steps up (card 18.5% → popover 21% → muted 22% → hover 26%),
-     while borders sit above all of them at 30% so they stay visible on each
-     surface. Hue is held at 225° with low saturation so the greys read
-     neutral-cool rather than blue. */
-  .dark[data-theme='midnight'] {
-    --color-background: hsl(225 10.5% 14.9%);
-    --color-foreground: hsl(225 10% 90%);
-    --color-card: hsl(225 9% 18.5%);
-    --color-card-foreground: hsl(225 10% 90%);
-    /* Popovers float above cards, so they get their own step up rather than
-       matching the page (which is what the other themes do). */
-    --color-popover: hsl(225 9% 21%);
-    --color-popover-foreground: hsl(225 10% 90%);
-    /* Google Blue 300 (#8ab4f8) — the canonical Material dark accent. Paired
-       with a near-black label at 7.5:1; as `text-primary` it clears 7.4:1 on
-       the page. */
-    --color-primary: hsl(217 89% 76%);
-    --color-primary-foreground: hsl(225 10% 14%);
-    --color-secondary: hsl(225 8% 24%);
-    --color-secondary-foreground: hsl(225 10% 90%);
-    --color-muted: hsl(225 8% 22%);
-    --color-muted-foreground: hsl(225 8% 66%);
-    --color-accent: hsl(225 8% 26%);
-    --color-accent-foreground: hsl(225 10% 92%);
-    /* Google Red 300 (#f28b82). Deliberately a *light* red with a dark label:
-       `text-destructive` is used far more often than `bg-destructive` in this
-       codebase, and it needs to be legible on the dark page (6.7:1 here). */
-    --color-destructive: hsl(5 81% 73%);
-    --color-destructive-foreground: hsl(225 10% 14%);
-    --color-border: hsl(225 8% 30%);
-    --color-input: hsl(225 8% 30%);
-    --color-ring: hsl(217 89% 76%);
-    /* Recessed nav rail, one step *darker* than the page — the inverse of the
-       other themes, matching how Google treats persistent side navigation. */
-    --color-sidebar: hsl(225 10% 12%);
-    --color-sidebar-foreground: hsl(225 10% 90%);
-    /* Neutral-cool to match the 225° greys, rather than the blue-tinted scrim
-       the other dark palette uses. */
-    --color-overlay: hsl(225 10% 4% / 0.68);
-    /* Neutral grey bubble (~#3b3d44), as in Gemini — the user's turn is
-       distinguished by surface elevation rather than by a brand colour. */
-    --color-scrollbar-thumb: hsl(225 8% 66% / 0.22);
-    --color-scrollbar-thumb-hover: hsl(225 8% 66% / 0.4);
+    --color-destructive: oklch(0.78 0.15 22);
+    --color-destructive-foreground: oklch(0.19 0.02 22);
+    --color-success: oklch(0.74 0.14 158);
+    --color-success-foreground: oklch(0.18 0.02 158);
+    --color-warning: oklch(0.8 0.13 78);
+    --color-warning-foreground: oklch(0.2 0.02 78);
+
+    --color-overlay: oklch(0.06 0.02 262 / 0.66);
+    --color-scrollbar-thumb: oklch(0.75 0.02 262 / 0.2);
+    --color-scrollbar-thumb-hover: oklch(0.75 0.02 262 / 0.38);
+    --color-code-bg: oklch(0.175 0.016 262);
+
+    --color-primary: oklch(0.79 calc(var(--accent-c) * 0.78) var(--accent-h));
+    --color-primary-hover: oklch(0.845 calc(var(--accent-c) * 0.72) var(--accent-h));
+    --color-primary-foreground: oklch(0.185 0.02 var(--accent-h));
+    --color-ring: oklch(0.77 calc(var(--accent-c) * 0.8) var(--accent-h));
+    --color-chat-user: oklch(0.33 0.03 var(--accent-h));
+    --color-chat-user-foreground: oklch(0.958 0.006 262);
   }
 }
 
+/* ─── Base ───────────────────────────────────────────────────────────────── */
 @layer base {
-  * {
-    @apply border-border;
-    outline: none !important;
-  }
-  /* Suppress native focus rings app-wide. Radix Select focuses its content
-     element when the pointer leaves a highlighted item onto a group label, so
-     exempt the listbox (the dropdown panel) from the box-shadow suppression to
-     keep its `shadow-md`. */
-  *:focus:not([role="listbox"]),
-  *:focus-visible:not([role="listbox"]) {
-    outline: none !important;
-    box-shadow: none !important;
-  }
-  body {
-    @apply bg-background text-foreground;
-    font-family: system-ui, -apple-system, sans-serif;
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-border);
   }
 
-  /* ─── First-paint surface ───────────────────────────────────────────────────
-     `body` alone is not enough. The compositor paints the canvas from `html`,
-     and it does so before `body` has any layout, so a themed `body` still
-     flashes the browser default white first. Propagating the token to `html`
-     makes the very first frame the right colour. */
   html {
+    /* The compositor paints the canvas from `html` before `body` has layout;
+       without this a light flash precedes every dark page load. */
     background-color: var(--color-background);
+    color-scheme: light;
+    /* Scale the whole UI from one place. Everything above is rem-based. */
+    font-size: 16px;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
   }
 
-  /* Last-resort anti-FOUC for the window before `applyTheme` runs.
-     `theme-preload.js` normally sets `data-theme` synchronously in `<head>`, so
-     this only engages when that script is unavailable (blocked, or a stale
-     cached HTML that predates it). `:not([data-theme])` makes it self-
-     disabling: the moment a theme is painted the attribute exists and these
-     declarations stop matching, so they can never fight the real tokens.
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    font-size: var(--text-sm);
+    line-height: var(--text-sm--line-height);
+    font-synthesis-weight: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
 
-     Only `system` + OS-dark is recoverable without reading storage; an explicit
-     `dark`/`midnight` preference under an OS-light setting is what the preload
-     script exists to cover. Values mirror the `.dark` palette above and are
-     pinned by tests/theme.test.ts. */
+  /* One focus treatment for the whole product.
+     The previous build stripped outlines globally (`outline: none !important`),
+     which left keyboard users with no pointer at all — a WCAG 2.4.7 failure.
+     A single 2px ring at 2px offset reads on every surface and needs no
+     per-component opt-in. */
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+  [role="listbox"]:focus-visible,
+  [role="menu"]:focus-visible {
+    outline: none;
+  }
+
+  ::selection {
+    background-color: color-mix(in oklch, var(--color-primary) 26%, transparent);
+    color: var(--color-foreground);
+  }
+
+  /* Reserve the scrollbar gutter so switching between a short and a long list
+     never shifts the content sideways. */
+  .scroll-container {
+    scrollbar-gutter: stable;
+  }
+
+  /* Last-resort anti-FOUC before `theme-preload.js` runs. `:not([data-theme])`
+     makes it self-disabling: the moment a palette is painted the attribute
+     exists and these declarations stop matching. */
   @media (prefers-color-scheme: dark) {
     html:not([data-theme]) {
-      background-color: hsl(222.2 84% 4.9%);
+      background-color: oklch(0.168 0.004 270);
       color-scheme: dark;
+    }
+  }
+
+  /* Windows high-contrast / forced colours: system colours replace ours, so
+     only geometry needs to survive. */
+  @media (forced-colors: active) {
+    :focus-visible {
+      outline-color: Highlight;
+    }
+  }
+
+  /* Users who ask for more contrast get stronger edges and text, not a
+     different layout. */
+  @media (prefers-contrast: more) {
+    :root {
+      --color-border: oklch(0.75 0.01 285);
+      --color-muted-foreground: oklch(0.42 0.012 285);
+    }
+    .dark {
+      --color-border: oklch(0.45 0.01 270);
+      --color-muted-foreground: oklch(0.82 0.008 270);
     }
   }
 }
 
-/* ─── Unified scrollbar ──────────────────────────────────────────────────────
-   Applied via the `scrollbar-lumo` utility so sidepanel and options share the
-   exact same look. Overlay-style: narrow track, no arrows, thumb only.        */
+/* ─── CJK optical centring ───────────────────────────────────────────────── */
+/* SVG icons are centred on their own geometry; CJK ink sits ~0.16em above the
+   centre of the line box, so an icon + Chinese label pair reads as "label high".
+   The nudge is language-scoped: English labels are already centred and must not
+   move. `translate` is used instead of `transform` so it cannot fight a utility
+   that composes transform on the same element. */
+.text-optical {
+  display: inline-block;
+}
+:lang(zh) .text-optical {
+  translate: 0 0.16em;
+}
 
+/* ─── Scrollbar ──────────────────────────────────────────────────────────── */
 @utility scrollbar-lumo {
   scrollbar-width: thin;
   scrollbar-color: var(--color-scrollbar-thumb) transparent;
 
   &::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
   }
 
   &::-webkit-scrollbar-track {
@@ -204,8 +399,8 @@
   &::-webkit-scrollbar-thumb {
     background-color: var(--color-scrollbar-thumb);
     border-radius: 9999px;
-    /* Inset the thumb so it reads as a floating pill, not a full-width bar */
-    border: 2px solid transparent;
+    /* Inset the thumb so it reads as a floating pill, not a full-width bar. */
+    border: 3px solid transparent;
     background-clip: content-box;
   }
 
@@ -213,74 +408,118 @@
     background-color: var(--color-scrollbar-thumb-hover);
   }
 
-  /* Prevent the white square where vertical and horizontal bars meet */
   &::-webkit-scrollbar-corner {
     background: transparent;
   }
 }
 
-/* CodeMirror scroller inherits the unified scrollbar */
 .cm-scroller {
   @apply scrollbar-lumo;
 }
 
-/* ─── Radix popover / dialog transitions ─────────────────────────────────────
-   `tailwindcss-animate` is not a dependency, so the `data-[state]:animate-in`
-   classes shadcn ships are no-ops here. These keyframes drive the same
-   `data-state` attributes directly, which keeps the enter/exit motion in CSS —
-   Radix can then delay unmount itself and no `AnimatePresence` wrapper is
-   needed at the call sites.                                                    */
-
+/* ─── Overlay motion ─────────────────────────────────────────────────────── */
 @layer components {
   @keyframes lumo-fade-in {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 
   @keyframes lumo-fade-out {
-    from { opacity: 1; }
-    to { opacity: 0; }
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
   }
 
-  /* Scales about the element's own centre. No `translate()` here: the dialog is
-     centred by a flex wrapper, not by `-translate-1/2`. Tailwind v4 compiles
-     that utility to the standalone `translate` property, which a `transform`
-     keyframe composes with rather than overriding — restating it here is what
-     made the panel fly in from the top-left corner. */
+  /* Scale about the element's own centre. No `translate()` here: the dialog is
+     centred by a flex wrapper, and Tailwind v4 compiles `-translate-*` to the
+     standalone `translate` property, which a `transform` keyframe composes with
+     rather than overriding. */
   @keyframes lumo-dialog-in {
-    from { opacity: 0; transform: scale(0.96); }
-    to { opacity: 1; transform: scale(1); }
+    from {
+      opacity: 0;
+      transform: scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
   }
 
   @keyframes lumo-dialog-out {
-    from { opacity: 1; transform: scale(1); }
-    to { opacity: 0; transform: scale(0.98); }
+    from {
+      opacity: 1;
+      transform: scale(1);
+    }
+    to {
+      opacity: 0;
+      transform: scale(0.985);
+    }
   }
 
-  .dialog-overlay[data-state='open'] {
-    animation: lumo-fade-in 150ms ease-out;
+  /* Popovers enter from the side they are anchored to, which is what makes the
+     spatial relationship between trigger and panel legible. */
+  @keyframes lumo-popover-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(4px) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
   }
 
-  .dialog-overlay[data-state='closed'] {
-    animation: lumo-fade-out 120ms ease-in;
+  @keyframes lumo-popover-in-down {
+    from {
+      opacity: 0;
+      transform: translateY(-4px) scale(0.985);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
   }
 
-  .dialog-content[data-state='open'] {
-    animation: lumo-dialog-in 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  .dialog-overlay[data-state="open"] {
+    animation: lumo-fade-in 160ms var(--ease-standard);
+  }
+  .dialog-overlay[data-state="closed"] {
+    animation: lumo-fade-out 120ms var(--ease-exit);
   }
 
-  .dialog-content[data-state='closed'] {
-    animation: lumo-dialog-out 120ms ease-in;
+  .dialog-content[data-state="open"] {
+    animation: lumo-dialog-in 180ms var(--ease-emphasis);
+  }
+  .dialog-content[data-state="closed"] {
+    animation: lumo-dialog-out 120ms var(--ease-exit);
   }
 
-  /* Shared by the Select and DropdownMenu popovers. Radix sets `data-side`, so
-     the panel slides in from the trigger rather than scaling in place. */
-  .popover-panel[data-state='open'] {
-    animation: lumo-fade-in 120ms ease-out;
+  .popover-panel[data-state="open"] {
+    animation: lumo-popover-in-down 140ms var(--ease-emphasis);
+  }
+  .popover-panel[data-state="open"][data-side="top"] {
+    animation-name: lumo-popover-in-up;
+  }
+  .popover-panel[data-state="closed"] {
+    animation: lumo-fade-out 90ms var(--ease-exit);
   }
 
-  .popover-panel[data-state='closed'] {
-    animation: lumo-fade-out 90ms ease-in;
+  /* Route transitions (options page). View Transitions are available in
+     Chrome 111+, and this project targets 138+. The old snapshot fades down,
+     the new one fades up 6px — enough to read as "the page moved", not enough
+     to delay reading. */
+  ::view-transition-old(page-content) {
+    animation: lumo-fade-out 90ms var(--ease-exit);
+  }
+  ::view-transition-new(page-content) {
+    animation: lumo-fade-in 160ms var(--ease-standard);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -289,19 +528,22 @@
     .popover-panel {
       animation-duration: 1ms !important;
     }
+    ::view-transition-old(page-content),
+    ::view-transition-new(page-content) {
+      animation-duration: 1ms;
+    }
+    html {
+      scroll-behavior: auto;
+    }
   }
 }
 
-/* ─── Code view (Shiki highlighting) ─────────────────────────────────────── */
-
+/* ─── Code (Shiki) ───────────────────────────────────────────────────────── */
 @layer components {
-  /* Shiki emits inline light-theme colors plus `--shiki-dark`/`--shiki-dark-bg`
-     CSS variables on the same elements. The `.dark` rules override the inline
-     colors with `!important` so the code switches theme with the app. */
   .code-view .shiki {
     margin: 0;
     font-size: inherit;
-    font-family: inherit;
+    font-family: var(--font-mono);
     line-height: 1.25rem;
     background-color: transparent !important;
   }
@@ -322,16 +564,29 @@
   }
 }
 
-/* ─── CodeMirror host ─────────────────────────────────────────────────────── */
+/* ─── CodeMirror host ────────────────────────────────────────────────────── */
 .cm-editor {
   height: 100%;
+  background-color: transparent;
 }
 
 .cm-editor .cm-scroller {
   overflow: auto;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+  font-family: var(--font-mono);
+  line-height: 1.5rem;
 }
 
 .cm-editor.cm-focused {
   outline: none;
+}
+
+.cm-editor .cm-gutters {
+  background-color: transparent;
+  border-right: 1px solid var(--color-border);
+  color: var(--color-muted-foreground);
+}
+
+.cm-editor .cm-activeLine,
+.cm-editor .cm-activeLineGutter {
+  background-color: color-mix(in oklch, var(--color-primary) 6%, transparent);
 }

@@ -5,19 +5,23 @@ import { cn } from '@/lib/utils';
 /**
  * Compact status/metadata pill.
  *
- * The options pages had this inlined as `text-xs bg-primary/10 text-primary
- * px-1.5 py-0.5 rounded` in several places; centralising it keeps the tint
- * ratios consistent across the three themes.
+ * Tints are 10–12% of the semantic colour with a matching border, which keeps
+ * a badge readable as a *category* rather than as a button. Variants map 1:1 to
+ * meaning so log levels and script states cannot accidentally share a colour.
  */
 const badgeVariants = cva(
-  'inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 text-[11px] font-medium leading-tight whitespace-nowrap',
+  'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-2xs font-medium leading-tight',
   {
     variants: {
       variant: {
-        /** Neutral metadata — provider transport, counts. */
+        /** Neutral metadata — namespace, counts, sizes. */
         default: 'border-transparent bg-muted text-muted-foreground',
-        /** Highlighted capability — e.g. vision support. */
-        accent: 'border-primary/20 bg-primary/10 text-primary',
+        /** Accent-tinted capability — version, "update available". */
+        accent: 'border-primary/25 bg-primary/10 text-primary',
+        /** Positive state — enabled, installed, healthy. */
+        success: 'border-success/25 bg-success/10 text-success',
+        /** Caution — updates staged, non-fatal warnings. */
+        warning: 'border-warning/30 bg-warning/10 text-warning',
         /** Problems that need the user's attention. */
         destructive: 'border-destructive/25 bg-destructive/10 text-destructive',
         /** Low-emphasis label that still needs an edge to read as a chip. */

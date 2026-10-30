@@ -3,6 +3,15 @@
   "description": "A powerful, well-crafted userscript manager for Chrome",
   "private": true,
   "version": "0.1.0",
+  "author": "mscststs",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/mscststs/lumo-userscript-manager.git"
+  },
+  "homepage": "https://github.com/mscststs/lumo-userscript-manager#readme",
+  "bugs": {
+    "url": "https://github.com/mscststs/lumo-userscript-manager/issues"
+  },
   "engines": {
     "node": ">=22.22.2",
     "npm": ">=10"
@@ -22,7 +31,8 @@
     "test:watch": "vitest",
     "prepare": "git config core.hooksPath .githooks || true",
     "postinstall": "wxt prepare",
-    "build:runtime": "node scripts/build-runtime.mjs"
+    "build:runtime": "node scripts/build-runtime.mjs",
+    "build:icons": "node scripts/build-icons.mjs"
   },
   "overrides": {
     "@vitejs/plugin-react": "^5.0.4"

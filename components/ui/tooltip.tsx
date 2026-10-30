@@ -2,6 +2,13 @@ import * as React from 'react';
 import * as TooltipPrimitive from '@radix-ui/react-tooltip';
 import { cn } from '@/lib/utils';
 
+/**
+ * Tooltip.
+ *
+ * Reserved for icon-only controls whose label is not otherwise recoverable.
+ * A tooltip is not an explanation surface: if a control needs a sentence to be
+ * understood, the control is wrong.
+ */
 const TooltipProvider = TooltipPrimitive.Provider;
 const Tooltip = TooltipPrimitive.Root;
 const TooltipTrigger = TooltipPrimitive.Trigger;
@@ -15,7 +22,7 @@ const TooltipContent = React.forwardRef<
       ref={ref}
       sideOffset={sideOffset}
       className={cn(
-        'z-50 overflow-hidden rounded-md border border-border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground shadow-md popover-panel',
+        'z-50 max-w-[min(18rem,calc(100vw-1rem))] overflow-hidden rounded-md border border-border bg-popover px-2 py-1 text-xs leading-relaxed text-popover-foreground shadow-elev2 popover-panel',
         className,
       )}
       {...props}

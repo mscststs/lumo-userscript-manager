@@ -124,30 +124,6 @@ export async function buildRuntimePayload(uuid: string): Promise<PlannedScript |
   return buildPlannedScript(script, settings);
 }
 
-export async function runScriptOnTab(uuid: string, tabId: number): Promise<void> {
-  const settings = await storage.getUISettings();
-  if (!settings.scriptsEnabled) {
-    throw new Error('Scripts are disabled globally.');
-  }
-  const planned = await buildRuntimePayload(uuid);
-  if (!planned) throw new Error('Script not found.');
-  const execute = (chrome.userScripts as any)?.execute;
-  if (typeof execute !== 'function') {
-    throw new Error('chrome.userScripts.execute is unavailable in this browser.');
-  }
-  await execute({
-    js: [
-      // A tab opened before this script was installed has no engine injected.
-      // Re-running the engine file is a no-op when it is already live.
-      { file: planned.world === 'MAIN' ? RUNNER_FILE : HOST_FILE },
-      { code: compileLauncher(planned.payload, planned.world) },
-    ],
-    target: { tabId },
-    world: planned.world,
-    injectImmediately: true,
-  });
-}
-
 async function buildPlannedScript(
   script: UserScript,
   settings: Awaited<ReturnType<typeof storage.getUISettings>>,

@@ -6,6 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { sendBg } from '@/lib/messages';
+import { ThemeInit } from '@/lib/theme';
+import { FontSizeInit } from '@/lib/font-size';
 import { formatBytes } from '@/lib/utils';
 
 type State =
@@ -83,10 +85,12 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-background px-6 py-8 text-foreground">
+      <ThemeInit />
+      <FontSizeInit />
       <div className="mx-auto w-full max-w-2xl space-y-6">
         <header className="flex items-center justify-between gap-4">
           <div className="flex min-w-0 items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <div className="flex h-8 w-8 items-center justify-center rounded-control bg-primary/10 text-primary">
               <FileCode2 className="h-4 w-4" />
             </div>
             <div>
@@ -100,7 +104,7 @@ export default function App() {
         </header>
 
         {state.status === 'loading' && (
-          <div className="rounded-lg border border-border bg-card p-6">
+          <div className="rounded-card border border-border bg-card p-6">
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <RefreshCw className="h-4 w-4 animate-spin" />
               {t('install.fetching')}
@@ -109,7 +113,7 @@ export default function App() {
         )}
 
         {state.status === 'error' && (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-6">
+          <div className="rounded-card border border-destructive/30 bg-destructive/5 p-6">
             <p className="flex items-center gap-2 text-sm font-medium text-destructive">
               <ShieldAlert className="h-4 w-4" />
               {t('install.errorTitle')}
@@ -130,9 +134,9 @@ export default function App() {
 
         {state.status === 'ready' && (
           <>
-            <div className="rounded-lg border border-border bg-card p-5">
+            <div className="rounded-card border border-border bg-card p-5">
               <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-card bg-muted text-muted-foreground">
                   <FileCode2 className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -154,7 +158,7 @@ export default function App() {
                       {state.summary.description}
                     </p>
                   )}
-                  <p className="mt-2 truncate text-[11px] text-muted-foreground">
+                  <p className="mt-2 truncate text-2xs text-muted-foreground">
                     {state.summary.sourceUrl || t('install.localSource')}
                   </p>
                 </div>
@@ -196,7 +200,7 @@ export default function App() {
                         <div key={item.url} className="break-all text-muted-foreground">
                           <span className="text-foreground">{formatBytes(item.size)}</span> · {item.url}
                           {item.hash && (
-                            <span className="ml-1 text-[10px] opacity-70">
+                            <span className="ml-1 text-2xs opacity-70">
                               #{item.hash.slice(0, 12)}
                             </span>
                           )}
@@ -216,7 +220,7 @@ export default function App() {
               </div>
 
               {state.summary.warnings.length > 0 && (
-                <div className="mt-4 rounded-md border border-border bg-muted/40 p-3 text-[11px] text-muted-foreground">
+                <div className="mt-4 rounded-md border border-border bg-muted/40 p-3 text-2xs text-muted-foreground">
                   {state.summary.warnings.map((warning) => (
                     <p key={warning}>• {warning}</p>
                   ))}
@@ -224,11 +228,11 @@ export default function App() {
               )}
             </div>
 
-            <details className="rounded-lg border border-border bg-card">
+            <details className="rounded-card border border-border bg-card">
               <summary className="cursor-pointer select-none px-4 py-3 text-xs font-medium">
                 {t('install.codePreview')}
               </summary>
-              <pre className="max-h-72 overflow-auto border-t border-border p-4 text-[11px] leading-relaxed scrollbar-lumo">
+              <pre className="max-h-72 overflow-auto border-t border-border p-4 text-2xs leading-relaxed scrollbar-lumo">
                 {state.summary.code}
               </pre>
             </details>
@@ -256,7 +260,7 @@ export default function App() {
         )}
 
         {state.status === 'installing' && (
-          <div className="rounded-lg border border-border bg-card p-6">
+          <div className="rounded-card border border-border bg-card p-6">
             <p className="flex items-center gap-2 text-sm text-muted-foreground">
               <RefreshCw className="h-4 w-4 animate-spin" />
               {t('install.installing')}
@@ -265,7 +269,7 @@ export default function App() {
         )}
 
         {state.status === 'installed' && (
-          <div className="rounded-lg border border-border bg-card p-6">
+          <div className="rounded-card border border-border bg-card p-6">
             <p className="text-sm font-medium text-foreground">{t('install.successTitle')}</p>
             <p className="mt-1 text-xs text-muted-foreground">{t('install.successDesc')}</p>
             <div className="mt-4 flex gap-2">
@@ -286,7 +290,7 @@ export default function App() {
 function InfoBlock({ title, children }: { title: string; children: ReactNode }) {
   return (
     <div className="min-w-0 space-y-1.5">
-      <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
+      <p className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
       <div className="break-words text-xs">{children}</div>
     </div>
   );

@@ -7,6 +7,26 @@ export function formatDateTime(timestamp: number | undefined, locale: string): s
   }
 }
 
+/**
+ * Date + time without seconds, for list columns.
+ *
+ * `toLocaleString` always includes seconds, which is the single biggest reason
+ * a timestamp column has to be truncated in a dense list. Seconds matter in the
+ * log stream (where entries are compared), not in "when was this script last
+ * updated".
+ */
+export function formatDateTimeShort(timestamp: number | undefined, locale: string): string {
+  if (!timestamp) return '—';
+  try {
+    return new Intl.DateTimeFormat(locale, {
+      dateStyle: 'short',
+      timeStyle: 'short',
+    }).format(new Date(timestamp));
+  } catch {
+    return formatDateTime(timestamp, locale);
+  }
+}
+
 export function formatRelativeTime(timestamp: number | undefined, locale: string): string {
   if (!timestamp) return '—';
   const diff = Date.now() - timestamp;

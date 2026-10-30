@@ -1,30 +1,35 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { AnimatePresence, motion } from 'motion/react';
 import {
-  Download,
   FileCode2,
   FilePlus2,
-  Filter,
   Link2,
   MoreHorizontal,
   RefreshCw,
+  RotateCcw,
   Search,
   Trash2,
   Upload,
+  X,
 } from 'lucide-react';
 import type { UserScript } from '@/types';
 import { sendBg, onLumoEvent } from '@/lib/messages';
-import { readBackupZip } from '@/lib/backup';
 import { formatBytes } from '@/lib/utils';
-import { formatDateTime } from '@/lib/format';
+import { formatDateTime, formatDateTimeShort } from '@/lib/format';
 import { mergeMetadata } from '@/lib/script/metadata';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Segmented } from '@/components/ui/segmented';
 import { EmptyState } from '@/components/layout/EmptyState';
-import { SettingsHeader } from '@/components/settings/SettingsHeader';
+import { PageHeader } from '@/components/layout/PageHeader';
+import { PageLayout } from '@/components/layout/PageLayout';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { useToast } from '@/components/ui/toast';
 import {
   Dialog,
   DialogContent,
@@ -41,22 +46,36 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
+type Filter = 'all' | 'enabled' | 'disabled' | 'updates';
+
+/** One grid template for the header *and* every row, so columns cannot drift. */
+const ROW_GRID =
+  'grid grid-cols-[1.75rem_minmax(0,1fr)_auto] items-center gap-2 sm:grid-cols-[1.75rem_minmax(0,1fr)_7.5rem_5rem] sm:gap-3';
+
 interface ScriptsPageProps {
   onOpenEditor: (uuid: string) => void;
   onOpenSettings: () => void;
 }
 
+interface PendingAction {
+  kind: 'delete' | 'purge' | 'batch-delete';
+  script?: UserScript;
+}
+
 export function ScriptsPage({ onOpenEditor, onOpenSettings }: ScriptsPageProps) {
   const { t, i18n } = useTranslation();
+  const toast = useToast();
   const [scripts, setScripts] = useState<UserScript[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<Filter>('all');
   const [showTrash, setShowTrash] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [status, setStatus] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [urlOpen, setUrlOpen] = useState(false);
   const [url, setUrl] = useState('');
+  const [pending, setPending] = useState<PendingAction | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -75,39 +94,76 @@ export function ScriptsPage({ onOpenEditor, onOpenSettings }: ScriptsPageProps) 
     void load();
   }, [load]);
 
-  useEffect(() => onLumoEvent((event) => {
-    if (event === 'scripts-changed' || event === 'updates-checked') void load();
-  }), [load]);
+  useEffect(
+    () =>
+      onLumoEvent((event) => {
+        if (event === 'scripts-changed' || event === 'updates-checked') void load();
+      }),
+    [load],
+  );
+
+  // A filter change invalidates any selection made under the previous one.
+  useEffect(() => {
+    setSelected(new Set());
+  }, [filter, showTrash, query]);
+
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return scripts.filter((script) => {
+      if (filter === 'enabled' && (!script.enabled || script.removedAt)) return false;
+      if (filter === 'disabled' && (script.enabled || script.removedAt)) return false;
+      if (filter === 'updates' && script.updateState !== 'update-available') return false;
       if (!needle) return true;
       return (
         script.name.toLowerCase().includes(needle) ||
         script.namespace.toLowerCase().includes(needle) ||
         script.tags.some((tag) => tag.toLowerCase().includes(needle)) ||
-        [...script.metadata.match ?? [], ...script.metadata.include ?? []].some((value) =>
+        [...(script.metadata.match ?? []), ...(script.metadata.include ?? [])].some((value) =>
           value.toLowerCase().includes(needle),
         )
       );
     });
-  }, [query, scripts]);
+  }, [filter, query, scripts]);
+
+  const counts = useMemo(
+    () => ({
+      all: scripts.length,
+      enabled: scripts.filter((script) => script.enabled && !script.removedAt).length,
+      disabled: scripts.filter((script) => !script.enabled || script.removedAt).length,
+      updates: scripts.filter((script) => script.updateState === 'update-available').length,
+    }),
+    [scripts],
+  );
+
+  // "Update available" is a conditional option: once the last pending update is
+  // applied it disappears from the control, so a lingering selection would point
+  // at a tab that no longer exists.
+  useEffect(() => {
+    if (filter === 'updates' && !loading && counts.updates === 0) setFilter('all');
+  }, [counts.updates, filter, loading]);
 
   const toggle = async (script: UserScript, enabled: boolean) => {
+    const previous = scripts;
+    setScripts((prev) =>
+      prev.map((item) => (item.uuid === script.uuid ? { ...item, enabled } : item)),
+    );
     try {
       await sendBg('scripts:toggle', { uuid: script.uuid, enabled });
-      setScripts((prev) => prev.map((item) => (item.uuid === script.uuid ? { ...item, enabled } : item)));
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setScripts(previous);
+      toast({
+        title: t('common.error'),
+        description: e instanceof Error ? e.message : String(e),
+        variant: 'error',
+      });
     }
   };
 
   const remove = async (script: UserScript) => {
-    if (!window.confirm(t('scripts.confirmDelete'))) return;
     try {
       await sendBg('scripts:delete', { uuid: script.uuid });
-      setStatus(t('scripts.trashHint'));
+      toast({ title: t('scripts.movedToTrash'), description: script.name, variant: 'success' });
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -115,7 +171,6 @@ export function ScriptsPage({ onOpenEditor, onOpenSettings }: ScriptsPageProps) 
   };
 
   const purge = async (script: UserScript) => {
-    if (!window.confirm(t('scripts.confirmPurge'))) return;
     try {
       await sendBg('scripts:purge', { uuid: script.uuid });
       await load();
@@ -134,7 +189,7 @@ export function ScriptsPage({ onOpenEditor, onOpenSettings }: ScriptsPageProps) 
   };
 
   const checkUpdates = async () => {
-    setStatus(t('common.loading'));
+    setBusy(true);
     try {
       const result = await sendBg<{
         checked: number;
@@ -142,73 +197,60 @@ export function ScriptsPage({ onOpenEditor, onOpenSettings }: ScriptsPageProps) 
         available: number;
         errors: string[];
       }>('updates:check');
-      setStatus(t('scripts.checkUpdatesDone', result));
-      if (result.errors?.length) setError(result.errors.join('\n'));
+      toast({
+        title: t('scripts.checkUpdatesDone', result),
+        description: result.errors?.length ? result.errors.join('\n') : undefined,
+        variant: result.errors?.length ? 'error' : 'success',
+      });
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
-      setStatus(null);
+    } finally {
+      setBusy(false);
     }
   };
 
-  const exportBackup = async () => {
-    try {
-      const data = await sendBg<Record<string, unknown>>('backup:export');
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-      const href = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = href;
-      anchor.download = `lumo-userscripts-${new Date().toISOString().slice(0, 10)}.json`;
-      anchor.click();
-      URL.revokeObjectURL(href);
-      setStatus(t('scripts.exportDone'));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  };
-
+  // Scripts page owns the *script* lifecycle: a dropped file is a userscript to
+  // review and install. Backups are a different scope and live in
+  // Settings → Data, so a `.json`/`.zip` here no longer silently restores one.
   const importFiles = async (files: FileList | null) => {
     if (!files?.length) return;
-    setStatus(t('common.loading'));
+    setBusy(true);
     try {
       for (const file of Array.from(files)) {
-        if (file.name.toLowerCase().endsWith('.json')) {
-          const data = JSON.parse(await file.text());
-          await sendBg('backup:import', { data });
-        } else if (file.name.toLowerCase().endsWith('.zip')) {
-          const data = readBackupZip(await file.arrayBuffer());
-          await sendBg('backup:import', { data });
-        } else {
-          const code = await file.text();
-          const { token } = await sendBg<{ token: string }>('install:prepare', { code });
-          await chrome.tabs.create({ url: `${chrome.runtime.getURL('install.html')}?token=${token}` });
-        }
+        const code = await file.text();
+        const { token } = await sendBg<{ token: string }>('install:prepare', { code });
+        await chrome.tabs.create({
+          url: `${chrome.runtime.getURL('install.html')}?token=${token}`,
+        });
       }
-      setStatus(null);
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
-      setStatus(null);
+    } finally {
+      setBusy(false);
     }
   };
 
   const installUrl = async () => {
     if (!url.trim()) {
-      setStatus(t('scripts.urlRequired'));
+      setError(t('scripts.urlRequired'));
       return;
     }
-    setStatus(t('common.loading'));
+    setBusy(true);
     try {
       const { token } = await sendBg<{ token: string }>('install:prepare', {
         sourceUrl: url.trim(),
       });
       setUrlOpen(false);
       setUrl('');
-      await chrome.tabs.create({ url: `${chrome.runtime.getURL('install.html')}?token=${token}` });
-      setStatus(null);
+      await chrome.tabs.create({
+        url: `${chrome.runtime.getURL('install.html')}?token=${token}`,
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
-      setStatus(null);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -219,119 +261,191 @@ export function ScriptsPage({ onOpenEditor, onOpenSettings }: ScriptsPageProps) 
     });
   };
 
+  const allSelected = filtered.length > 0 && selected.size === filtered.length;
+  const someSelected = selected.size > 0 && !allSelected;
+
   const toggleAll = () => {
-    if (selected.size === filtered.length) setSelected(new Set());
-    else setSelected(new Set(filtered.map((script) => script.uuid)));
+    setSelected(allSelected ? new Set() : new Set(filtered.map((script) => script.uuid)));
+  };
+
+  const toggleOne = (uuid: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(uuid)) next.delete(uuid);
+      else next.add(uuid);
+      return next;
+    });
   };
 
   const batch = async (action: 'enable' | 'disable' | 'delete') => {
-    for (const uuid of selected) {
-      const script = scripts.find((item) => item.uuid === uuid);
-      if (!script) continue;
-      if (action === 'delete') await sendBg('scripts:delete', { uuid });
-      else await sendBg('scripts:toggle', { uuid, enabled: action === 'enable' });
+    setBusy(true);
+    try {
+      for (const uuid of selected) {
+        if (action === 'delete') await sendBg('scripts:delete', { uuid });
+        else await sendBg('scripts:toggle', { uuid, enabled: action === 'enable' });
+      }
+      setSelected(new Set());
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
     }
-    setSelected(new Set());
-    await load();
   };
 
-  return (
-    <div className="mx-auto w-full max-w-5xl space-y-6">
-      <SettingsHeader
-        title={t('scripts.title')}
-        description={t('scripts.description')}
-        action={
-          <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={() => void checkUpdates()}>
-              <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
-              {t('scripts.checkUpdates')}
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => void exportBackup()}>
-              <Download className="mr-1.5 h-3.5 w-3.5" />
-              {t('scripts.export')}
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => fileInput.current?.click()}>
-              <Upload className="mr-1.5 h-3.5 w-3.5" />
-              {t('scripts.import')}
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setUrlOpen(true)}>
-              <Link2 className="mr-1.5 h-3.5 w-3.5" />
-              {t('scripts.importUrl')}
-            </Button>
-            <Button size="sm" onClick={() => onOpenEditor('new')}>
-              <FilePlus2 className="mr-1.5 h-3.5 w-3.5" />
-              {t('scripts.new')}
-            </Button>
-          </div>
-        }
-      />
+  const confirmPending = async () => {
+    if (!pending) return;
+    if (pending.kind === 'batch-delete') await batch('delete');
+    else if (pending.kind === 'delete' && pending.script) await remove(pending.script);
+    else if (pending.kind === 'purge' && pending.script) await purge(pending.script);
+  };
 
+  const header = (
+    <PageHeader
+      title={t('scripts.title')}
+      description={t('scripts.description')}
+      actions={
+        <>
+          <Button size="default" onClick={() => onOpenEditor('new')}>
+            <FilePlus2 className="h-3.5 w-3.5" />
+            {t('scripts.new')}
+          </Button>
+          <Button variant="outline" size="default" onClick={() => setUrlOpen(true)}>
+            <Link2 className="h-3.5 w-3.5" />
+            {t('scripts.importUrl')}
+          </Button>
+          <Button variant="outline" size="default" onClick={() => fileInput.current?.click()}>
+            <Upload className="h-3.5 w-3.5" />
+            {t('scripts.import')}
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" aria-label={t('common.actions')}>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem disabled={busy} onClick={() => void checkUpdates()}>
+                <RefreshCw />
+                {t('scripts.checkUpdates')}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={onOpenSettings}>
+                {t('common.settings')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </>
+      }
+    />
+  );
+
+  return (
+    <PageLayout header={header}>
       <input
         ref={fileInput}
         type="file"
-        accept=".user.js,.js,.json,.zip"
+        accept=".user.js,.js"
         multiple
         className="hidden"
         onChange={(event) => void importFiles(event.target.files)}
       />
 
+      {/* Toolbar: search grows, filter stays compact, trash is a toggle. */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[12rem] flex-1">
+        <div className="relative min-w-0 flex-1 basis-56">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={t('scripts.searchPlaceholder')}
-            className="h-9 pl-8"
+            aria-label={t('scripts.searchPlaceholder')}
+            className="pl-8"
           />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery('')}
+              aria-label={t('common.clear')}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-3 w-3" />
+            </button>
+          )}
         </div>
+        <Segmented
+          ariaLabel={t('scripts.filter')}
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { value: 'all', label: t('scripts.filterAll'), count: counts.all },
+            { value: 'enabled', label: t('common.enabled'), count: counts.enabled },
+            { value: 'disabled', label: t('common.disabled'), count: counts.disabled },
+            ...(counts.updates
+              ? [{ value: 'updates' as const, label: t('scripts.updateAvailable'), count: counts.updates }]
+              : []),
+          ]}
+        />
         <Button
           variant={showTrash ? 'secondary' : 'ghost'}
-          size="sm"
-          onClick={() => {
-            setShowTrash((value) => !value);
-            setSelected(new Set());
-          }}
+          size="default"
+          onClick={() => setShowTrash((value) => !value)}
+          aria-pressed={showTrash}
         >
-          <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+          <Trash2 className="h-3.5 w-3.5" />
           {t('scripts.trash')}
         </Button>
       </div>
 
-      {status && <p className="text-xs text-muted-foreground">{status}</p>}
-      {error && <p className="whitespace-pre-wrap text-xs text-destructive">{error}</p>}
-
-      {selected.size > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-xs">
-          <span className="text-muted-foreground">{t('scripts.selected', { count: selected.size })}</span>
-          <Button variant="ghost" size="sm" className="h-7" onClick={() => void batch('enable')}>
-            {t('scripts.batchEnable')}
-          </Button>
-          <Button variant="ghost" size="sm" className="h-7" onClick={() => void batch('disable')}>
-            {t('scripts.batchDisable')}
-          </Button>
-          <Button variant="ghost" size="sm" className="h-7" onClick={() => void batch('delete')}>
-            {t('scripts.batchDelete')}
-          </Button>
-          <Button variant="ghost" size="sm" className="h-7" onClick={() => setSelected(new Set())}>
-            {t('scripts.clearSelection')}
+      {error && (
+        <div
+          role="alert"
+          className="mt-3 flex items-start gap-2 rounded-card border border-destructive/30 bg-destructive/5 px-3 py-2"
+        >
+          <p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-xs leading-relaxed text-destructive">
+            {error}
+          </p>
+          <Button variant="ghost" size="xs" onClick={() => setError(null)}>
+            {t('common.close')}
           </Button>
         </div>
       )}
 
-      <div className="overflow-hidden rounded-lg border border-border bg-card">
+      <div className="mt-3 overflow-hidden rounded-card border border-border bg-card">
         {loading ? (
-          <div className="p-6 text-xs text-muted-foreground">{t('common.loading')}</div>
+          <div>
+            {[0, 1, 2, 3].map((index) => (
+              <div key={index} className={`${ROW_GRID} border-b border-border px-3 py-3 last:border-b-0`}>
+                <Skeleton className="h-4 w-4" />
+                <div className="min-w-0 space-y-1.5">
+                  <Skeleton className="h-3.5 w-2/5" />
+                  <Skeleton className="h-2.5 w-3/5" />
+                </div>
+                <Skeleton className="h-4 w-8" />
+              </div>
+            ))}
+          </div>
         ) : filtered.length === 0 ? (
           <EmptyState
             icon={showTrash ? Trash2 : FileCode2}
-            title={showTrash ? t('scripts.emptyTrashTitle') : t('scripts.emptyTitle')}
+            title={
+              query
+                ? t('scripts.noMatches')
+                : showTrash
+                  ? t('scripts.emptyTrashTitle')
+                  : t('scripts.emptyTitle')
+            }
             description={
-              showTrash ? t('scripts.emptyTrashDescription') : t('scripts.emptyDescription')
+              query
+                ? undefined
+                : showTrash
+                  ? t('scripts.emptyTrashDescription')
+                  : t('scripts.emptyDescription')
             }
             action={
-              !showTrash ? (
+              !showTrash && !query ? (
                 <Button size="sm" onClick={() => onOpenEditor('new')}>
+                  <FilePlus2 className="h-3.5 w-3.5" />
                   {t('scripts.new')}
                 </Button>
               ) : undefined
@@ -339,146 +453,272 @@ export function ScriptsPage({ onOpenEditor, onOpenSettings }: ScriptsPageProps) 
           />
         ) : (
           <>
-            <div className="flex items-center gap-2 border-b border-border px-3 py-2 text-[11px] text-muted-foreground">
-              <input
-                type="checkbox"
-                checked={selected.size === filtered.length && filtered.length > 0}
-                onChange={toggleAll}
-                aria-label={t('scripts.selectAll')}
+            <div
+              className={`${ROW_GRID} border-b border-border px-3 py-1.5 text-2xs font-medium uppercase tracking-wider text-muted-foreground`}
+            >
+              <Checkbox
+                checked={allSelected}
+                indeterminate={someSelected}
+                onCheckedChange={toggleAll}
+                label={t('scripts.selectAll')}
               />
-              <span className="flex-1">{t('common.name')}</span>
-              <span className="hidden w-20 text-right sm:block">{t('common.version')}</span>
-              <span className="hidden w-24 text-right md:block">{t('common.status')}</span>
-              <span className="w-8" />
+              <span className="min-w-0 truncate">{t('common.name')}</span>
+              <span className="hidden text-right sm:block">{t('scripts.lastUpdated')}</span>
+              <span className="hidden text-right sm:block">{t('common.actions')}</span>
             </div>
-            <div className="divide-y divide-border">
+
+            <div>
               {filtered.map((script) => (
-                <div key={script.uuid} className="flex items-center gap-2 px-3 py-3">
-                  <input
-                    type="checkbox"
-                    checked={selected.has(script.uuid)}
-                    onChange={() =>
-                      setSelected((prev) => {
-                        const next = new Set(prev);
-                        if (next.has(script.uuid)) next.delete(script.uuid);
-                        else next.add(script.uuid);
-                        return next;
-                      })
-                    }
-                    aria-label={script.name}
-                  />
-                  <button
-                    type="button"
-                    className="min-w-0 flex-1 text-left"
-                    onClick={() => onOpenEditor(script.uuid)}
-                  >
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="truncate text-sm font-medium text-foreground">{script.name}</span>
-                      {script.version && <Badge variant="outline">v{script.version}</Badge>}
-                      {script.updateState === 'update-available' && (
-                        <Badge variant="accent">{t('scripts.updateAvailable')}</Badge>
-                      )}
-                      {!script.enabled && <Badge variant="default">{t('common.disabled')}</Badge>}
-                    </div>
-                    <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                      {script.namespace || t('scripts.noSource')}
-                      {script.tags.length ? ` · ${script.tags.join(', ')}` : ''}
-                      {` · ${formatBytes(script.codeSize)}`}
-                    </div>
-                    <div className="mt-0.5 truncate text-[11px] text-muted-foreground">
-                      {(() => {
-                        const effective = mergeMetadata(script.metadata, script.selfMetadata);
-                        return (
-                          [...effective.match ?? [], ...effective.include ?? []]
-                            .slice(0, 2)
-                            .join(', ') || t('install.allPages')
-                        );
-                      })()}
-                    </div>
-                    {script.lastError && (
-                      <p className="mt-1 line-clamp-1 text-[11px] text-destructive">{script.lastError}</p>
-                    )}
-                  </button>
-                  <span className="hidden w-20 text-right text-[11px] text-muted-foreground sm:block">
-                    {script.version || '—'}
-                  </span>
-                  <span className="hidden w-24 text-right text-[11px] text-muted-foreground md:block">
-                    {formatDateTime(script.updatedAt, i18n.language)}
-                  </span>
-                  <div className="flex w-20 shrink-0 items-center justify-end gap-1">
-                    <Switch
-                      checked={script.enabled && !script.removedAt}
-                      disabled={Boolean(script.removedAt)}
-                      onCheckedChange={(checked) => void toggle(script, checked)}
-                      aria-label={t('scripts.toggle')}
-                    />
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-7 w-7">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {script.removedAt ? (
-                          <>
-                            <DropdownMenuItem onClick={() => void restore(script)}>
-                              {t('scripts.restore')}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem destructive onClick={() => void purge(script)}>
-                              {t('scripts.purge')}
-                            </DropdownMenuItem>
-                          </>
-                        ) : (
-                          <>
-                            <DropdownMenuItem onClick={() => onOpenEditor(script.uuid)}>
-                              {t('scripts.edit')}
-                            </DropdownMenuItem>
-                            {script.updateState === 'update-available' && script.pendingInstallToken && (
-                              <DropdownMenuItem onClick={() => openUpdate(script)}>
-                                {t('scripts.reviewUpdate')}
-                              </DropdownMenuItem>
-                            )}
-                            <DropdownMenuItem onClick={() => onOpenSettings()}>
-                              {t('common.settings')}
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem destructive onClick={() => void remove(script)}>
-                              {t('scripts.delete')}
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
+                <ScriptRow
+                  key={script.uuid}
+                  script={script}
+                  selected={selected.has(script.uuid)}
+                  onSelect={() => toggleOne(script.uuid)}
+                  onToggle={(enabled) => void toggle(script, enabled)}
+                  onOpen={() => onOpenEditor(script.uuid)}
+                  onRestore={() => void restore(script)}
+                  onReviewUpdate={() => openUpdate(script)}
+                  onDelete={() => setPending({ kind: 'delete', script })}
+                  onPurge={() => setPending({ kind: 'purge', script })}
+                  locale={i18n.language}
+                />
               ))}
             </div>
           </>
         )}
       </div>
 
+      {/* Batch bar: appears only with a selection, and occupies the bottom edge
+          where the pointer already is after dragging across rows. */}
+      <AnimatePresence>
+        {selected.size > 0 && (
+          <motion.div
+            initial={{ y: 16, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 16, opacity: 0 }}
+            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+            className="sticky bottom-3 z-30 mx-auto mt-3 flex w-fit max-w-full flex-wrap items-center gap-1.5 rounded-card border border-border bg-popover px-2 py-1.5 shadow-elev3"
+          >
+            <span className="px-1.5 text-xs tabular-nums text-muted-foreground">
+              {t('scripts.selected', { count: selected.size })}
+            </span>
+            <span className="mx-0.5 h-5 w-px bg-border" aria-hidden="true" />
+            <Button variant="ghost" size="sm" disabled={busy} onClick={() => void batch('enable')}>
+              {t('scripts.batchEnable')}
+            </Button>
+            <Button variant="ghost" size="sm" disabled={busy} onClick={() => void batch('disable')}>
+              {t('scripts.batchDisable')}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={busy}
+              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+              onClick={() => setPending({ kind: 'batch-delete' })}
+            >
+              {t('scripts.batchDelete')}
+            </Button>
+            <Button variant="ghost" size="iconSm" onClick={() => setSelected(new Set())} aria-label={t('scripts.clearSelection')}>
+              <X className="h-3.5 w-3.5" />
+            </Button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <Dialog open={urlOpen} onOpenChange={setUrlOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-md" closeLabel={t('common.close')}>
           <DialogHeader>
             <DialogTitle>{t('scripts.fromUrl')}</DialogTitle>
             <DialogDescription>{t('scripts.urlPlaceholder')}</DialogDescription>
           </DialogHeader>
-          <Textarea
+          <Input
             value={url}
             onChange={(event) => setUrl(event.target.value)}
             placeholder={t('scripts.urlPlaceholder')}
-            className="min-h-20"
+            autoFocus
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') void installUrl();
+            }}
           />
           <DialogFooter>
-            <Button variant="ghost" size="sm" onClick={() => setUrlOpen(false)}>
+            <Button variant="ghost" onClick={() => setUrlOpen(false)}>
               {t('common.cancel')}
             </Button>
-            <Button size="sm" onClick={() => void installUrl()}>
+            <Button onClick={() => void installUrl()} disabled={busy}>
               {t('common.install')}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={pending !== null}
+        onOpenChange={(open) => !open && setPending(null)}
+        title={
+          pending?.kind === 'purge'
+            ? t('scripts.confirmPurge')
+            : pending?.kind === 'batch-delete'
+              ? t('scripts.confirmBatchDelete', { count: selected.size })
+              : t('scripts.confirmDelete')
+        }
+        description={
+          pending?.kind === 'purge'
+            ? t('scripts.purgeHint')
+            : pending?.kind === 'delete'
+              ? t('scripts.trashHint')
+              : undefined
+        }
+        confirmLabel={
+          pending?.kind === 'purge' || pending?.kind === 'batch-delete'
+            ? t('common.delete')
+            : t('scripts.delete')
+        }
+        cancelLabel={t('common.cancel')}
+        destructive
+        onConfirm={confirmPending}
+      />
+    </PageLayout>
+  );
+}
+
+function ScriptRow({
+  script,
+  selected,
+  onSelect,
+  onToggle,
+  onOpen,
+  onRestore,
+  onReviewUpdate,
+  onDelete,
+  onPurge,
+  locale,
+}: {
+  script: UserScript;
+  selected: boolean;
+  onSelect: () => void;
+  onToggle: (enabled: boolean) => void;
+  onOpen: () => void;
+  onRestore: () => void;
+  onReviewUpdate: () => void;
+  onDelete: () => void;
+  onPurge: () => void;
+  locale: string;
+}) {
+  const { t } = useTranslation();
+  const removed = Boolean(script.removedAt);
+  const effective = mergeMetadata(script.metadata, script.selfMetadata);
+  const matches = [...(effective.match ?? []), ...(effective.include ?? [])];
+
+  return (
+    <div
+      className={`${ROW_GRID} group relative border-b border-border px-3 py-2.5 transition-colors duration-100 last:border-b-0 hover:bg-muted/40 ${
+        selected ? 'bg-primary/[0.06]' : ''
+      }`}
+    >
+      <Checkbox
+        checked={selected}
+        onCheckedChange={onSelect}
+        label={script.name}
+        className="relative z-10"
+      />
+
+      <button
+        type="button"
+        onClick={onOpen}
+        disabled={removed}
+        className="min-w-0 text-left disabled:cursor-default"
+      >
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span
+            className={`min-w-0 truncate text-sm font-medium ${
+              removed || !script.enabled ? 'text-muted-foreground' : 'text-foreground'
+            }`}
+            title={script.name}
+          >
+            {script.name}
+          </span>
+          {script.version && <Badge variant="outline">v{script.version}</Badge>}
+          {script.updateState === 'update-available' && (
+            <Badge variant="accent">{t('scripts.updateAvailable')}</Badge>
+          )}
+          {removed && <Badge variant="default">{t('scripts.trash')}</Badge>}
+          {!removed && !script.enabled && <Badge variant="default">{t('common.disabled')}</Badge>}
+        </span>
+        <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-2xs text-muted-foreground">
+          <span className="truncate">{script.namespace || t('scripts.noSource')}</span>
+          <span aria-hidden="true">·</span>
+          <span className="shrink-0 tabular-nums">{formatBytes(script.codeSize)}</span>
+          <span aria-hidden="true" className="hidden sm:inline">
+            ·
+          </span>
+          <span className="hidden min-w-0 truncate font-mono sm:inline">
+            {matches.slice(0, 2).join(', ') || t('install.allPages')}
+          </span>
+        </span>
+        {script.lastError && (
+          <span className="mt-0.5 block truncate text-2xs text-destructive">
+            {script.lastError}
+          </span>
+        )}
+      </button>
+
+      <span
+        className="hidden truncate text-right text-2xs tabular-nums text-muted-foreground sm:block"
+        title={formatDateTime(script.updatedAt, locale)}
+      >
+        {formatDateTimeShort(script.updatedAt, locale)}
+      </span>
+
+      <div className="flex items-center justify-end gap-1">
+        {!removed && (
+          <Switch
+            size="sm"
+            checked={script.enabled}
+            onCheckedChange={onToggle}
+            aria-label={`${t('scripts.toggle')}: ${script.name}`}
+          />
+        )}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="iconSm"
+              aria-label={t('common.actions')}
+              className="opacity-60 group-hover:opacity-100"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            {removed ? (
+              <>
+                <DropdownMenuItem onClick={onRestore}>
+                  <RotateCcw />
+                  {t('scripts.restore')}
+                </DropdownMenuItem>
+                <DropdownMenuItem destructive onClick={onPurge}>
+                  <Trash2 />
+                  {t('scripts.purge')}
+                </DropdownMenuItem>
+              </>
+            ) : (
+              <>
+                <DropdownMenuItem onClick={onOpen}>{t('scripts.edit')}</DropdownMenuItem>
+                {script.updateState === 'update-available' && script.pendingInstallToken && (
+                  <DropdownMenuItem onClick={onReviewUpdate}>
+                    {t('scripts.reviewUpdate')}
+                  </DropdownMenuItem>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem destructive onClick={onDelete}>
+                  <Trash2 />
+                  {t('scripts.delete')}
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </div>
   );
 }

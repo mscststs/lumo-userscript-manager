@@ -24,7 +24,14 @@
  */
 
 import type { UISettings } from '@/types';
-import { DEFAULT_THEME, normalizeTheme } from '@/lib/theme-registry';
+import {
+  DEFAULT_ACCENT,
+  DEFAULT_DARK_THEME,
+  DEFAULT_THEME_MODE,
+  normalizeAccent,
+  normalizeDarkTheme,
+  normalizeThemeMode,
+} from '@/lib/theme-registry';
 import { DEFAULT_FONT_SIZE, normalizeFontSize } from '@/lib/font-size-registry';
 import { DEFAULT_LANGUAGE, normalizeLanguage } from '@/lib/language';
 
@@ -66,7 +73,9 @@ export interface StorageFieldDef<K extends StorageKey> {
 
 export const DEFAULT_UI_SETTINGS: UISettings = {
   language: DEFAULT_LANGUAGE,
-  theme: DEFAULT_THEME,
+  theme: DEFAULT_THEME_MODE,
+  darkTheme: DEFAULT_DARK_THEME,
+  accent: DEFAULT_ACCENT,
   fontSize: DEFAULT_FONT_SIZE,
   scriptsEnabled: true,
   defaultRunAt: 'document-idle',
@@ -112,7 +121,15 @@ export const STORAGE_FIELDS: { [K in StorageKey]: StorageFieldDef<K> } = {
       // Guards configs exported by a build that knows a theme this one does not
       // (and pre-field configs). An unrecognised value would otherwise reach
       // `data-theme`, match no token block, and silently leave light tokens.
-      theme: normalizeTheme(raw?.theme),
+      // `theme` used to carry the palette (`'midnight'`). A legacy record must
+      // win over `darkTheme` even if that field exists with a default value,
+      // otherwise a partially-written record would drop the user's palette.
+      theme: normalizeThemeMode(raw?.theme),
+      darkTheme:
+        (raw?.theme as unknown) === 'midnight'
+          ? 'midnight'
+          : normalizeDarkTheme(raw?.darkTheme),
+      accent: normalizeAccent(raw?.accent),
       fontSize: normalizeFontSize(raw?.fontSize),
       scriptsEnabled: raw?.scriptsEnabled !== false,
       defaultRunAt:

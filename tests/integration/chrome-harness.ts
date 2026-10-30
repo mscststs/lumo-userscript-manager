@@ -247,17 +247,6 @@ export class ExtensionHarness {
     );
   }
 
-  async activateTab(tabId: number): Promise<void> {
-    await this.extEval(`chrome.tabs.update(${tabId},{active:true})`);
-  }
-
-  async runScript(uuid: string): Promise<void> {
-    const response = await this.extEval<{ ok: boolean; error?: string }>(
-      `chrome.runtime.sendMessage({type:'scripts:run',payload:{uuid:${JSON.stringify(uuid)}}})`,
-    );
-    if (!response?.ok) throw new Error(response?.error ?? 'scripts:run failed');
-  }
-
   async setScriptsEnabled(enabled: boolean): Promise<void> {
     await this.extEval(`(async()=>{
       const stored = await chrome.storage.local.get('uiSettings');

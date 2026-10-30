@@ -50,7 +50,6 @@ import {
   checkUserScriptsAvailable,
   getRuntimeStatus,
   requestRegistration,
-  runScriptOnTab,
 } from '@/lib/background/registry';
 
 const INSTALL_RULE_ID = 1;
@@ -190,12 +189,6 @@ async function handleRuntimeMessage(
     case 'scripts:purge':
       await destroyScript(String(payload.uuid ?? ''));
       return true;
-    case 'scripts:run': {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (tab?.id === undefined) throw new Error('No active tab.');
-      await runScriptOnTab(String(payload.uuid ?? ''), tab.id);
-      return true;
-    }
     case 'install:prepare':
       return prepareInstall({
         sourceUrl: payload.sourceUrl ? String(payload.sourceUrl) : undefined,

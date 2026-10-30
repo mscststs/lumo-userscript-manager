@@ -156,26 +156,6 @@ document.documentElement.dataset.lumoMain = 'ran';
     expect(mainScriptUuid).toBeTruthy();
   }, 60_000);
 
-  it('runs a script on an already-open tab via scripts:run', async () => {
-    const match = `${harness.pageUrl}*`;
-    const uuid = await harness.installScript(`// ==UserScript==
-// @name         Lumo E2E run-on-tab
-// @namespace    e2e
-// @version      1.0.0
-// @match        ${match}
-// @grant        none
-// @run-at       document-idle
-// ==/UserScript==
-window.__lumoRunOnTab = true;
-`);
-    await harness.refresh();
-
-    const tabId = await harness.tabId();
-    await harness.activateTab(tabId);
-    await harness.runScript(uuid);
-    await harness.waitForPage(`window.__lumoRunOnTab === true`, 15_000);
-  }, 60_000);
-
   it('supports the original brightness-script shape: @require, regex @include, @noframes', async () => {
     const uuid = await harness.installScript(`// ==UserScript==
 // @name         Lumo E2E require+noframes
@@ -213,12 +193,11 @@ GM_registerMenuCommand('require menu', () => {
     );
   }, 60_000);
 
-  it('stops registering and running scripts when globally disabled', async () => {
+  it('stops registering scripts when globally disabled', async () => {
     await harness.setScriptsEnabled(false);
     await harness.refresh();
 
     expect(await harness.registeredScriptIds()).toEqual([]);
-    await expect(harness.runScript(mainScriptUuid)).rejects.toThrow(/disabled/i);
 
     await harness.setScriptsEnabled(true);
     await harness.refresh();

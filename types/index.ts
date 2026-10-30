@@ -5,23 +5,33 @@
 export type FontSize = 12 | 13 | 14 | 15 | 16 | 17 | 18;
 
 /**
- * A user-selectable colour theme.
+ * A concrete palette. Each one maps 1:1 to a token block in `assets/globals.css`
+ * and to an entry in `THEMES` (`lib/theme-registry.ts`).
  *
- * `'system'` is a *preference*, not a palette — it resolves to one of the
- * concrete themes at apply time based on `prefers-color-scheme`. Every other
- * member maps 1:1 to a token block in `assets/globals.css`.
- *
- * Adding a theme is a two-step change: extend this union, then register it in
- * `THEMES` (see `lib/theme-registry.ts`) — TypeScript will flag every place
- * that needs updating, including the i18n label map.
+ * `light` is the only light palette; `dark` (Graphite) and `midnight` are the
+ * dark palettes the user can choose between.
  */
-export type Theme = 'light' | 'dark' | 'midnight' | 'system';
+export type ResolvedTheme = 'light' | 'dark' | 'midnight';
+
+/** Palette used whenever the resolved scheme is dark. */
+export type DarkTheme = 'dark' | 'midnight';
 
 /**
- * The subset of {@link Theme} that names an actual palette. `'system'` is
- * excluded because it always resolves to one of these before being applied.
+ * Light/dark *preference*, deliberately separate from which dark palette is
+ * used. `'system'` was previously a member of the palette union, which made it
+ * impossible to answer "when the OS goes dark, which dark palette should I use?"
+ * without a second field anyway.
  */
-export type ResolvedTheme = Exclude<Theme, 'system'>;
+export type ThemeMode = 'light' | 'dark' | 'system';
+
+/**
+ * Accent hue preset.
+ *
+ * Orthogonal to {@link ThemeMode} / {@link ResolvedTheme}: the palette fixes
+ * lightness and contrast, the
+ * accent only rotates the hue of `primary` / `ring`. See `lib/theme-registry`.
+ */
+export type AccentColor = 'azure' | 'violet' | 'emerald' | 'amber' | 'rose';
 
 /** Stored language preference. `auto` follows the browser UI language. */
 export type Language = 'auto' | 'en' | 'zh';
@@ -33,7 +43,12 @@ export type UserLogLevel = 'error' | 'warn' | 'info' | 'debug';
 /** Settings that affect every extension page and the runtime. */
 export interface UISettings {
   language: Language;
-  theme: Theme;
+  /** Light/dark preference. */
+  theme: ThemeMode;
+  /** Palette painted when the resolved scheme is dark. */
+  darkTheme: DarkTheme;
+  /** Hue of every accent-derived token. */
+  accent: AccentColor;
   /** Global UI font size in pixels. */
   fontSize: FontSize;
 

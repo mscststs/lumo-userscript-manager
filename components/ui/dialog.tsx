@@ -6,13 +6,9 @@ import { cn } from '@/lib/utils';
 /**
  * Modal dialog built on `@radix-ui/react-dialog`.
  *
- * Replaces the hand-rolled `fixed inset-0` overlays the options pages used to
- * ship: Radix supplies the focus trap, Esc handling, scroll lock and
- * `aria-modal` wiring that those were missing.
- *
- * Enter/exit motion is delegated to CSS keyframes via Radix's `data-state`
- * attributes rather than `motion`, so the component can unmount without an
- * `AnimatePresence` wrapper at every call site.
+ * Radix supplies the focus trap, Esc handling, scroll lock and `aria-modal`
+ * wiring. Enter/exit motion is delegated to CSS keyframes via `data-state`, so a
+ * call site does not need an `AnimatePresence` wrapper just to unmount.
  */
 
 const Dialog = DialogPrimitive.Root;
@@ -27,8 +23,8 @@ const DialogOverlay = React.forwardRef<
     ref={ref}
     className={cn(
       // `bg-overlay` is a per-theme token, not a `foreground` tint: on the dark
-      // palettes `foreground` is near-white, so `bg-foreground/40` produced a
-      // white wash that lightened the page instead of dimming it.
+      // palettes `foreground` is near-white, so `bg-foreground/40` would
+      // lighten the page instead of dimming it.
       'fixed inset-0 z-50 bg-overlay backdrop-blur-[2px] dialog-overlay',
       className,
     )}
@@ -41,35 +37,33 @@ interface DialogContentProps
   extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
   /** Render the built-in top-right close button. Defaults to true. */
   showCloseButton?: boolean;
+  /** Accessible label for the close button. Call sites pass the localised string. */
+  closeLabel?: string;
+  /** ARIA role. Use `alertdialog` for destructive confirmations. */
+  role?: 'dialog' | 'alertdialog';
 }
 
 const DialogContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
   DialogContentProps
->(({ className, children, showCloseButton = true, ...props }, ref) => (
+>(({ className, children, showCloseButton = true, closeLabel = 'Close', role = 'dialog', ...props }, ref) => (
   <DialogPrimitive.Portal>
     <DialogOverlay />
     {/*
       Centring is done by this flex wrapper rather than the usual
-      `top-1/2 left-1/2 -translate-1/2` trick.
-
-      In Tailwind v4 `-translate-x-1/2` compiles to the standalone `translate`
-      property, not to `transform: translate(...)`. A keyframe animating
-      `transform` therefore does not override it — the two *compose*, so the
-      panel started at -100%/-100% (up and left of the viewport) and snapped to
-      its real position only when the animation ended. Centring via layout means
-      the animation only has to touch opacity and scale.
-
-      `pointer-events-none` keeps the wrapper from swallowing backdrop clicks;
-      the panel re-enables them for itself.
+      `top-1/2 left-1/2 -translate-1/2` trick. In Tailwind v4 `-translate-*`
+      compiles to the standalone `translate` property, not `transform`; a
+      keyframe animating `transform` therefore composes with it instead of
+      overriding it, which made the panel fly in from the top-left corner.
     */}
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+    <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center p-4">
       <DialogPrimitive.Content
         ref={ref}
+        role={role}
         className={cn(
           'pointer-events-auto flex w-full max-w-md flex-col gap-4',
-          'rounded-xl border border-border bg-card p-5 shadow-xl',
-          'max-h-[calc(100dvh-4rem)] overflow-y-auto scrollbar-lumo dialog-content',
+          'rounded-card border border-border bg-card p-5 shadow-elev3',
+          'max-h-[calc(100dvh-3rem)] overflow-y-auto scrollbar-lumo dialog-content',
           className,
         )}
         {...props}
@@ -77,10 +71,10 @@ const DialogContent = React.forwardRef<
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close
-            className="absolute right-3.5 top-3.5 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            aria-label="Close"
+            className="absolute right-3 top-3 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            aria-label={closeLabel}
           >
-            <X className="h-4 w-4" />
+            <X className="h-3.5 w-3.5" />
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Content>
@@ -91,6 +85,10 @@ DialogContent.displayName = DialogPrimitive.Content.displayName;
 
 function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return <div className={cn('flex flex-col gap-1 pr-8', className)} {...props} />;
+}
+
+function DialogBody({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn('text-sm leading-relaxed text-muted-foreground', className)} {...props} />;
 }
 
 function DialogFooter({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
@@ -120,7 +118,7 @@ const DialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn('text-xs leading-relaxed text-muted-foreground', className)}
+    className={cn('text-sm leading-relaxed text-muted-foreground', className)}
     {...props}
   />
 ));
@@ -133,6 +131,7 @@ export {
   DialogDescription,
   DialogFooter,
   DialogHeader,
+  DialogBody,
   DialogOverlay,
   DialogTitle,
   DialogTrigger,

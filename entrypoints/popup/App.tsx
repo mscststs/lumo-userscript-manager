@@ -1,14 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ChevronDown,
   CircleAlert,
   FileCode2,
+  Globe,
   LayoutDashboard,
+  MoreHorizontal,
   Pencil,
-  Play,
   Plus,
   RefreshCw,
-  Settings,
   SlidersHorizontal,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -21,12 +20,16 @@ import { ThemeInit } from '@/lib/theme';
 import { FontSizeInit } from '@/lib/font-size';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/layout/EmptyState';
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   Tooltip,
   TooltipContent,
@@ -47,12 +50,36 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** `https://example.com/path` → `example.com`. Falls back to the raw string. */
+function hostnameOf(url: string | undefined): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname || parsed.protocol.replace(':', '');
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * Popup.
+ *
+ * Three fixed bands: identity + global switch, the per-page script list, and the
+ * two destinations that matter (new script / dashboard). The list scrolls
+ * inside a capped flex column so the footer never drifts off-screen — a popup
+ * whose primary action can be scrolled away is a popup that gets closed instead.
+ *
+ * Density is deliberate: 13px names, 11px metadata, 28px rows. Everything the
+ * eye needs to answer "is this script running here, and do I want it to?" is on
+ * one line; everything else is one disclosure away.
+ */
 export default function App() {
   const { t } = useTranslation();
   const [data, setData] = useState<PopupData | null>(null);
   const [menus, setMenus] = useState<RuntimeMenuCommand[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setInitialLoading(true);
@@ -65,9 +92,7 @@ export default function App() {
         url: tab.url,
       });
       const nextMenus =
-        tab.id === undefined
-          ? []
-          : await sendBg<RuntimeMenuCommand[]>('menus:list', { tabId: tab.id });
+        tab.id === undefined ? [] : await sendBg<RuntimeMenuCommand[]>('menus:list', { tabId: tab.id });
       setData(next);
       setMenus(nextMenus);
     } catch (e) {
@@ -100,6 +125,18 @@ export default function App() {
   }, [menus]);
 
   const scriptsEnabled = data?.settings.scriptsEnabled ?? true;
+  const hostname = hostnameOf(data?.url);
+
+  const scripts = useMemo(() => {
+    const list = data?.scripts ?? [];
+    const needle = query.trim().toLowerCase();
+    if (!needle) return list;
+    return list.filter(
+      (script) =>
+        script.name.toLowerCase().includes(needle) ||
+        (script.namespace ?? '').toLowerCase().includes(needle),
+    );
+  }, [data?.scripts, query]);
 
   const openOptions = (hash = '') => {
     void chrome.tabs.create({ url: chrome.runtime.getURL(`options.html${hash}`) });
@@ -151,15 +188,6 @@ export default function App() {
     }
   };
 
-  const runScript = async (script: PopupScriptInfo) => {
-    try {
-      await sendBg('scripts:run', { uuid: script.uuid });
-      window.close();
-    } catch (e) {
-      setError(errorMessage(e));
-    }
-  };
-
   const invokeMenu = async (command: RuntimeMenuCommand) => {
     try {
       const delivered = await sendBg<boolean>('menus:invoke', {
@@ -176,12 +204,33 @@ export default function App() {
   };
 
   return (
-    <TooltipProvider delayDuration={300}>
-      <div className="flex w-[380px] flex-col bg-background">
+    <TooltipProvider delayDuration={350}>
+      <div className="flex max-h-[600px] w-[360px] flex-col bg-background text-foreground">
         <ThemeInit />
         <FontSizeInit />
 
-        <div className="flex items-center gap-2.5 border-b border-border bg-muted/30 px-3 py-2">
+        {/* ── Global band ───────────────────────────────────────────────────
+            This switch pauses injection on *every* site, so it lives in the
+            extension-identity band and is labelled as such. The page identity
+            is a separate, read-only strip below: mixing the two scopes is how
+            the popup previously implied the switch only affected this tab. */}
+        <header className="flex shrink-0 items-center gap-2.5 border-b border-border bg-muted/30 px-3 py-2.5">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-control bg-primary/10 text-primary">
+            <FileCode2 className="h-3.5 w-3.5" aria-hidden="true" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="min-w-0 truncate text-sm font-semibold leading-tight text-foreground">
+              {t('popup.injection')}
+            </p>
+            <p
+              className={cn(
+                'min-w-0 truncate text-2xs leading-tight',
+                scriptsEnabled ? 'text-muted-foreground' : 'text-warning',
+              )}
+            >
+              {scriptsEnabled ? t('common.enabled') : t('popup.globalDisabled')}
+            </p>
+          </div>
           <Switch
             size="sm"
             checked={scriptsEnabled}
@@ -189,36 +238,40 @@ export default function App() {
             onCheckedChange={(checked) => void toggleGlobal(checked)}
             aria-label={t('popup.globalSwitch')}
           />
+        </header>
+
+        {/* ── Page band ─────────────────────────────────────────────────────
+            Read-only context: which tab the list below belongs to. */}
+        <div className="flex shrink-0 items-center gap-1.5 border-b border-border px-3 py-1.5">
+          <Globe className="h-3 w-3 shrink-0 text-muted-foreground" aria-hidden="true" />
           <span
-            className={cn(
-              'min-w-0 flex-1 truncate text-[13px] font-medium',
-              scriptsEnabled ? 'text-foreground' : 'text-muted-foreground',
-            )}
+            className="min-w-0 truncate text-xs font-medium text-foreground"
+            title={data?.url}
           >
-            {scriptsEnabled ? t('common.enabled') : t('common.disabled')}
+            {hostname ?? t('popup.unknownPage')}
           </span>
           {data && (
-            <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
-              {t('popup.scriptsOnPage')} · {data.scripts.length}
+            <span className="ml-auto shrink-0 text-2xs tabular-nums text-muted-foreground">
+              {t('popup.pageSummary', { count: data.scripts.length })}
             </span>
           )}
         </div>
 
         {data && !data.runtime.userScriptsAvailable && (
-          <div className="flex items-start gap-2 border-b border-border bg-destructive/5 px-3 py-2">
+          <div className="flex shrink-0 items-start gap-2 border-b border-border bg-destructive/5 px-3 py-2">
             <CircleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-destructive" />
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-medium text-destructive">
+              <p className="text-2xs font-medium text-destructive">
                 {t('popup.userScriptsUnavailable')}
               </p>
-              <p className="mt-0.5 line-clamp-2 text-[10px] leading-snug text-muted-foreground">
+              <p className="mt-0.5 line-clamp-2 text-2xs leading-snug text-muted-foreground">
                 {t('popup.userScriptsUnavailableDescription')}
               </p>
             </div>
             <Button
-              variant="ghost"
-              size="sm"
-              className="h-6 shrink-0 px-1.5 text-[11px]"
+              variant="outline"
+              size="xs"
+              className="shrink-0"
               onClick={openExtensions}
             >
               {t('popup.openExtensions')}
@@ -227,18 +280,15 @@ export default function App() {
         )}
 
         {error && data && (
-          <div className="flex items-center gap-2 border-b border-border bg-destructive/5 px-3 py-1.5">
+          <div className="flex shrink-0 items-center gap-2 border-b border-border bg-destructive/5 px-3 py-1.5">
             <CircleAlert className="h-3.5 w-3.5 shrink-0 text-destructive" />
-            <span
-              className="min-w-0 flex-1 truncate text-[11px] text-destructive"
-              title={error}
-            >
+            <span className="min-w-0 flex-1 truncate text-2xs text-destructive" title={error}>
               {error}
             </span>
             <Button
               variant="ghost"
-              size="icon"
-              className="h-6 w-6 shrink-0"
+              size="iconSm"
+              className="shrink-0"
               onClick={() => void load(true)}
               aria-label={t('common.retry')}
             >
@@ -247,7 +297,21 @@ export default function App() {
           </div>
         )}
 
-        <main className="max-h-[26rem] overflow-y-auto scrollbar-lumo">
+        {/* Search is progressive disclosure: five rows do not need a filter,
+            fifty do. Below the threshold the field does not exist at all. */}
+        {(data?.scripts.length ?? 0) > 5 && (
+          <div className="shrink-0 border-b border-border px-3 py-1.5">
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder={t('popup.searchPlaceholder')}
+              aria-label={t('popup.searchPlaceholder')}
+              className="h-7 text-xs"
+            />
+          </div>
+        )}
+
+        <main className="min-h-0 flex-1 overflow-y-auto scrollbar-lumo">
           {!data && initialLoading ? (
             <PopupSkeleton />
           ) : !data && error ? (
@@ -257,22 +321,24 @@ export default function App() {
               icon={FileCode2}
               title={t('popup.noScripts')}
               description={t('popup.noScriptsDescription')}
-              className="min-h-0 py-8"
+              className="py-8"
+            />
+          ) : data && scripts.length === 0 ? (
+            <EmptyState
+              icon={FileCode2}
+              title={t('scripts.noMatches')}
+              className="py-8"
             />
           ) : data ? (
             <div className="divide-y divide-border" role="list">
-              {data.scripts.map((script) => (
+              {scripts.map((script) => (
                 <ScriptRow
                   key={script.uuid}
                   script={script}
-                  scriptsEnabled={scriptsEnabled}
                   commands={
-                    script.enabled && scriptsEnabled
-                      ? (commandsByUuid.get(script.uuid) ?? [])
-                      : []
+                    script.enabled && scriptsEnabled ? commandsByUuid.get(script.uuid) ?? [] : []
                   }
                   onToggle={(enabled) => void toggleScript(script, enabled)}
-                  onRun={() => void runScript(script)}
                   onInvoke={(command) => void invokeMenu(command)}
                   onEdit={() => openOptions(`#/script/${script.uuid}`)}
                   onConfigure={() => openOptions(`#/script/${script.uuid}/metadata`)}
@@ -282,35 +348,33 @@ export default function App() {
           ) : null}
         </main>
 
-        <footer className="shrink-0 border-t border-border">
-          <div className="flex items-center gap-1.5 px-2 py-2">
-            <Button
-              size="sm"
-              className="h-8 flex-1 text-[12px]"
-              onClick={() => openOptions('#/script/new')}
-            >
-              <Plus className="mr-1.5 h-3.5 w-3.5" />
-              {t('scripts.new')}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 flex-1 px-2 text-[12px] text-muted-foreground"
-              onClick={() => openOptions('#/scripts')}
-            >
-              <LayoutDashboard className="mr-1.5 h-3.5 w-3.5" />
-              {t('popup.manage')}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 flex-1 px-2 text-[12px] text-muted-foreground"
-              onClick={() => openOptions('#/settings')}
-            >
-              <Settings className="mr-1.5 h-3.5 w-3.5" />
-              {t('common.settings')}
-            </Button>
-          </div>
+        {/* Compact destinations with labels. The previous icon-only pair was
+            unreadable without hovering, and the full-width primary made "new"
+            look like the only thing worth clicking in the whole panel. */}
+        <footer className="flex shrink-0 items-center gap-1 border-t border-border px-2 py-2">
+          <Button size="sm" onClick={() => openOptions('#/script/new')}>
+            <Plus className="h-3.5 w-3.5" />
+            {t('scripts.new')}
+          </Button>
+          <span className="flex-1" />
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
+            onClick={() => openOptions('#/scripts')}
+          >
+            <LayoutDashboard className="h-3.5 w-3.5" />
+            {t('popup.manageShort')}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
+            onClick={() => openOptions('#/settings/general')}
+          >
+            <SlidersHorizontal className="h-3.5 w-3.5" />
+            {t('common.settings')}
+          </Button>
         </footer>
       </div>
     </TooltipProvider>
@@ -319,10 +383,8 @@ export default function App() {
 
 interface ScriptRowProps {
   script: PopupScriptInfo;
-  scriptsEnabled: boolean;
   commands: RuntimeMenuCommand[];
   onToggle: (enabled: boolean) => void;
-  onRun: () => void;
   onInvoke: (command: RuntimeMenuCommand) => void;
   onEdit: () => void;
   onConfigure: () => void;
@@ -330,41 +392,48 @@ interface ScriptRowProps {
 
 function ScriptRow({
   script,
-  scriptsEnabled,
   commands,
   onToggle,
-  onRun,
   onInvoke,
   onEdit,
   onConfigure,
 }: ScriptRowProps) {
   const { t } = useTranslation();
   const title = script.version ? `${script.name} · v${script.version}` : script.name;
+  // One grant is worth naming; a list of four is noise in a 360px row.
+  const grants = script.grant.filter((grant) => grant && grant !== 'none');
+  const grantHint =
+    grants.length === 0
+      ? t('install.noPermissions')
+      : grants.length === 1
+        ? grants[0]!
+        : t('popup.grantCount', { count: grants.length });
 
   return (
-    <div className="flex items-start gap-2.5 px-3 py-2.5" role="listitem">
-      <div className="mt-0.5 shrink-0">
-        <Switch
-          size="sm"
-          checked={script.enabled}
-          onCheckedChange={onToggle}
-          aria-label={`${t('scripts.toggle')}: ${script.name}`}
-        />
-      </div>
+    <div className="group px-3 py-2 transition-colors hover:bg-muted/40" role="listitem">
+      <div className="flex items-start gap-2">
+        <div className="mt-1 shrink-0">
+          <Switch
+            size="sm"
+            checked={script.enabled}
+            onCheckedChange={onToggle}
+            aria-label={`${t('scripts.toggle')}: ${script.name}`}
+          />
+        </div>
 
-      <Collapsible className="min-w-0 flex-1">
-        <div className="flex items-start gap-1.5">
-          <div className="min-w-0 flex-1">
-            <div className="flex min-w-0 items-center gap-1.5">
+        <div className="min-w-0 flex-1">
+          <button type="button" onClick={onEdit} className="block w-full min-w-0 text-left">
+            <span className="flex min-w-0 items-center gap-1.5">
               <span
                 className={cn(
-                  'min-w-0 truncate text-[13px] font-medium leading-tight',
+                  'min-w-0 truncate text-sm font-medium leading-tight',
                   script.enabled ? 'text-foreground' : 'text-muted-foreground',
                 )}
                 title={title}
               >
                 {script.name}
               </span>
+              {script.version && <Badge variant="outline">v{script.version}</Badge>}
               {script.lastError && (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -379,78 +448,62 @@ function ScriptRow({
                   </TooltipTrigger>
                   <TooltipContent
                     side="top"
-                    className="max-w-[260px] whitespace-pre-wrap break-words text-[11px]"
+                    className="max-w-[260px] whitespace-pre-wrap break-words text-2xs"
                   >
                     {script.lastError}
                   </TooltipContent>
                 </Tooltip>
               )}
-            </div>
-            {script.namespace && (
-              <p className="mt-0.5 truncate text-[11px] leading-tight text-muted-foreground">
-                {script.namespace}
-              </p>
-            )}
-          </div>
+            </span>
+            <span className="mt-0.5 flex min-w-0 items-center gap-1 text-2xs leading-tight text-muted-foreground">
+              <span className="truncate">{script.namespace || t('scripts.noSource')}</span>
+              <span aria-hidden="true">·</span>
+              <span className="min-w-0 truncate font-mono">{grantHint}</span>
+            </span>
+          </button>
 
-          <CollapsibleTrigger
-            className="group -mr-1 -mt-1 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-            title={t('popup.moreActions')}
-          >
-            <ChevronDown className="h-3.5 w-3.5 transition-transform duration-150 group-data-[state=open]:rotate-180" />
-            <span className="sr-only">{t('popup.moreActions')}</span>
-          </CollapsibleTrigger>
+          {commands.length > 0 && (
+            <div className="mt-1 space-y-0.5 border-l-2 border-border pl-2">
+              {commands.map((command) => (
+                <button
+                  key={command.id}
+                  type="button"
+                  className="block w-full truncate rounded px-1 py-0.5 text-left text-2xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+                  onClick={() => onInvoke(command)}
+                  title={command.title}
+                >
+                  {command.title}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
 
-        {commands.length > 0 && (
-          <div className="mt-1.5 space-y-0.5 border-l border-border pl-2">
-            {commands.map((command) => (
-              <button
-                key={command.id}
-                type="button"
-                className="block w-full truncate rounded px-1.5 py-1 text-left text-[11px] text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-                onClick={() => onInvoke(command)}
-                title={command.title}
+        <div className="flex shrink-0 items-center gap-0.5">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="iconSm"
+                aria-label={t('popup.moreActions')}
+                className="opacity-70 group-hover:opacity-100 data-[state=open]:bg-accent"
               >
-                {command.title}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <CollapsibleContent>
-          <div className="mt-2 flex flex-wrap items-center gap-1 border-t border-border/70 pt-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1 px-2 text-[11px] text-muted-foreground hover:text-foreground"
-              onClick={onEdit}
-            >
-              <Pencil className="h-3 w-3" />
-              {t('scripts.edit')}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1 px-2 text-[11px] text-muted-foreground hover:text-foreground"
-              onClick={onConfigure}
-            >
-              <SlidersHorizontal className="h-3 w-3" />
-              {t('popup.configure')}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 gap-1 px-2 text-[11px] text-muted-foreground hover:text-foreground"
-              disabled={!script.enabled || !scriptsEnabled}
-              onClick={onRun}
-            >
-              <Play className="h-3 w-3" />
-              {t('popup.runOnTab')}
-            </Button>
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
+                <MoreHorizontal className="h-3.5 w-3.5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="min-w-[9rem]">
+              <DropdownMenuItem onClick={onEdit}>
+                <Pencil />
+                {t('scripts.edit')}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onConfigure}>
+                <SlidersHorizontal />
+                {t('popup.configure')}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
     </div>
   );
 }
@@ -459,13 +512,13 @@ function PopupSkeleton() {
   return (
     <div className="divide-y divide-border">
       {[0, 1, 2].map((index) => (
-        <div key={index} className="flex items-start gap-2.5 px-3 py-2.5">
-          <div className="mt-0.5 h-5 w-9 animate-pulse rounded-full bg-muted motion-reduce:animate-none" />
+        <div key={index} className="flex items-start gap-2 px-3 py-2">
+          <Skeleton className="mt-1 h-4 w-7 rounded-full" />
           <div className="min-w-0 flex-1 space-y-1.5">
-            <div className="h-3 w-2/5 animate-pulse rounded bg-muted motion-reduce:animate-none" />
-            <div className="h-2.5 w-1/4 animate-pulse rounded bg-muted motion-reduce:animate-none" />
+            <Skeleton className="h-3 w-2/5" />
+            <Skeleton className="h-2.5 w-1/2" />
           </div>
-          <div className="h-3.5 w-3.5 animate-pulse rounded bg-muted motion-reduce:animate-none" />
+          <Skeleton className="h-6 w-11" />
         </div>
       ))}
     </div>

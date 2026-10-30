@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_THEME } from '@/lib/theme-registry';
+import {
+  DEFAULT_ACCENT,
+  DEFAULT_DARK_THEME,
+  DEFAULT_THEME_MODE,
+} from '@/lib/theme-registry';
 import { DEFAULT_FONT_SIZE } from '@/lib/font-size-registry';
 import { DEFAULT_LANGUAGE } from '@/lib/language';
 import { EXPORTABLE_KEYS, STORAGE_FIELDS } from '@/store/storage-schema';
@@ -21,7 +25,9 @@ describe('storage schema', () => {
     const settings = normalizeUI(STORAGE_FIELDS.uiSettings.defaultValue);
     expect(settings).toEqual({
       language: DEFAULT_LANGUAGE,
-      theme: DEFAULT_THEME,
+      theme: DEFAULT_THEME_MODE,
+      darkTheme: DEFAULT_DARK_THEME,
+      accent: DEFAULT_ACCENT,
       fontSize: DEFAULT_FONT_SIZE,
       scriptsEnabled: true,
       defaultRunAt: 'document-idle',
@@ -42,13 +48,29 @@ describe('storage schema', () => {
 
     const settings = normalizeUI(raw);
     expect(settings.language).toBe(DEFAULT_LANGUAGE);
-    expect(settings.theme).toBe(DEFAULT_THEME);
+    expect(settings.theme).toBe(DEFAULT_THEME_MODE);
+    expect(settings.darkTheme).toBe(DEFAULT_DARK_THEME);
+    expect(settings.accent).toBe(DEFAULT_ACCENT);
     expect(settings.fontSize).toBe(DEFAULT_FONT_SIZE);
   });
 
+  it('migrates a legacy `theme: midnight` into dark + Midnight', () => {
+    const settings = normalizeUI({
+      ...STORAGE_FIELDS.uiSettings.defaultValue,
+      theme: 'midnight',
+    } as unknown as UISettings);
+    expect(settings.theme).toBe('dark');
+    expect(settings.darkTheme).toBe('midnight');
+  });
+
   it('keeps valid persisted values across every preset', () => {
-    for (const theme of ['light', 'dark', 'midnight', 'system'] as const) {
+    for (const theme of ['light', 'dark', 'system'] as const) {
       expect(normalizeUI({ ...STORAGE_FIELDS.uiSettings.defaultValue, theme }).theme).toBe(theme);
+    }
+    for (const darkTheme of ['dark', 'midnight'] as const) {
+      expect(
+        normalizeUI({ ...STORAGE_FIELDS.uiSettings.defaultValue, darkTheme }).darkTheme,
+      ).toBe(darkTheme);
     }
     for (const language of ['auto', 'en', 'zh'] as const) {
       expect(

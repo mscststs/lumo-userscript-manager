@@ -1,7 +1,7 @@
 import { applyLanguage, watchLanguageChanges } from '@/i18n';
-import { applyTheme } from '@/lib/theme';
+import { applyAccent, applyTheme } from '@/lib/theme';
 import { applyFontSize } from '@/lib/font-size';
-import { normalizeTheme } from '@/lib/theme-registry';
+import { normalizeAccent, normalizeDarkTheme, normalizeThemeMode } from '@/lib/theme-registry';
 import { normalizeFontSize } from '@/lib/font-size-registry';
 import { storage } from '@/store/storage';
 
@@ -23,7 +23,11 @@ export async function bootstrapPage(): Promise<void> {
   try {
     const settings = await storage.getUISettings();
     await applyLanguage(settings.language);
-    applyTheme(normalizeTheme(settings.theme));
+    applyTheme(
+      normalizeThemeMode(settings.theme),
+      normalizeDarkTheme(settings.darkTheme, settings.theme),
+    );
+    applyAccent(normalizeAccent(settings.accent));
     applyFontSize(normalizeFontSize(settings.fontSize));
   } catch (error) {
     // Render with defaults rather than not at all. `theme-preload.js` has

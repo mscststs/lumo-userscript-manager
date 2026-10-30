@@ -37,9 +37,9 @@ const noopTransport: GmTransport = {
  */
 export function installEngine(options: EngineOptions): void {
   const globals = globalThis as Record<string, unknown>;
-  // `scripts:run` executes the engine file before the launcher so a tab that
-  // was opened before the script was installed can still run it. Re-executing
-  // the engine must not replace the live client or duplicate listeners.
+  // Defensive: a launcher can arrive while the engine module is still
+  // evaluating (they are registered as separate entries). Re-executing the
+  // engine must not replace the live client or duplicate listeners.
   if (globals[options.engineKey]) {
     // A launcher may have queued before a second engine injection; let the
     // already-installed engine drain it.

@@ -15,8 +15,9 @@ interface EmptyStateProps {
  * Shared empty / fallback surface.
  *
  * Deliberately quiet: one icon, one sentence of state, and nothing that looks
- * like a call to action unless a real action is supplied. Used by the side panel
- * and by settings pages that have no content yet.
+ * like a call to action unless a real action is supplied. The copy explains
+ * *what will appear here*, never *what to click* — the surrounding page already
+ * owns the action.
  */
 export function EmptyState({
   icon: Icon,
@@ -28,17 +29,17 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        'flex min-h-[12rem] flex-col items-center justify-center gap-3 px-6 py-10 text-center',
+        'flex flex-col items-center justify-center gap-3 px-6 py-12 text-center',
         className,
       )}
     >
-      <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-card text-muted-foreground">
-        <Icon className="h-5 w-5" aria-hidden="true" />
+      <div className="flex h-10 w-10 items-center justify-center rounded-card border border-border bg-card text-muted-foreground shadow-elev1">
+        <Icon className="h-4.5 w-4.5" aria-hidden="true" />
       </div>
       <div className="space-y-1">
         <p className="text-sm font-medium text-foreground">{title}</p>
         {description && (
-          <p className="max-w-[32ch] text-xs leading-relaxed text-muted-foreground">
+          <p className="mx-auto max-w-[38ch] text-xs leading-relaxed text-muted-foreground text-pretty">
             {description}
           </p>
         )}

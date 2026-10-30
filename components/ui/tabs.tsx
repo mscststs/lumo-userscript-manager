@@ -2,6 +2,12 @@ import * as React from 'react';
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 import { cn } from '@/lib/utils';
 
+/**
+ * Tabs — an *underlined* nav pattern, deliberately distinct from `Segmented`.
+ * Use tabs for switching page-level sections whose content differs; use
+ * segmented for filtering one list. Two patterns, two shapes: if they looked
+ * alike, users would have to read the label to know whether the page changed.
+ */
 const Tabs = TabsPrimitive.Root;
 
 const TabsList = React.forwardRef<
@@ -10,10 +16,7 @@ const TabsList = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <TabsPrimitive.List
     ref={ref}
-    className={cn(
-      'inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground',
-      className,
-    )}
+    className={cn('flex items-center gap-1 border-b border-border', className)}
     {...props}
   />
 ));
@@ -26,7 +29,10 @@ const TabsTrigger = React.forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      'inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow',
+      'relative -mb-px inline-flex items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent px-2.5 py-2 text-sm font-medium text-muted-foreground',
+      'transition-colors duration-150 ease-standard hover:text-foreground',
+      'data-[state=active]:border-primary data-[state=active]:text-foreground',
+      'disabled:pointer-events-none disabled:opacity-50',
       className,
     )}
     {...props}
@@ -38,11 +44,7 @@ const TabsContent = React.forwardRef<
   React.ComponentRef<typeof TabsPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.Content>
 >(({ className, ...props }, ref) => (
-  <TabsPrimitive.Content
-    ref={ref}
-    className={cn('mt-2 focus-visible:outline-none', className)}
-    {...props}
-  />
+  <TabsPrimitive.Content ref={ref} className={cn('mt-4', className)} {...props} />
 ));
 TabsContent.displayName = TabsPrimitive.Content.displayName;
 

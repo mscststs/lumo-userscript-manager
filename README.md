@@ -4,6 +4,9 @@ A powerful, well-crafted userscript manager for Chrome. Built on the same WXT + 
 
 Chrome MV3 only. Minimum Chrome version: **138** (the “Allow User Scripts” toggle generation).
 
+- Repository: <https://github.com/mscststs/lumo-userscript-manager>
+- Issues: <https://github.com/mscststs/lumo-userscript-manager/issues>
+
 ## Features
 
 - Install userscripts from a URL, file, clipboard, or the dashboard
@@ -38,6 +41,15 @@ Chrome MV3 only. Minimum Chrome version: **138** (the “Allow User Scripts” t
 | State | IndexedDB, Chrome Storage API |
 | i18n | i18next + react-i18next |
 | Build | Vite 7, TypeScript 5.9 |
+
+### Design system
+
+Every surface (popup, options, install) is built from one token layer and one theme
+registry. The rules — type scale, OKLCH palettes, accents, contrast matrix, motion
+curves, component states and the responsive/HiDPI/accessibility invariants — live in
+[`docs/DESIGN.md`](docs/DESIGN.md). Tokens are implemented in
+[`assets/globals.css`](assets/globals.css); palettes and accents are registered in
+[`lib/theme-registry.ts`](lib/theme-registry.ts).
 
 ## Getting Started
 
@@ -104,9 +116,11 @@ entrypoints/
 components/
   ui/                 # shadcn base components
   editor/             # CodeMirror editor
-  layout/             # EmptyState
-  settings/           # SettingsHeader / SettingRow
+  layout/             # PageLayout / PageHeader / EmptyState
+  settings/           # SectionNav / SettingsGroup / SettingRow
 lib/
+  theme-registry.ts   # palettes + accent presets (single source of truth)
+  theme.ts            # apply/mirror appearance, first-paint contract
   script/             # metadata parser, URL rules, launcher compiler, semver
   runtime/            # shared engines + BridgeClient/BridgeServer transport
   background/         # registration, host RPC service, GM APIs, tokens

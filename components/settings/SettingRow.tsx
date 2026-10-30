@@ -5,6 +5,8 @@ interface SettingRowProps {
   label: string;
   /** Stable id of the control this row labels. */
   htmlFor?: string;
+  /** One sentence of consequence, not an instruction. Omitted when obvious. */
+  description?: string;
   control: ReactNode;
   className?: string;
 }
@@ -12,21 +14,39 @@ interface SettingRowProps {
 /**
  * Label + control pair used by settings screens.
  *
- * The control is always right-aligned and never allowed to shrink the label to
- * unreadable widths, which is what keeps rows intact at side-panel widths.
+ * The row wraps instead of shrinking: at rail widths the control drops to its
+ * own line rather than truncating the label to "Enable script…". Labels are the
+ * only thing on the row that cannot be recovered by looking elsewhere, so they
+ * get priority over the control's inline position.
  */
-export function SettingRow({ label, htmlFor, control, className }: SettingRowProps) {
+export function SettingRow({
+  label,
+  htmlFor,
+  description,
+  control,
+  className,
+}: SettingRowProps) {
   return (
     <div
       className={cn(
-        'flex min-h-11 items-center justify-between gap-6 py-3',
+        'flex flex-wrap items-start justify-between gap-x-6 gap-y-2 py-2.5',
         className,
       )}
     >
-      <label htmlFor={htmlFor} className="min-w-0 truncate text-sm text-foreground">
-        {label}
-      </label>
-      <div className="shrink-0">{control}</div>
+      <div className="min-w-0 flex-1 basis-52">
+        <label
+          htmlFor={htmlFor}
+          className="block text-sm font-medium leading-5 text-foreground"
+        >
+          {label}
+        </label>
+        {description && (
+          <p className="mt-0.5 max-w-[62ch] text-xs leading-relaxed text-muted-foreground text-pretty">
+            {description}
+          </p>
+        )}
+      </div>
+      <div className="flex shrink-0 items-center">{control}</div>
     </div>
   );
 }

@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { en } from '@/i18n/en';
 import { zh } from '@/i18n/zh';
-import { THEME_OPTIONS } from '@/lib/theme-registry';
+import {
+  ACCENT_OPTIONS,
+  DARK_THEME_OPTIONS,
+  THEME_MODE_OPTIONS,
+} from '@/lib/theme-registry';
 import { FONT_SIZE_OPTIONS } from '@/lib/font-size-registry';
 import { LANGUAGES } from '@/lib/language';
 
@@ -20,7 +24,10 @@ describe('i18n resources', () => {
   it('resolves every registry label key', () => {
     const keys = new Set(flatten(en));
     const registryKeys = [
-      ...THEME_OPTIONS.map((option) => option.labelKey),
+      ...THEME_MODE_OPTIONS.map((option) => option.labelKey),
+      ...DARK_THEME_OPTIONS.map((option) => option.labelKey),
+      ...DARK_THEME_OPTIONS.map((option) => option.descriptionKey),
+      ...ACCENT_OPTIONS.map((option) => option.labelKey),
       ...FONT_SIZE_OPTIONS.map((option) => option.labelKey),
       ...LANGUAGES.map((option) => option.labelKey),
     ];
