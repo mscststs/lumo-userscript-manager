@@ -1,0 +1,209 @@
+/** Normalized `@run-at` values, plus the two ScriptCat/Tampermonkey extras. */
+export type ScriptRunAt =
+  | 'document-start'
+  | 'document-body'
+  | 'document-end'
+  | 'document-idle'
+  | 'context-menu'
+  | 'early-start';
+
+/** Where a script wants to execute. */
+export type ScriptInjectInto = 'auto' | 'page' | 'content';
+
+/** The world chosen for a concrete registration. */
+export type ScriptWorld = 'MAIN' | 'USER_SCRIPT';
+
+/** Raw metablock: tag -> all values, tag names lower-cased. */
+export interface ScriptMetadata {
+  [key: string]: string[] | undefined;
+}
+
+export type UrlRule =
+  | { kind: 'match-include'; pattern: string }
+  | { kind: 'match-exclude'; pattern: string }
+  | { kind: 'glob-include'; pattern: string }
+  | { kind: 'glob-exclude'; pattern: string }
+  | { kind: 'regex-include'; source: string; flags: string }
+  | { kind: 'regex-exclude'; source: string; flags: string };
+
+export interface ScriptResourceRef {
+  name: string;
+  url: string;
+}
+
+/** Persisted script metadata/index record. Source code lives in its own store. */
+export interface UserScript {
+  uuid: string;
+  name: string;
+  namespace: string;
+  version: string;
+  description?: string;
+  author?: string;
+  homepage?: string;
+  supportUrl?: string;
+  icon?: string;
+  antifeature?: string[];
+
+  enabled: boolean;
+  /** Set when moved to the recycle bin. */
+  removedAt?: number;
+  sort: number;
+
+  createdAt: number;
+  updatedAt: number;
+  lastRunAt?: number;
+  runCount: number;
+
+  /** URL the script was installed from. */
+  origin: string;
+  downloadUrl?: string;
+  updateUrl?: string;
+  checkUpdate: boolean;
+  updateIntervalHours?: number;
+  updateState: 'idle' | 'checking' | 'update-available' | 'error';
+  pendingInstallToken?: string;
+  pendingVersion?: string;
+  lastError?: string;
+
+  metadata: ScriptMetadata;
+  /** User overrides. Only present keys differ from `metadata`. */
+  selfMetadata?: ScriptMetadata;
+
+  tags: string[];
+  grant: string[];
+  connect: string[];
+  require: string[];
+  resource: string[];
+
+  runAt: ScriptRunAt;
+  injectInto: ScriptInjectInto;
+  noFrames: boolean;
+  unwrap: boolean;
+  topLevelAwait: boolean;
+
+  codeHash: string;
+  codeSize: number;
+}
+
+export interface ScriptVersion {
+  /** `${uuid}:${timestamp}` */
+  id: string;
+  uuid: string;
+  code: string;
+  metadata: ScriptMetadata;
+  createdAt: number;
+}
+
+export interface StoredResource {
+  uuid: string;
+  url: string;
+  name: string;
+  kind: 'require' | 'require-css' | 'resource';
+  content: string;
+  contentType: string;
+  base64?: string;
+  hash: string;
+  fetchedAt: number;
+}
+
+export interface RuntimeResource {
+  name: string;
+  url: string;
+  content: string;
+  contentType: string;
+  base64?: string;
+}
+
+export interface ScriptBootstrap {
+  values: Record<string, unknown>;
+  resources: Record<string, RuntimeResource>;
+}
+
+/** The serializable payload embedded in a generated userScript launcher. */
+export interface RuntimeScriptPayload {
+  uuid: string;
+  token: string;
+  name: string;
+  namespace: string;
+  version: string;
+  description?: string;
+  metaStr: string;
+  meta: ScriptMetadata;
+  handlerVersion: string;
+  grant: string[];
+  connect: string[];
+  rules: UrlRule[];
+  code: string;
+  /** Concatenated @require sources, already fetched and cached. */
+  requires: string[];
+  requireCss: string[];
+  /** Names available to GM_getResourceText/URL. */
+  resourceNames: string[];
+  runAt: ScriptRunAt;
+  injectInto: 'page' | 'content';
+  noFrames: boolean;
+  unwrap: boolean;
+  contextMenu: boolean;
+  /** Injected by the launcher at runtime. */
+  run?: (GM: any, GM_info: any, unsafeWindow: any) => Promise<void>;
+}
+
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+export interface LogEntry {
+  id?: number;
+  uuid?: string;
+  name?: string;
+  level: LogLevel;
+  message: string;
+  time: number;
+  url?: string;
+  stack?: string;
+}
+
+export interface RuntimeMenuCommand {
+  id: string;
+  uuid: string;
+  title: string;
+  accessKey?: string;
+  tabId: number;
+  frameId: number;
+}
+
+export interface RuntimeStatus {
+  userScriptsAvailable: boolean;
+  scriptsEnabled: boolean;
+  registeredCount: number;
+  engineCount: number;
+  lastError?: string;
+  lastCheckedAt: number;
+}
+
+export interface InstallDraftSummary {
+  token: string;
+  sourceUrl: string;
+  isUpdate: boolean;
+  existingUuid?: string;
+  previousVersion?: string;
+  name: string;
+  namespace: string;
+  version: string;
+  description?: string;
+  author?: string;
+  icon?: string;
+  homepage?: string;
+  supportURL?: string;
+  antifeature?: string[];
+  grant: string[];
+  connect: string[];
+  requires: string[];
+  requireCss: string[];
+  requireDetails?: { url: string; size: number; hash?: string }[];
+  resources: string[];
+  matches: string[];
+  includes: string[];
+  code: string;
+  codeSize: number;
+  warnings: string[];
+  errors: string[];
+}

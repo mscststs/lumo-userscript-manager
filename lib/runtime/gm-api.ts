@@ -1,0 +1,907 @@
+import type { RuntimeResource, ScriptMetadata } from '@/types';
+
+export type GMCallback<T = unknown> = (result: T) => void;
+export type GMValueChangeListener = (
+  key: string,
+  oldValue: unknown,
+  newValue: unknown,
+  remote: boolean,
+) => void;
+
+export interface GmTransport {
+  call(api: string, args: unknown[]): Promise<unknown>;
+  log(level: 'debug' | 'info' | 'warn' | 'error', args: unknown[]): void;
+  registerMenuCommand(title: string, options?: Record<string, unknown>): Promise<string>;
+  unregisterMenuCommand(id: string | number): Promise<void>;
+}
+
+export interface GmApiOptions {
+  grant: string[];
+  meta: ScriptMetadata;
+  metaStr: string;
+  handlerVersion: string;
+  sandboxMode: 'raw' | 'content';
+  values: Record<string, unknown>;
+  resources: Record<string, RuntimeResource>;
+  transport: GmTransport;
+  window: Window & typeof globalThis;
+  document: Document;
+  /** Page-realm window when the script runs in the page world. */
+  unsafeWindow?: Window & typeof globalThis;
+  extensionUrl?: string;
+}
+
+export interface GmApiHandle {
+  GM: Record<string, any>;
+  GM_info: Record<string, any>;
+  emitValueChanged: (
+    key: string,
+    oldValue: unknown,
+    newValue: unknown,
+    remote: boolean,
+  ) => void;
+  emitNotificationClick: (id: string, event?: Record<string, unknown>) => void;
+  emitNotificationClose: (id: string, byUser?: boolean) => void;
+  emitXhrProgress: (requestId: string, loaded: number, total: number) => void;
+  emitDownloadProgress: (requestId: string, loaded: number, total: number) => void;
+  emitDownloadResult: (requestId: string, result: Record<string, unknown>, error?: string) => void;
+  emitOpenTabClosed: (tabId: number) => void;
+  dispose: () => void;
+}
+
+function metaList(meta: ScriptMetadata, key: string): string[] {
+  return meta[key] ?? [];
+}
+
+function metaFirst(meta: ScriptMetadata, key: string): string | undefined {
+  return meta[key]?.[0];
+}
+
+function hasGrant(grant: string[], name: string): boolean {
+  return grant.includes('none') ? false : grant.includes(name);
+}
+
+function serializeXhrOptions(options: Record<string, unknown>): Record<string, unknown> {
+  const allowed = [
+    'method',
+    'url',
+    'headers',
+    'data',
+    'timeout',
+    'responseType',
+    'overrideMimeType',
+    'anonymous',
+    'user',
+    'password',
+  ];
+  const result: Record<string, unknown> = {};
+  for (const key of allowed) {
+    if (options[key] !== undefined) result[key] = options[key];
+  }
+  return result;
+}
+
+function base64ToArrayBuffer(base64: string): ArrayBuffer {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes.buffer;
+}
+
+function normalizeXhrResult(result: any, responseType: string): any {
+  if (!result) return result;
+  if (responseType === 'document' && typeof result.responseText === 'string') {
+    try {
+      const contentType = String(result.contentType ?? '');
+      const type = contentType.includes('html') ? 'text/html' : 'application/xml';
+      return { ...result, response: new DOMParser().parseFromString(result.responseText, type) };
+    } catch {
+      return result;
+    }
+  }
+  if (!result.responseBase64) return result;
+  const buffer = base64ToArrayBuffer(result.responseBase64);
+  if (responseType === 'arraybuffer') {
+    const { responseBase64: _ignored, ...rest } = result;
+    return { ...rest, response: buffer };
+  }
+  if (responseType === 'blob') {
+    const { responseBase64: _ignored, ...rest } = result;
+    return {
+      ...rest,
+      response: new Blob([buffer], { type: String(result.contentType ?? 'application/octet-stream') }),
+    };
+  }
+  return result;
+}
+
+export function createGmApi(options: GmApiOptions): GmApiHandle {
+  const { grant, meta, metaStr, handlerVersion, values, resources, transport, document } = options;
+  const pageWindow = options.window;
+  const unsafeWindow = options.unsafeWindow ?? pageWindow;
+  const valueListeners = new Map<string, { key: string; fn: GMValueChangeListener }>();
+  const notificationCallbacks = new Map<
+    string,
+    {
+      onclick?: (event?: Record<string, unknown>) => void;
+      ondone?: (byUser?: boolean) => void;
+    }
+  >();
+  const xhrProgressCallbacks = new Map<string, (event: Record<string, unknown>) => void>();
+  const downloadCallbacks = new Map<
+    string,
+    {
+      onload?: (result: Record<string, unknown>) => void;
+      onerror?: (result: Record<string, unknown>) => void;
+      onprogress?: (result: Record<string, unknown>) => void;
+      onabort?: () => void;
+    }
+  >();
+  const downloadResolvers = new Map<
+    string,
+    { resolve: (value: unknown) => void; reject: (reason?: unknown) => void }
+  >();
+  const openTabs = new Map<
+    number,
+    { closed: boolean; onclose?: () => void; close: () => void }
+  >();
+  let listenerId = 0;
+
+  const resourcesInfo = metaList(meta, 'resource')
+    .map((item) => {
+      const match = item.trim().match(/^(\S+)\s+(.+)$/);
+      return match ? { name: match[1]!, url: match[2]!.trim() } : null;
+    })
+    .filter((item): item is { name: string; url: string } => item !== null);
+  const scriptInfo = {
+    name: metaFirst(meta, 'name') ?? '',
+    namespace: metaFirst(meta, 'namespace') ?? '',
+    version: metaFirst(meta, 'version') ?? '',
+    description: metaFirst(meta, 'description'),
+    author: metaFirst(meta, 'author'),
+    matches: metaList(meta, 'match'),
+    includes: metaList(meta, 'include'),
+    excludes: metaList(meta, 'exclude'),
+    'exclude-match': metaList(meta, 'exclude-match'),
+    runAt: metaFirst(meta, 'run-at') ?? 'document-idle',
+    grant,
+    connect: metaList(meta, 'connect'),
+    connects: metaList(meta, 'connect'),
+    require: metaList(meta, 'require'),
+    resources: resourcesInfo,
+    noframes: metaList(meta, 'noframes').length > 0,
+    unwrap: metaList(meta, 'unwrap').length > 0,
+    injectInto: metaFirst(meta, 'inject-into'),
+    storageName: metaFirst(meta, 'storagename'),
+    downloadURL: metaFirst(meta, 'downloadurl'),
+    updateURL: metaFirst(meta, 'updateurl'),
+    icon: metaFirst(meta, 'icon') ?? metaFirst(meta, 'iconurl'),
+    icon64: metaFirst(meta, 'icon64') ?? metaFirst(meta, 'icon64url'),
+    homepage: metaFirst(meta, 'homepage') ?? metaFirst(meta, 'homepageurl') ?? metaFirst(meta, 'website'),
+    supportURL: metaFirst(meta, 'supporturl'),
+    source: metaFirst(meta, 'source'),
+    antifeature: metaList(meta, 'antifeature'),
+    lastModified: Date.now(),
+  };
+
+  const GM_info: Record<string, any> = {
+    scriptHandler: 'Lumo Userscripts',
+    version: handlerVersion,
+    scriptWillUpdate: true,
+    sandboxMode: options.sandboxMode,
+    script: scriptInfo,
+    scriptMetaStr: metaStr,
+    userAgent: pageWindow.navigator.userAgent,
+    userAgentData: (pageWindow.navigator as any).userAgentData,
+    platform: {
+      browserName: 'Chrome',
+      browserVersion: pageWindow.navigator.userAgent.match(/Chrome\/([\d.]+)/)?.[1] ?? '',
+      os: pageWindow.navigator.platform,
+    },
+  };
+
+  const emitValueChanged = (
+    key: string,
+    oldValue: unknown,
+    newValue: unknown,
+    remote: boolean,
+  ) => {
+    for (const item of valueListeners.values()) {
+      if (item.key === key) {
+        try {
+          item.fn(key, oldValue, newValue, remote);
+        } catch (error) {
+          transport.log('error', [`GM_addValueChangeListener callback failed: ${String(error)}`]);
+        }
+      }
+    }
+  };
+
+  const emitNotificationClick = (id: string, event?: Record<string, unknown>) => {
+    const callbacks = notificationCallbacks.get(id);
+    if (!callbacks) return;
+    try {
+      callbacks.onclick?.(event);
+    } finally {
+      callbacks.onclick = undefined;
+    }
+  };
+
+  const emitNotificationClose = (id: string, byUser?: boolean) => {
+    const callbacks = notificationCallbacks.get(id);
+    if (!callbacks) return;
+    notificationCallbacks.delete(id);
+    try {
+      callbacks.ondone?.(byUser);
+    } catch (error) {
+      transport.log('error', [`GM_notification ondone failed: ${String(error)}`]);
+    }
+  };
+
+  const emitDownloadProgress = (requestId: string, loaded: number, total: number) => {
+    const callback = downloadCallbacks.get(requestId)?.onprogress;
+    if (!callback) return;
+    try {
+      callback({ loaded, total, lengthComputable: total > 0 });
+    } catch (error) {
+      transport.log('error', [`GM_download onprogress failed: ${String(error)}`]);
+    }
+  };
+
+  const emitDownloadResult = (
+    requestId: string,
+    result: Record<string, unknown>,
+    error?: string,
+  ) => {
+    const callbacks = downloadCallbacks.get(requestId);
+    const resolver = downloadResolvers.get(requestId);
+    downloadResolvers.delete(requestId);
+    if (!callbacks) {
+      if (resolver) error ? resolver.reject(new Error(error)) : resolver.resolve(result);
+      return;
+    }
+    downloadCallbacks.delete(requestId);
+    try {
+      if (error) {
+        callbacks.onerror?.(result);
+        resolver?.reject(new Error(error));
+      } else {
+        callbacks.onload?.(result);
+        resolver?.resolve(result);
+      }
+    } catch (callbackError) {
+      transport.log('error', [`GM_download callback failed: ${String(callbackError)}`]);
+    }
+  };
+
+  const emitOpenTabClosed = (tabId: number) => {
+    const handle = openTabs.get(tabId);
+    if (!handle) return;
+    openTabs.delete(tabId);
+    handle.closed = true;
+    try {
+      handle.onclose?.();
+    } catch (error) {
+      transport.log('error', [`GM_openInTab onclose failed: ${String(error)}`]);
+    }
+  };
+
+  const emitXhrProgress = (requestId: string, loaded: number, total: number) => {
+    const callback = xhrProgressCallbacks.get(requestId);
+    if (!callback) return;
+    try {
+      callback({
+        type: 'progress',
+        loaded,
+        total,
+        lengthComputable: total > 0,
+      });
+    } catch (error) {
+      transport.log('error', [`GM_xmlhttpRequest onprogress failed: ${String(error)}`]);
+    }
+  };
+
+  const valueChanged = (key: string, oldValue: unknown, newValue: unknown, remote: boolean) => {
+    if (newValue === undefined) delete values[key];
+    else values[key] = newValue;
+    emitValueChanged(key, oldValue, newValue, remote);
+  };
+
+  const setValue = (key: string, value: unknown) => {
+    const oldValue = values[key];
+    if (value === undefined) delete values[key];
+    else values[key] = value;
+    void (value === undefined
+      ? transport.call('GM_deleteValue', [key])
+      : transport.call('GM_setValue', [key, value])
+    ).catch((error) => transport.log('error', [`GM_setValue failed: ${String(error)}`]));
+    emitValueChanged(key, oldValue, value, false);
+  };
+
+  const deleteValue = (key: string) => setValue(key, undefined);
+
+  const GM: Record<string, any> = Object.create(null);
+  const GM4: Record<string, any> = Object.create(null);
+  GM.GM = GM4;
+
+  const define = (name: string, fn: (...args: any[]) => any) => {
+    GM[name] = fn;
+    if (name.startsWith('GM_')) {
+      const short = name.slice(3);
+      GM4[short] = (...args: any[]) => Promise.resolve(fn(...args));
+    }
+  };
+
+  GM.GM_info = GM_info;
+  GM4.info = GM_info;
+  define('GM_getValue', (key: string, fallback?: unknown) =>
+    Object.prototype.hasOwnProperty.call(values, key) ? values[key] : fallback,
+  );
+  define('GM_setValue', (key: string, value: unknown) => setValue(String(key), value));
+  define('GM_deleteValue', (key: string) => deleteValue(String(key)));
+  define('GM_listValues', () => Object.keys(values));
+  define('GM_getValues', (keysOrDefaults: string[] | Record<string, unknown> | null | undefined) => {
+    if (Array.isArray(keysOrDefaults)) {
+      const result: Record<string, unknown> = {};
+      for (const key of keysOrDefaults) {
+        if (Object.prototype.hasOwnProperty.call(values, key)) result[key] = values[key];
+      }
+      return result;
+    }
+    if (keysOrDefaults && typeof keysOrDefaults === 'object') {
+      const result: Record<string, unknown> = { ...keysOrDefaults };
+      for (const key of Object.keys(keysOrDefaults)) {
+        if (Object.prototype.hasOwnProperty.call(values, key)) result[key] = values[key];
+      }
+      return result;
+    }
+    return { ...values };
+  });
+  define('GM_setValues', (obj: Record<string, unknown>) => {
+    for (const [key, value] of Object.entries(obj ?? {})) setValue(key, value);
+  });
+  define('GM_deleteValues', (keys: string[]) => {
+    for (const key of keys ?? []) deleteValue(String(key));
+  });
+  define('GM_addValueChangeListener', (key: string, fn: GMValueChangeListener) => {
+    const id = ++listenerId;
+    valueListeners.set(String(id), { key: String(key), fn });
+    return id;
+  });
+  define('GM_removeValueChangeListener', (id: string | number) => {
+    valueListeners.delete(String(id));
+  });
+  define('GM_log', (message: unknown, level: string = 'info', ...labels: unknown[]) => {
+    const normalized =
+      level === 'debug' || level === 'warn' || level === 'error' ? level : 'info';
+    transport.log(normalized, labels.length ? [message, ...labels] : [message]);
+  });
+  define('GM_addStyle', (css: string) => {
+    const style = document.createElement('style');
+    style.textContent = String(css);
+    (document.head || document.documentElement).appendChild(style);
+    // Violentmonkey-compatible thenable so `await GM_addStyle()` works while
+    // legacy scripts still receive the style element synchronously.
+    Object.defineProperty(style, 'then', {
+      value: (resolve: (value: Element) => unknown) => resolve(style),
+      configurable: true,
+    });
+    return style;
+  });
+  define('GM_addElement', (...args: any[]) => {
+    let parent: Element | null = null;
+    let tag: string;
+    let attrs: Record<string, unknown> | undefined;
+    if (args.length >= 2 && typeof args[0] === 'object' && args[0]?.nodeType) {
+      parent = args[0] as Element;
+      tag = String(args[1]);
+      attrs = args[2];
+    } else {
+      tag = String(args[0]);
+      attrs = args[1];
+    }
+    const element = document.createElement(tag);
+    for (const [key, value] of Object.entries(attrs ?? {})) {
+      if (key === 'textContent') element.textContent = String(value);
+      else element.setAttribute(key, String(value));
+    }
+    (parent ?? document.head ?? document.documentElement).appendChild(element);
+    return element;
+  });
+  define('GM_getResourceText', (name: string) => resources[name]?.content ?? null);
+  define('GM_getResourceURL', (name: string) => {
+    const resource = resources[name];
+    if (!resource) return null;
+    if (resource.base64) {
+      const byteCharacters = atob(resource.base64);
+      const bytes = new Uint8Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i += 1) {
+        bytes[i] = byteCharacters.charCodeAt(i);
+      }
+      return URL.createObjectURL(new Blob([bytes], { type: resource.contentType }));
+    }
+    return URL.createObjectURL(new Blob([resource.content], { type: resource.contentType }));
+  });
+  define('GM_registerMenuCommand', async (
+    title: string,
+    fn: () => void,
+    options?: Record<string, unknown> | string,
+  ) => {
+    const opts = typeof options === 'string' ? { accessKey: options } : options;
+    const id = await transport.registerMenuCommand(String(title), opts);
+    // The host owns the id -> callback mapping; this map is only used by the
+    // runtime-side menu event below.
+    menuCallbacks.set(String(id), fn);
+    return id;
+  });
+  define('GM_unregisterMenuCommand', async (id: string | number) => {
+    menuCallbacks.delete(String(id));
+    await transport.unregisterMenuCommand(id);
+  });
+  define('GM_notification', (
+    details: Record<string, any> | string,
+    title?: string | (() => void),
+    image?: string,
+    onclick?: () => void,
+  ) => {
+    const opts: Record<string, any> =
+      typeof details === 'string'
+        ? {
+            text: details,
+            title: typeof title === 'string' ? title : undefined,
+            image,
+            onclick,
+            ondone: typeof title === 'function' ? title : undefined,
+          }
+        : { ...details };
+    const id = opts.id ?? `lumo-notification-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const serializable = {
+      ...opts,
+      id,
+      onclick: undefined,
+      oncreate: undefined,
+      ondone: undefined,
+      onerror: undefined,
+    };
+    notificationCallbacks.set(id, {
+      onclick: typeof opts.onclick === 'function' ? opts.onclick : undefined,
+      ondone: typeof opts.ondone === 'function' ? opts.ondone : undefined,
+    });
+    void transport
+      .call('GM_notification', [serializable])
+      .then(() => {
+        try {
+          opts.oncreate?.({ id });
+        } catch (error) {
+          transport.log('error', [`GM_notification oncreate failed: ${String(error)}`]);
+        }
+      })
+      .catch((error) => {
+        notificationCallbacks.delete(id);
+        try {
+          opts.onerror?.({ error: String(error) });
+        } catch (callbackError) {
+          transport.log('error', [`GM_notification onerror failed: ${String(callbackError)}`]);
+        }
+        transport.log('error', [`GM_notification failed: ${String(error)}`]);
+      });
+    return id;
+  });
+  define('GM_closeNotification', (id: string) => {
+    return transport.call('GM_closeNotification', [String(id)]);
+  });
+  define('GM_updateNotification', (id: string, details: Record<string, any>) => {
+    const opts = { ...(details ?? {}) };
+    delete opts.onclick;
+    delete opts.oncreate;
+    delete opts.ondone;
+    delete opts.onerror;
+    return transport.call('GM_updateNotification', [String(id), opts]);
+  });
+
+  const makeDownload = (
+    details: Record<string, any> | string,
+    name?: string,
+    awaitResult = false,
+  ) => {
+    const opts: Record<string, any> = typeof details === 'string' ? { url: details, name } : { ...details };
+    const requestId = `lumo-download-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const serializable: Record<string, any> = { ...opts, requestId };
+    for (const key of ['onload', 'onerror', 'onprogress', 'onabort', 'ontimeout']) {
+      delete serializable[key];
+    }
+    downloadCallbacks.set(requestId, {
+      onload: typeof opts.onload === 'function' ? opts.onload : undefined,
+      onerror: typeof opts.onerror === 'function' ? opts.onerror : undefined,
+      onprogress: typeof opts.onprogress === 'function' ? opts.onprogress : undefined,
+      onabort: typeof opts.onabort === 'function' ? opts.onabort : undefined,
+    });
+    let settled = false;
+    let resolveResult: ((value: unknown) => void) | undefined;
+    let rejectResult: ((reason?: unknown) => void) | undefined;
+    const promise = awaitResult
+      ? new Promise((resolve, reject) => {
+          resolveResult = resolve;
+          rejectResult = reject;
+          downloadResolvers.set(requestId, { resolve, reject });
+        })
+      : undefined;
+    const handle = {
+      abort: () => {
+        if (settled) return;
+        settled = true;
+        downloadCallbacks.get(requestId)?.onabort?.();
+        downloadCallbacks.delete(requestId);
+        downloadResolvers.delete(requestId);
+        rejectResult?.(new Error('GM_download aborted'));
+        void transport.call('GM_downloadAbort', [requestId]).catch(() => undefined);
+      },
+    };
+    void transport
+      .call('GM_download', [serializable])
+      .then((result: any) => {
+        if (result?.error) {
+          settled = true;
+          downloadCallbacks.delete(requestId);
+          downloadResolvers.delete(requestId);
+          opts.onerror?.(result);
+          rejectResult?.(new Error(String(result.error)));
+          return;
+        }
+        // Resolve GM.download from the terminal download-result event, not
+        // from the initial chrome.downloads id. Legacy GM_download returns a
+        // handle immediately and therefore has nothing to resolve here.
+        if (!awaitResult) resolveResult?.(result);
+      })
+      .catch((error) => {
+        settled = true;
+        downloadCallbacks.delete(requestId);
+        downloadResolvers.delete(requestId);
+        opts.onerror?.({ error: String(error) });
+        rejectResult?.(error);
+        transport.log('error', [`GM_download failed: ${String(error)}`]);
+      });
+    return awaitResult ? Object.assign(promise!, handle) : handle;
+  };
+  GM.GM_download = (details: Record<string, any> | string, name?: string) =>
+    makeDownload(details, name, false);
+  GM4.download = (details: Record<string, any> | string, name?: string) =>
+    makeDownload(details, name, true);
+
+  define('GM_openInTab', (url: string, options?: Record<string, any> | boolean) => {
+    const opts: Record<string, any> = typeof options === 'boolean' ? { active: !options } : { ...(options ?? {}) };
+    if (opts.active === undefined) {
+      opts.active = typeof opts.loadInBackground === 'boolean' ? !opts.loadInBackground : true;
+    }
+    let tabId = 0;
+    let closeRequested = false;
+    const handle = {
+      closed: false,
+      onclose: undefined as (() => void) | undefined,
+      close: () => {
+        if (tabId) {
+          void transport.call('GM_closeInTab', [tabId]).catch(() => undefined);
+        } else {
+          closeRequested = true;
+        }
+      },
+    };
+    void transport
+      .call('GM_openInTab', [String(url), opts])
+      .then((tab: any) => {
+        if (!tab || typeof tab.id !== 'number') {
+          handle.closed = true;
+          handle.onclose?.();
+          return;
+        }
+        tabId = tab.id;
+        openTabs.set(tabId, handle);
+        if (closeRequested) handle.close();
+      })
+      .catch((error) => {
+        handle.closed = true;
+        handle.onclose?.();
+        transport.log('error', [`GM_openInTab failed: ${String(error)}`]);
+      });
+    return handle;
+  });
+  define('GM_closeInTab', (tabId: string | number) =>
+    transport.call('GM_closeInTab', [Number(tabId)]),
+  );
+  GM4.openInTab = (url: string, options?: Record<string, any> | boolean) =>
+    Promise.resolve(GM.GM_openInTab(url, options));
+
+  define('GM_setClipboard', (
+    data: string,
+    info?: string | Record<string, any>,
+    callback?: () => void,
+  ) => {
+    let type = 'text/plain';
+    if (typeof info === 'string') type = info;
+    else if (info && typeof info === 'object') type = String(info.mimetype ?? info.type ?? 'text/plain');
+    if (type === 'text') type = 'text/plain';
+    if (type === 'html') type = 'text/html';
+    const promise = transport.call('GM_setClipboard', [String(data), type]);
+    void promise
+      .then(() => callback?.())
+      .catch((error) => {
+        callback?.();
+        transport.log('error', [`GM_setClipboard failed: ${String(error)}`]);
+      });
+    return promise;
+  });
+
+  const makeXhr = (details: Record<string, any>, awaitResult: boolean) => {
+    const requestId = `lumo-xhr-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const serializable = serializeXhrOptions(details);
+    if (typeof details.onprogress === 'function') {
+      xhrProgressCallbacks.set(requestId, details.onprogress);
+    }
+    let resolveResult: ((value: unknown) => void) | undefined;
+    let rejectResult: ((reason?: unknown) => void) | undefined;
+    const promise = awaitResult
+      ? new Promise((resolve, reject) => {
+          resolveResult = resolve;
+          rejectResult = reject;
+        })
+      : undefined;
+    let settled = false;
+    const finish = (normalized: any) => {
+      if (settled) return;
+      settled = true;
+      xhrProgressCallbacks.delete(requestId);
+      if (normalized && typeof normalized === 'object' && details.context !== undefined) {
+        normalized.context = details.context;
+      }
+      details.onreadystatechange?.(normalized);
+      if (normalized?.error) {
+        if (String(normalized.error).toLowerCase().includes('timeout')) {
+          details.ontimeout?.(normalized);
+        } else {
+          details.onerror?.(normalized);
+        }
+        rejectResult?.(new Error(String(normalized.error)));
+      } else {
+        details.onload?.(normalized);
+        resolveResult?.(normalized);
+      }
+      details.onloadend?.(normalized);
+    };
+    try {
+      details.onloadstart?.({});
+    } catch (error) {
+      transport.log('error', [`GM_xmlhttpRequest onloadstart failed: ${String(error)}`]);
+    }
+    void transport
+      .call('GM_xmlhttpRequest', [{ ...serializable, requestId }])
+      .then((result: any) => {
+        finish(normalizeXhrResult(result, String(serializable.responseType ?? 'text')));
+      })
+      .catch((error) => {
+        finish({ error: String(error) });
+      });
+    const handle = {
+      abort: () => {
+        if (settled) return;
+        settled = true;
+        xhrProgressCallbacks.delete(requestId);
+        details.onabort?.({});
+        details.onloadend?.({ error: 'GM_xmlhttpRequest aborted' });
+        rejectResult?.(new Error('GM_xmlhttpRequest aborted'));
+        void transport.call('GM_xmlhttpRequestAbort', [requestId]).catch(() => undefined);
+      },
+    };
+    return awaitResult ? Object.assign(promise!, handle) : handle;
+  };
+  GM.GM_xmlhttpRequest = (details: Record<string, any>) => makeXhr(details, false);
+  GM4.xmlHttpRequest = (details: Record<string, any>) => makeXhr(details, true);
+
+  const cookieAction = (
+    action: string,
+    details: Record<string, unknown>,
+    callback?: (result: unknown, error?: unknown) => void,
+  ) => {
+    const promise = transport.call('GM_cookie', [action, details]);
+    if (callback) {
+      void promise.then(
+        (result) => callback(result),
+        (error) => callback(undefined, error),
+      );
+    }
+    return promise;
+  };
+  const cookieApi = (action: string, details: Record<string, unknown>) =>
+    transport.call('GM_cookie', [action, details]);
+  define('GM_cookie', cookieAction);
+  (GM.GM_cookie as any).set = (details: Record<string, unknown>, cb?: (result: unknown, error?: unknown) => void) =>
+    cookieAction('set', details, cb);
+  (GM.GM_cookie as any).list = (details: Record<string, unknown>, cb?: (result: unknown, error?: unknown) => void) =>
+    cookieAction('list', details, cb);
+  (GM.GM_cookie as any).delete = (details: Record<string, unknown>, cb?: (result: unknown, error?: unknown) => void) =>
+    cookieAction('delete', details, cb);
+  GM4.cookie = {
+    list: (details: Record<string, unknown>) => cookieApi('list', details),
+    set: (details: Record<string, unknown>) => cookieApi('set', details),
+    delete: (details: Record<string, unknown>) => cookieApi('delete', details),
+  };
+  define('GM_getTab', (callback?: GMCallback) => {
+    const promise = transport.call('GM_getTab', []).then((value) => value ?? {});
+    if (callback) void promise.then(callback);
+    return promise;
+  });
+  define('GM_saveTab', (data: Record<string, unknown>, callback?: () => void) => {
+    const promise = transport.call('GM_saveTab', [data]);
+    if (callback) void promise.then(callback);
+    return promise;
+  });
+  define('GM_getTabs', (callback?: GMCallback) => {
+    const promise = transport.call('GM_getTabs', []);
+    if (callback) void promise.then(callback);
+    return promise;
+  });
+  define('window.close', () => transport.call('window.close', []));
+  define('window.focus', () => transport.call('window.focus', []));
+
+  const menuCallbacks = new Map<string, () => void>();
+  const handleMenuCommand = (id: string) => {
+    const fn = menuCallbacks.get(id);
+    if (!fn) return;
+    try {
+      fn();
+    } catch (error) {
+      transport.log('error', [`Menu command failed: ${String(error)}`]);
+    }
+  };
+
+  // Only expose the APIs the script actually requested. `GM_info` is always
+  // available, matching Violentmonkey/ScriptCat.
+  const allowed = new Set(grant.includes('none') ? [] : grant);
+  const GM_ALIASES: Record<string, string> = {
+    'GM.getValue': 'GM_getValue',
+    'GM.setValue': 'GM_setValue',
+    'GM.deleteValue': 'GM_deleteValue',
+    'GM.listValues': 'GM_listValues',
+    'GM.getValues': 'GM_getValues',
+    'GM.setValues': 'GM_setValues',
+    'GM.deleteValues': 'GM_deleteValues',
+    'GM.addValueChangeListener': 'GM_addValueChangeListener',
+    'GM.removeValueChangeListener': 'GM_removeValueChangeListener',
+    'GM.log': 'GM_log',
+    'GM.addStyle': 'GM_addStyle',
+    'GM.addElement': 'GM_addElement',
+    'GM.getResourceText': 'GM_getResourceText',
+    'GM.getResourceUrl': 'GM_getResourceURL',
+    'GM.getResourceURL': 'GM_getResourceURL',
+    'GM.registerMenuCommand': 'GM_registerMenuCommand',
+    'GM.unregisterMenuCommand': 'GM_unregisterMenuCommand',
+    'GM.notification': 'GM_notification',
+    'GM.closeNotification': 'GM_closeNotification',
+    'GM.updateNotification': 'GM_updateNotification',
+    'GM.download': 'GM_download',
+    'GM.openInTab': 'GM_openInTab',
+    'GM.closeInTab': 'GM_closeInTab',
+    'GM.setClipboard': 'GM_setClipboard',
+    'GM.xmlHttpRequest': 'GM_xmlhttpRequest',
+    'GM.cookie': 'GM_cookie',
+    'GM.getTab': 'GM_getTab',
+    'GM.saveTab': 'GM_saveTab',
+    'GM.getTabs': 'GM_getTabs',
+  };
+
+  // Build a *scoped* GM object. The full API table above stays private so a
+  // script cannot reach ungranted APIs through `GM.GM_*` or `GM.GM.*`.
+  const scopedGM: Record<string, any> = Object.create(null);
+  const scopedGM4: Record<string, any> = Object.create(null);
+  // ScriptCat exposes unsafeWindow unconditionally; doing the same keeps
+  // scripts portable even when they forget to declare @grant unsafeWindow.
+  scopedGM.unsafeWindow = unsafeWindow;
+
+  let urlChangeHandler: ((event: Event & { url: string }) => void) | null = null;
+  let urlChangeAttached = false;
+  const attachUrlChange = () => {
+    if (urlChangeAttached) return;
+    const nav = (pageWindow as any).navigation;
+    if (!nav?.addEventListener) return;
+    urlChangeAttached = true;
+    nav.addEventListener('navigate', (event: any) => {
+      const url = String(event?.destination?.url ?? pageWindow.location.href);
+      const changeEvent = new Event('urlchange') as Event & { url: string };
+      Object.defineProperty(changeEvent, 'url', { value: url, enumerable: true });
+      try {
+        urlChangeHandler?.call(scopedGM.window ?? pageWindow, changeEvent);
+      } catch (error) {
+        transport.log('error', [`window.onurlchange failed: ${String(error)}`]);
+      }
+    });
+  };
+
+  for (const name of allowed) {
+    if (name === 'none') continue;
+    const target = GM_ALIASES[name] ?? name;
+    const fn = GM[target];
+    if (!fn) continue;
+    scopedGM[target] = fn;
+    if (name.startsWith('GM_') || name.startsWith('GM.')) scopedGM[name] = fn;
+    if (target.startsWith('GM_')) {
+      const short = target.slice(3);
+      if (GM4[short]) scopedGM4[short] = GM4[short];
+      if (target === 'GM_getResourceURL') {
+        scopedGM4.getResourceURL = GM4.getResourceURL;
+        scopedGM4.getResourceUrl = GM4.getResourceURL;
+      }
+    }
+  }
+
+  if (
+    allowed.has('window.close') ||
+    allowed.has('window.focus') ||
+    allowed.has('window.onurlchange')
+  ) {
+    // `with (GM)` makes the bare `window` identifier resolve to GM.window.
+    // Only install the proxy when a window API is granted so ordinary scripts
+    // keep the real page window and its identity semantics.
+    scopedGM.window = new Proxy(pageWindow as any, {
+      get(target, prop, receiver) {
+        if (prop === 'close' && allowed.has('window.close')) {
+          return () => transport.call('window.close', []);
+        }
+        if (prop === 'focus' && allowed.has('window.focus')) {
+          return () => transport.call('window.focus', []);
+        }
+        if (prop === 'onurlchange' && allowed.has('window.onurlchange')) {
+          return urlChangeHandler;
+        }
+        const value = Reflect.get(target, prop, target);
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+      set(target, prop, value) {
+        if (prop === 'onurlchange' && allowed.has('window.onurlchange')) {
+          urlChangeHandler = typeof value === 'function' ? value : null;
+          if (urlChangeHandler) attachUrlChange();
+          return true;
+        }
+        return Reflect.set(target, prop, value, target);
+      },
+      has(target, prop) {
+        return prop in target;
+      },
+      ownKeys(target) {
+        return Reflect.ownKeys(target);
+      },
+      getOwnPropertyDescriptor(target, prop) {
+        return Reflect.getOwnPropertyDescriptor(target, prop);
+      },
+    });
+  }
+
+  scopedGM.GM = scopedGM4;
+  scopedGM.GM_info = GM_info;
+  scopedGM4.info = GM_info;
+  // Menu callbacks are triggered through the host event.
+  (scopedGM as any).__handleMenuCommand = handleMenuCommand;
+
+  return {
+    GM: scopedGM,
+    GM_info,
+    emitValueChanged: valueChanged,
+    emitNotificationClick,
+    emitNotificationClose,
+    emitXhrProgress,
+    emitDownloadProgress,
+    emitDownloadResult,
+    emitOpenTabClosed,
+    dispose: () => {
+      valueListeners.clear();
+      notificationCallbacks.clear();
+      xhrProgressCallbacks.clear();
+      downloadCallbacks.clear();
+      downloadResolvers.clear();
+      openTabs.clear();
+      menuCallbacks.clear();
+    },
+  };
+}
+
+export function grantList(meta: ScriptMetadata): string[] {
+  return meta.grant ?? ['none'];
+}
