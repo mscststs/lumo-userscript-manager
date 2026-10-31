@@ -81,8 +81,8 @@ console.log('backup e2e');
     });
     const text = String(body.result.value);
 
-    expect(text).toContain('EXPORT BACKUP');
-    expect(text).toContain('RESTORE BACKUP');
+    expect(text).toContain('Export backup');
+    expect(text).toContain('Restore backup');
     expect(text).toContain('ZIP backup');
     expect(text).toContain('JSON backup');
     expect(text).toContain('Drop a JSON or ZIP backup');

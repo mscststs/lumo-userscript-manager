@@ -410,27 +410,22 @@
   }
 }
 
-/* ─── CJK optical centring ───────────────────────────────────────────────── */
-/* SVG icons are centred on their own geometry, while a line box centres ink
-   asymmetrically — by a font-specific amount. `lib/optical.ts` measures that
-   difference with the font that actually renders labels and publishes it as
-   `--text-optical-shift`; without JS (tests, static harnesses) the fallback is
-   plain geometric centring.
+/* ─── Label box ─────────────────────────────────────────────────────────── */
+/* Bare text inside a flex row is wrapped in `.text-optical` so it gets its own
+   box: a flex line box centres that box, and `truncate` / `max-width` on an
+   inline-block behaves predictably in a row of icon + label + count.
 
-   The nudge is language-scoped: Latin ink is already where the eye expects it.
-   `translate` is used instead of `transform` so it cannot fight a utility that
-   composes transform on the same element.
+   Metrics are deliberately *not* nudged. Any per-font vertical correction moves
+   the label relative to the icon or the trailing count in the same row (and
+   moves it by a different amount on every platform), which reads as broken
+   centring. One line-box centre for every member of the row is the invariant.
 
    Declared inside `@layer components` on purpose: as an unlayered rule it would
-   outrank every Tailwind utility, and `display: inline-block` would defeat the
-   sidebar's `hidden` on collapsed labels (icon and first character squeezed
-   into the 56px rail). */
+   outrank every Tailwind utility (`display: inline-block` would defeat a
+   `hidden` utility on the same element). */
 @layer components {
   .text-optical {
     display: inline-block;
-  }
-  :lang(zh) .text-optical {
-    translate: 0 var(--text-optical-shift, 0em);
   }
 }
 

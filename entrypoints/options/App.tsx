@@ -13,7 +13,6 @@ import {
 import { ThemeInit } from '@/lib/theme';
 import { FontSizeInit } from '@/lib/font-size';
 import { sendBg, onLumoEvent } from '@/lib/messages';
-import { REPOSITORY_URL } from '@/lib/project';
 import { cn } from '@/lib/utils';
 import { useStorageWatch } from '@/store/useStorageWatch';
 import { BrandMark } from '@/components/brand/BrandMark';
@@ -133,7 +132,6 @@ export default function App() {
   const [collapsed, setCollapsed] = useState(false);
   const active = route.name === 'editor' ? 'scripts' : route.name;
   const unreadErrors = useUnreadErrors();
-  const version = chrome.runtime.getManifest().version;
 
   const content = useMemo(() => {
     if (route.name === 'scripts') {
@@ -193,8 +191,9 @@ export default function App() {
                 <BrandMark className="h-7 w-7" />
                 <p
                   className={cn(
-                    'min-w-0 truncate text-sm font-semibold text-foreground',
-                    collapsed ? 'hidden' : 'hidden md:block',
+                    'min-w-0 max-w-0 overflow-hidden truncate text-sm font-semibold text-foreground opacity-0',
+                    'transition-[max-width,opacity] duration-200 ease-standard',
+                    !collapsed && 'md:max-w-[11rem] md:opacity-100',
                   )}
                 >
                   {/* Product wordmark stays English in every locale, like the
@@ -216,20 +215,19 @@ export default function App() {
                             type="button"
                             onClick={() => navigate({ name: item.name })}
                             aria-current={isActive ? 'page' : undefined}
-                            // Named explicitly: on the rail the visible label is
-                            // display:none, which would leave the button nameless.
+                            // Named explicitly: the visible label collapses to
+                            // zero width, which would leave the button nameless.
                             aria-label={
                               badge > 0
                                 ? t('options.nav.unreadErrors', { label, count: badge })
                                 : label
                             }
                             className={cn(
-                              'relative flex h-8 w-full items-center gap-2.5 rounded-control px-2.5 text-sm',
+                              'relative flex h-8 w-full items-center gap-2.5 rounded-control pl-3 text-sm',
                               'transition-colors duration-150 ease-standard',
                               isActive
                                 ? 'font-medium text-foreground'
                                 : 'text-muted-foreground hover:bg-accent/70 hover:text-foreground',
-                              collapsed ? 'md:justify-center md:px-0' : 'md:justify-start',
                             )}
                           >
                             {/* The selection is a raised chip — the same object
@@ -262,8 +260,9 @@ export default function App() {
                             </span>
                             <span
                               className={cn(
-                                'text-optical relative z-10 min-w-0 flex-1 truncate text-left',
-                                collapsed ? 'hidden' : 'hidden md:inline',
+                                'text-optical relative z-10 min-w-0 max-w-0 flex-1 truncate text-left opacity-0',
+                                'transition-[max-width,opacity] duration-200 ease-standard',
+                                !collapsed && 'md:max-w-48 md:opacity-100',
                               )}
                             >
                               {label}
@@ -290,22 +289,11 @@ export default function App() {
                 </div>
               </div>
 
-              <div
-                className={cn(
-                  'hidden h-10 shrink-0 items-center gap-2 px-2 md:flex',
-                  collapsed ? 'md:justify-center' : 'md:justify-between md:pl-4',
-                )}
-              >
-                {!collapsed && (
-                  <a
-                    href={REPOSITORY_URL}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="min-w-0 truncate rounded-sm font-mono text-2xs text-muted-foreground transition-colors duration-150 ease-standard hover:text-foreground"
-                  >
-                    v{version}
-                  </a>
-                )}
+              {/* The collapse control keeps a constant inset from the rail's
+                  right edge. The rail width animates, so the button slides left
+                  as the panel closes and *ends* centred — it never jumps to the
+                  middle of the still-wide rail first. */}
+              <div className="hidden h-10 shrink-0 items-center justify-end pr-3.5 md:flex">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button

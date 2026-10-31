@@ -47,7 +47,7 @@ export const en = {
   },
   app: {
     name: 'Lumo Userscripts',
-    tagline: 'Userscript manager for Chrome',
+    tagline: 'Local-first userscript management',
   },
   popup: {
     unknownPage: 'Current page',
@@ -136,7 +136,7 @@ export const en = {
     about: {
       title: 'About',
       intro:
-        'A native Chrome userscript manager: install, edit, enable and update scripts without leaving the browser. Everything stays on this device.',
+        'Install, edit, enable, and update userscripts inside the browser.',
       openExtensions: 'Extension settings',
       manageData: 'Manage data',
       version: 'Version',

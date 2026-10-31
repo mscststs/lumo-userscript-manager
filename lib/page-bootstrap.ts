@@ -1,7 +1,6 @@
 import { applyLanguage, watchLanguageChanges } from '@/i18n';
 import { applyAccent, applyTheme } from '@/lib/theme';
 import { applyFontSize } from '@/lib/font-size';
-import { scheduleOpticalShift } from '@/lib/optical';
 import { normalizeAccent, normalizeDarkTheme, normalizeThemeMode } from '@/lib/theme-registry';
 import { normalizeFontSize } from '@/lib/font-size-registry';
 import { storage } from '@/store/storage';
@@ -30,9 +29,6 @@ export async function bootstrapPage(): Promise<void> {
     );
     applyAccent(normalizeAccent(settings.accent));
     applyFontSize(normalizeFontSize(settings.fontSize));
-    // Glyph metrics depend on the resolved font stack, which the theme and
-    // font-size above can change; measure after both have landed.
-    scheduleOpticalShift();
   } catch (error) {
     // Render with defaults rather than not at all. `theme-preload.js` has
     // already painted the mirrored palette, so a failure here is usually

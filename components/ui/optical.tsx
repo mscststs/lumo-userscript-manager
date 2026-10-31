@@ -1,18 +1,18 @@
 import { Children, type ReactNode } from 'react';
 
 /**
- * Wrap bare text children in a span that optically centres CJK labels against
- * an adjacent icon.
+ * Wrap bare text children in a span so every label owns a box in its flex row.
  *
- * An SVG icon is centred on its own geometry, but a line box centres ink
- * asymmetrically by an amount that depends on the font's ascent/descent versus
- * its ideographic ink box. `lib/optical.ts` measures that difference with the
- * font actually painting the label and publishes it as a CSS variable, so this
- * class carries no magic number of its own.
+ * A button row mixes an icon, a label and sometimes a count. The label needs to
+ * be a box of its own for `truncate` and width transitions (the sidebar rail),
+ * and the row then centres all three boxes on the same line-box centre.
+ *
+ * No metric-specific vertical nudge is applied: moving the label's ink relative
+ * to the icon or the count breaks the shared centre, and the amount differs per
+ * platform font.
  *
  * Only bare strings/numbers are wrapped; elements (icons, badges, truncation
- * spans) are left untouched so their layout is unchanged. The nudge is
- * language-scoped in CSS (`:lang(zh)`), so English labels are not moved.
+ * spans) are left untouched so their layout is unchanged.
  */
 export function opticalLabels(children: ReactNode): ReactNode {
   return Children.map(children, (child) =>
