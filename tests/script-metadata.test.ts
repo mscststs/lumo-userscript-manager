@@ -143,6 +143,16 @@ describe('URL rules', () => {
     expect(urlMatches('http://localhost:9090/app', portRules)).toBe(false);
   });
 
+  it('accepts any port for a match pattern that does not spell one out', () => {
+    // Chrome match patterns ignore ports, so the runtime predicate must agree;
+    // otherwise localhost dev sites showed a badge of 0 while scripts ran.
+    const rules = compileUrlRules({ match: ['*://127.0.0.1/*'] });
+    expect(urlMatches('http://127.0.0.1:3000/app', rules)).toBe(true);
+    expect(urlMatches('https://127.0.0.1:8443/', rules)).toBe(true);
+    expect(urlMatches('http://127.0.0.1/app', rules)).toBe(true);
+    expect(urlMatches('http://127.0.0.2:3000/app', rules)).toBe(false);
+  });
+
   it('widens registration for regex-only rules', () => {
     const patterns = toRegistrationPatterns(
       compileUrlRules({ include: ['/^https:\\/\\/api\\.test\\//'] }),

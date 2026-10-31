@@ -20,7 +20,7 @@ import { compileUrlRules, toRegistrationPatterns } from '@/lib/script/url-rules'
 import { compileLauncher } from '@/lib/script/compile';
 import { createRuntimeToken } from '@/lib/background/runtime-token';
 import { getRequireCssSources, getRequireSources } from './resources';
-import { invalidateBadgeIndex, refreshBadge } from './badge';
+import { invalidateBadgeIndex, refreshAllBadges } from './badge';
 
 const RUNNER_ID = 'us-runner';
 const HOST_ID = 'us-host';
@@ -396,12 +396,13 @@ function safelyRegister(): Promise<RuntimeStatus> {
 
 export function requestRegistration(): Promise<RuntimeStatus> {
   registrationChain = registrationChain.then(safelyRegister, safelyRegister);
-  // The badge mirrors what is registered, so it has to follow every change that
-  // re-registers scripts (toggle, save, install, import, update). Refreshing is
+  // The badge counts the reported scripts that are still active, so it has to
+  // follow every change that re-registers scripts (toggle, save, install,
+  // import, update) — in every tab, not just the front one. Refreshing is
   // fire-and-forget: callers must never wait on toolbar decoration.
   return registrationChain.then((result) => {
     invalidateBadgeIndex();
-    void refreshBadge();
+    void refreshAllBadges();
     return result;
   });
 }

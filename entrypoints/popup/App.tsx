@@ -194,8 +194,15 @@ export default function App() {
     );
   }, [data?.scripts, query]);
 
-  const openOptions = (hash = '') => {
-    void chrome.tabs.create({ url: chrome.runtime.getURL(`options.html${hash}`) });
+  // Opening the manager is always a message to the background: this popup is
+  // destroyed the moment the tab is activated, so the "focus an existing options
+  // tab, otherwise create one" logic has to outlive it (see lib/options-tab.ts).
+  const openOptions = async (hash = '') => {
+    try {
+      await sendBg('options:open', { hash });
+    } catch (e) {
+      setError(errorMessage(e));
+    }
   };
 
   const openExtensions = () => {
@@ -336,7 +343,7 @@ export default function App() {
                 <TooltipTrigger asChild>
                   <button
                     type="button"
-                    onClick={() => openOptions('#/script/new')}
+                    onClick={() => void openOptions('#/script/new')}
                     aria-label={t('scripts.new')}
                     className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-150 ease-standard hover:bg-foreground/10 hover:text-foreground"
                   >
@@ -368,7 +375,7 @@ export default function App() {
                   }
                   onToggle={(enabled) => void toggleScript(script, enabled)}
                   onInvoke={(command) => void invokeMenu(command)}
-                  onEdit={() => openOptions(`#/script/${script.uuid}`)}
+                  onEdit={() => void openOptions(`#/script/${script.uuid}`)}
                 />
               ))}
             </div>
@@ -404,7 +411,7 @@ export default function App() {
           </button>
           <button
             type="button"
-            onClick={() => openOptions('#/scripts')}
+            onClick={() => void openOptions('#/scripts')}
             className="flex h-10 w-full items-center gap-2.5 rounded-control pl-2 pr-1 text-left transition-colors duration-150 ease-standard hover:bg-accent active:bg-accent/70"
           >
             <LayoutDashboard

@@ -7,6 +7,25 @@ export interface HostPortRecord {
 
 const ports = new Map<string, HostPortRecord>();
 
+/** Frame-scoped cleanup hooks (menus). Wired from the background entry point. */
+const frameClosedListeners = new Set<(tabId: number, frameId: number) => void>();
+
+export function onHostPortClosed(
+  listener: (tabId: number, frameId: number) => void,
+): void {
+  frameClosedListeners.add(listener);
+}
+
+function notifyPortClosed(tabId: number, frameId: number): void {
+  for (const listener of frameClosedListeners) {
+    try {
+      listener(tabId, frameId);
+    } catch {
+      // A failing listener must not break port bookkeeping.
+    }
+  }
+}
+
 function key(tabId: number, frameId: number): string {
   return `${tabId}:${frameId}`;
 }
@@ -31,7 +50,13 @@ export function registerHostPort(
   ports.set(key(record.tabId, record.frameId), record);
   port.onDisconnect.addListener(() => {
     const current = ports.get(key(record.tabId, record.frameId));
-    if (current?.port === port) ports.delete(key(record.tabId, record.frameId));
+    if (current?.port !== port) return;
+    ports.delete(key(record.tabId, record.frameId));
+    // The frame (or its document) is gone: nothing can execute a menu callback
+    // registered there any more. Registrations are replayed by the engine after
+    // a bridge reconnect, so dropping them here is safe and keeps the popup
+    // free of rows that cannot be delivered.
+    notifyPortClosed(record.tabId, record.frameId);
   });
   return record;
 }

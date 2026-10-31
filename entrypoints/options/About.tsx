@@ -41,10 +41,8 @@ export function AboutPage({ onOpenData }: { onOpenData: () => void }) {
           </div>
 
           <dl className="mt-5 grid gap-x-6 gap-y-3 border-t border-border pt-4 sm:grid-cols-2">
-            <Meta label={t('options.about.stack')} value={t('options.about.stackValue')} />
             <Meta label={t('options.about.version')} value={version} mono />
             <Meta label={t('options.about.privacy')} value={t('options.about.privacyValue')} />
-            <Meta label={t('options.about.runtime')} value={t('options.about.runtimeValue')} mono />
           </dl>
 
           {/* The version lives here rather than in the nav rail: the rail is a
@@ -80,36 +78,6 @@ export function AboutPage({ onOpenData }: { onOpenData: () => void }) {
           </div>
         </CardContent>
       </Card>
-
-      <section>
-        <h2 className="mb-2 text-2xs font-semibold uppercase tracking-wider text-muted-foreground">
-          {t('options.about.permissions')}
-        </h2>
-        <Card>
-          <CardContent className="pt-4">
-            <p className="max-w-[64ch] text-xs leading-relaxed text-muted-foreground text-pretty">
-              {t('options.about.permissionsHint')}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-1.5">
-              {(manifest.permissions ?? []).map((permission) => (
-                <Badge key={permission} variant="outline" className="font-mono">
-                  {permission}
-                </Badge>
-              ))}
-            </div>
-            <p className="mt-3 text-2xs uppercase tracking-wider text-muted-foreground">
-              {t('options.about.hostPermissions')}
-            </p>
-            <div className="mt-1.5 flex flex-wrap gap-1.5">
-              {(manifest.host_permissions ?? []).map((pattern: string) => (
-                <Badge key={pattern} variant="accent" className="font-mono">
-                  {pattern}
-                </Badge>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </section>
 
       <p className="text-2xs leading-relaxed text-muted-foreground">
         {t('options.about.licenseValue')}

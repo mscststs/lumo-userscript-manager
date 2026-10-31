@@ -40,6 +40,41 @@ export type DefaultRunAt = 'document-idle' | 'document-end' | 'document-start';
 export type DefaultInjectInto = 'auto' | 'page' | 'content';
 export type UserLogLevel = 'error' | 'warn' | 'info' | 'debug';
 
+/**
+ * Trust configuration for the agent-facing MCP endpoint.
+ *
+ * The endpoint is deny-by-default: the user turns it on *and* lists the
+ * extension IDs allowed to call it. Chrome extension IDs are the only stable
+ * identity a receiver gets (`sender.id`), so they are the allowlist.
+ */
+export interface AgentSettings {
+  enabled: boolean;
+  allowedExtensionIds: string[];
+  /** Allow the agent to create/edit/enable/disable/trash scripts. Defaults to on. */
+  allowWrites: boolean;
+  /** New agent-authored scripts stay disabled until the user reviews them. Defaults to off. */
+  reviewWrites: boolean;
+  /** Open this extension's settings when an unknown extension asks for access. */
+  promptOnRequest: boolean;
+}
+
+/**
+ * An extension that probed the agent endpoint but is not on the allowlist.
+ *
+ * Bounded and non-exportable: it is runtime consent state, not configuration.
+ * `name`/`version` are self-reported by the caller and are only a display hint;
+ * the extension ID is the authoritative identity.
+ */
+export interface AgentPendingRequest {
+  id: string;
+  name?: string;
+  version?: string;
+  firstSeen: number;
+  lastSeen: number;
+  promptedAt?: number;
+  dismissedAt?: number;
+}
+
 /** Settings that affect every extension page and the runtime. */
 export interface UISettings {
   language: Language;

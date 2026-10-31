@@ -10,6 +10,10 @@ import {
   type BridgeEvent,
   type BridgeResult,
 } from '../protocol';
+import {
+  observePageLifecycle,
+  type PageLifecycleScope,
+} from '../lifecycle';
 
 /**
  * The only window API the client needs. Keeping this narrow makes the
@@ -19,18 +23,14 @@ export interface BridgeScope {
   postMessage(message: unknown, targetOrigin: string, transfer?: Transferable[]): void;
 }
 
-interface LifecycleScope {
-  addEventListener(type: 'pagehide', listener: () => void): void;
-  removeEventListener(type: 'pagehide', listener: () => void): void;
-}
-
 export interface BridgeClientOptions {
   kind: BridgeClientKind;
   onEvent: (event: BridgeEvent) => void;
   /** Called after the content bridge reconnected to a restarted worker. */
   onResume?: () => void;
   scope?: BridgeScope;
-  lifecycle?: LifecycleScope;
+  /** Page lifecycle source; `null` disables it (workers, unit tests). */
+  lifecycle?: PageLifecycleScope | null;
   /** Total time to keep retrying the initial handshake. */
   handshakeTimeoutMs?: number;
   /** Delay between handshake attempts (grows to `handshakeRetryMaxMs`). */
@@ -70,7 +70,7 @@ export class BridgeClient {
   private readonly kind: BridgeClientKind;
   private readonly clientId: string;
   private readonly scope: BridgeScope;
-  private readonly lifecycle: LifecycleScope | null;
+  private readonly unbindLifecycle: () => void;
   private readonly onEvent: (event: BridgeEvent) => void;
   private readonly onResume: (() => void) | undefined;
   private readonly handshakeTimeoutMs: number;
@@ -85,25 +85,31 @@ export class BridgeClient {
   private handshakePort: MessagePort | null = null;
   private retryDelay: number;
   private disposed = false;
+  /**
+   * Set once a handshake succeeded. A `pageshow` must not start a first
+   * handshake: the client is lazy on purpose, and a document without matching
+   * scripts would otherwise wake the worker on every back/forward trip.
+   */
+  private everConnected = false;
   private readonly requestPrefix = Math.random().toString(36).slice(2);
 
   constructor(options: BridgeClientOptions) {
     this.kind = options.kind;
     this.clientId = `${options.kind}:${Math.random().toString(36).slice(2)}`;
     this.scope = options.scope ?? (window as unknown as BridgeScope);
-    this.lifecycle =
-      options.lifecycle === undefined
-        ? typeof window === 'undefined'
-          ? null
-          : (window as unknown as LifecycleScope)
-        : options.lifecycle;
     this.onEvent = options.onEvent;
     this.onResume = options.onResume;
     this.handshakeTimeoutMs = options.handshakeTimeoutMs ?? 10_000;
     this.handshakeRetryMs = options.handshakeRetryMs ?? 150;
     this.handshakeRetryMaxMs = options.handshakeRetryMaxMs ?? 1_000;
     this.retryDelay = this.handshakeRetryMs;
-    this.lifecycle?.addEventListener('pagehide', this.handlePageHide);
+    this.unbindLifecycle = observePageLifecycle(
+      {
+        onResume: () => this.handlePageResume(),
+        onTerminate: () => this.dispose(),
+      },
+      options.lifecycle,
+    );
   }
 
   /** Resolves once the isolated content-script bridge accepted this engine. */
@@ -174,6 +180,7 @@ export class BridgeClient {
       }, this.retryDelay);
       this.acceptReady = () => {
         this.port = channel.port1;
+        this.everConnected = true;
         this.handshakePort = null;
         this.clearRetry();
         this.retryDelay = this.handshakeRetryMs;
@@ -238,15 +245,34 @@ export class BridgeClient {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.lifecycle?.removeEventListener('pagehide', this.handlePageHide);
+    this.unbindLifecycle();
     this.resetPort(new BridgeUnavailableError('Bridge client disposed.'));
   }
 
   private acceptReady: (() => void) | null = null;
 
-  private handlePageHide = () => {
-    this.dispose();
-  };
+  /**
+   * Back/forward cache restore.
+   *
+   * A frozen document keeps its `MessagePort`, so when the port is still there
+   * the runtime was never torn down and there is nothing to repair — replaying
+   * registrations would only cost one RPC per menu for no benefit. When the
+   * port is gone (the handshake timed out, or `postMessage` failed and reset
+   * it), the channel is rebuilt *before* announcing the resume so that the
+   * replay does not silently fail with `BRIDGE_UNAVAILABLE`.
+   *
+   * A worker restart is a different signal: the bridge broadcasts
+   * `BRIDGE_RESUME` for that, and both paths converge on `onResume`.
+   */
+  private handlePageResume(): void {
+    if (this.disposed || this.port || !this.everConnected) return;
+    void this.ensureReady()
+      .then(() => {
+        if (this.disposed) return;
+        this.onResume?.();
+      })
+      .catch(() => undefined);
+  }
 
   private clearRetry() {
     if (this.retryTimer !== null) {

@@ -3,39 +3,58 @@ import { listScripts } from '@/lib/db';
 import { storage } from '@/store/storage';
 import { oklchToHex } from '@/lib/color';
 import { ACCENTS, normalizeAccent, normalizeThemeMode } from '@/lib/theme-registry';
-import {
-  countActiveScripts,
-  evaluateScripts,
-  type EvaluatedScript,
-} from './matching';
+import { activeScriptUuids } from './matching';
+import { injectedUuids } from './injected-state';
 
 /**
- * Toolbar badge: how many scripts are actually active on the current tab.
+ * Toolbar badge: how many scripts are actually running on the current tab.
  *
- * Two properties make this affordable enough to run on every tab event:
+ * The number is no longer predicted from `@match` rules — it is the set of
+ * scripts that reported a start in this tab (`lib/background/injected-state.ts`),
+ * intersected with the scripts that are still allowed to run. That difference
+ * matters for three user-visible cases:
  *
- *  - **A compiled index, not a query.** `listScripts` + `compileUrlRules` for
- *    the whole library is cached in the worker and invalidated only when the
- *    registration changes. A navigation then costs one regex pass per script
- *    instead of an IndexedDB read plus a full metablock parse.
- *  - **Only the active tab.** Chrome badges are per-tab, so a tab that is not
- *    in front cannot be wrong for long — it is recomputed the moment it is
- *    activated. Walking every open tab on every change would be the expensive
- *    way to produce the same pixels.
+ *  - A script that failed to register (bad pattern, `userScripts` switched off)
+ *    used to be counted although it never ran.
+ *  - A script that only matches a frame URL used to be invisible.
+ *  - A page that finished loading used to keep the count of the page before it,
+ *    because Chrome clears a tab's badge when a new document commits and the
+ *    old `lastText` cache believed the number was still painted.
  *
- * The number is defined to match the popup list: a script counts when it is
- * enabled, not in the recycle bin, and its rules match the URL. `@run-at
- * context-menu` scripts count too — they are available on the page, just not
- * on load — so the badge can never contradict the rows the user clicked.
+ * Counting scripts instead of reports is why frames are unioned: one script in
+ * five iframes is one script.
+ *
+ * The set is further filtered by `activeScriptUuids` so that turning a script
+ * off in the popup drops it from the badge immediately, without a reload.
  */
 
-/** Index entry: only what counting needs, so the cache stays small. */
-type IndexEntry = Pick<EvaluatedScript, 'active' | 'rules'>;
+/** Ids of scripts that may run right now; cached until registration changes. */
+let activeUuids: Set<string> | null = null;
 
-let index: IndexEntry[] | null = null;
-
-/** Last text written per tab, so repeat events do not touch the UI. */
+/**
+ * Last text written per tab, so repeat events (activation, focus, settings)
+ * do not touch the UI. Chrome clears a tab's badge on a new document commit, so
+ * this cache must be dropped whenever that happens — `forgetBadge` is wired to
+ * `webNavigation.onCommitted`.
+ */
 const lastText = new Map<number, string>();
+
+/**
+ * Pending repaint per tab, from `requestBadgeRefresh`.
+ *
+ * A page load produces one injection report per frame per script; repainting on
+ * each of them would read settings and intersect the sets dozens of times for a
+ * single visual result. A short throttle collapses the burst.
+ */
+const pendingRefresh = new Map<number, ReturnType<typeof setTimeout>>();
+const REFRESH_THROTTLE_MS = 50;
+
+/**
+ * Per-tab refresh ticket. Asynchronous refreshes can overlap (a commit, a
+ * report, a settings write); only the newest one may paint, so an older count
+ * can never overwrite a newer one.
+ */
+const tickets = new Map<number, number>();
 
 /** Accent/theme signature of the palette currently applied to the badge. */
 let paletteKey = '';
@@ -43,20 +62,20 @@ let paletteKey = '';
 /** True once the badge has been cleared globally for a disabled setting. */
 let suppressed = false;
 
-/** Drop the cached library index; the next refresh recompiles it. */
+/** Drop the cached active-script set; the next refresh reloads it. */
 export function invalidateBadgeIndex(): void {
-  index = null;
+  activeUuids = null;
 }
 
-async function loadIndex(): Promise<IndexEntry[]> {
-  if (index) return index;
+async function loadActiveUuids(): Promise<Set<string>> {
+  if (activeUuids) return activeUuids;
   try {
-    const scripts = await listScripts(false);
-    index = evaluateScripts(scripts, undefined).map(({ active, rules }) => ({ active, rules }));
-    return index;
+    activeUuids = activeScriptUuids(await listScripts(false));
+    return activeUuids;
   } catch {
-    // IndexedDB unavailable: paint nothing rather than a wrong number.
-    return [];
+    // IndexedDB unavailable: paint nothing rather than a wrong number. Do not
+    // cache the empty set, so the next event retries.
+    return new Set();
   }
 }
 
@@ -70,6 +89,26 @@ async function loadIndex(): Promise<IndexEntry[]> {
 export function badgeTextFor(count: number): string {
   if (count <= 0) return '';
   return count > 99 ? '99+' : String(count);
+}
+
+/**
+ * Count reported scripts that are still active.
+ *
+ * Reports come per frame but the badge counts scripts, so the input is
+ * deduplicated. Pure and exported for the tests.
+ */
+export function countActiveInjected(
+  injected: Iterable<string>,
+  active: ReadonlySet<string>,
+): number {
+  const seen = new Set<string>();
+  let count = 0;
+  for (const uuid of injected) {
+    if (seen.has(uuid) || !active.has(uuid)) continue;
+    seen.add(uuid);
+    count += 1;
+  }
+  return count;
 }
 
 /**
@@ -101,12 +140,15 @@ function isDarkAppearance(settings: UISettings): boolean {
 
 async function writeText(tabId: number, text: string): Promise<void> {
   if (lastText.get(tabId) === text) return;
+  // Record optimistically: a failed call is retried by the next refresh, and
+  // the alternative (await, then record) lets two writes interleave.
+  lastText.set(tabId, text);
   try {
     await chrome.action.setBadgeText({ tabId, text });
-    lastText.set(tabId, text);
   } catch {
     // The action API is unavailable in this build; the badge is decoration, not
     // a capability, so nothing else should fail because of it.
+    lastText.delete(tabId);
   }
 }
 
@@ -147,22 +189,11 @@ async function suppressBadges(): Promise<void> {
   }
 }
 
-async function resolveTab(
-  tabId: number | undefined,
-  url: string | undefined,
-): Promise<{ tabId: number; url: string | undefined } | null> {
-  if (tabId !== undefined) {
-    if (url !== undefined) return { tabId, url };
-    try {
-      return { tabId, url: (await chrome.tabs.get(tabId)).url };
-    } catch {
-      return null;
-    }
-  }
+async function resolveTabId(tabId: number | undefined): Promise<number | null> {
+  if (tabId !== undefined) return tabId;
   try {
     const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-    if (tab?.id === undefined) return null;
-    return { tabId: tab.id, url: tab.url };
+    return tab?.id ?? null;
   } catch {
     return null;
   }
@@ -171,10 +202,12 @@ async function resolveTab(
 /**
  * Recompute the badge for one tab (default: the active one).
  *
- * `url` lets navigation events hand over the URL they already have, sparing a
- * `tabs.get` on the hottest path in the worker.
+ * Called by the injection reporter (`host:run`), by navigation commits, by the
+ * settings watch, and after registration changes. All of them are cheap: the
+ * active-script set is cached and the count is a set intersection over a
+ * handful of ids.
  */
-export async function refreshBadge(tabId?: number, url?: string): Promise<void> {
+export async function refreshBadge(tabId?: number): Promise<void> {
   try {
     const settings = await storage.getUISettings();
     if (!settings.showBadge) {
@@ -183,22 +216,71 @@ export async function refreshBadge(tabId?: number, url?: string): Promise<void> 
     }
     suppressed = false;
 
-    const target = await resolveTab(tabId, url);
-    if (!target) return;
+    const target = await resolveTabId(tabId);
+    if (target === null) return;
+
+    const ticket = (tickets.get(target) ?? 0) + 1;
+    tickets.set(target, ticket);
 
     await applyPalette(settings);
-    // The master switch pauses every script, so the honest count is zero even
-    // though the rows still match.
-    const count = settings.scriptsEnabled
-      ? countActiveScripts(await loadIndex(), target.url)
-      : 0;
-    await writeText(target.tabId, badgeTextFor(count));
+
+    // The master switch pauses every script, so the honest count is zero: no
+    // report can arrive while registrations are gone.
+    let count = 0;
+    if (settings.scriptsEnabled) {
+      count = countActiveInjected(await injectedUuids(target), await loadActiveUuids());
+    }
+
+    if (tickets.get(target) !== ticket) return;
+    await writeText(target, badgeTextFor(count));
   } catch (error) {
     console.warn('[Lumo Userscripts] Badge refresh failed:', error);
   }
 }
 
-/** Forget per-tab bookkeeping for a closed tab. */
+/**
+ * Recompute every open tab.
+ *
+ * Settings (badge on/off, accent) and the script set (toggle, install, delete)
+ * are global, so a single active tab would leave every background tab wrong
+ * until it is activated.
+ */
+export async function refreshAllBadges(): Promise<void> {
+  let tabs: chrome.tabs.Tab[];
+  try {
+    tabs = await chrome.tabs.query({});
+  } catch {
+    return;
+  }
+  await Promise.all(
+    tabs.map((tab) => (tab.id === undefined ? undefined : refreshBadge(tab.id))),
+  );
+}
+
+/**
+ * Ask for a repaint soon, coalescing a burst of injection reports.
+ *
+ * Returns immediately: `host:run` must not wait for toolbar decoration, and the
+ * count is recomputed from state anyway, so one paint per burst is enough.
+ */
+export function requestBadgeRefresh(tabId: number): void {
+  if (pendingRefresh.has(tabId)) return;
+  pendingRefresh.set(
+    tabId,
+    setTimeout(() => {
+      pendingRefresh.delete(tabId);
+      void refreshBadge(tabId);
+    }, REFRESH_THROTTLE_MS),
+  );
+}
+
+/** Forget per-tab bookkeeping: the tab closed, or a new document committed. */
 export function forgetBadge(tabId: number): void {
+  const pending = pendingRefresh.get(tabId);
+  if (pending !== undefined) {
+    clearTimeout(pending);
+    pendingRefresh.delete(tabId);
+  }
   lastText.delete(tabId);
+  tickets.delete(tabId);
 }

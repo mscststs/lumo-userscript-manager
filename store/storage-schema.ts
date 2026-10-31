@@ -23,7 +23,7 @@
  * revision counter in this area as the change-broadcast channel.
  */
 
-import type { UISettings } from '@/types';
+import type { AgentPendingRequest, AgentSettings, UISettings } from '@/types';
 import {
   DEFAULT_ACCENT,
   DEFAULT_DARK_THEME,
@@ -48,6 +48,14 @@ export interface StorageSchema {
    * already-open pages, which then fail closed until they reload.
    */
   runtimeSecret: string;
+  /**
+   * Agent endpoint trust configuration: master switch + extension ID allowlist.
+   * Deliberately not exportable — importing a backup must not grant another
+   * machine's extensions access to this browser.
+   */
+  agentSettings: AgentSettings;
+  /** Bounded queue of extensions waiting for the user's approval. */
+  agentPendingRequests: AgentPendingRequest[];
 }
 
 /** Union of all valid storage key strings. */
@@ -87,6 +95,42 @@ export const DEFAULT_UI_SETTINGS: UISettings = {
   logLevel: 'info',
 };
 
+export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
+  enabled: false,
+  allowedExtensionIds: [],
+  allowWrites: true,
+  reviewWrites: false,
+  promptOnRequest: true,
+};
+
+const EXTENSION_ID_RE = /^[a-p]{32}$/;
+
+/** Repair the bounded pending-request queue. */
+export function normalizeAgentPendingRequests(raw: unknown): AgentPendingRequest[] {
+  const now = Date.now();
+  const seen = new Set<string>();
+  const rows: AgentPendingRequest[] = [];
+  for (const entry of Array.isArray(raw) ? raw : []) {
+    if (!entry || typeof entry !== 'object') continue;
+    const record = entry as Record<string, unknown>;
+    const id = record.id;
+    if (typeof id !== 'string' || !EXTENSION_ID_RE.test(id) || seen.has(id)) continue;
+    seen.add(id);
+    const name = typeof record.name === 'string' ? record.name.trim().slice(0, 80) : '';
+    const version = typeof record.version === 'string' ? record.version.slice(0, 32) : '';
+    rows.push({
+      id,
+      ...(name ? { name } : {}),
+      ...(version ? { version } : {}),
+      firstSeen: typeof record.firstSeen === 'number' ? record.firstSeen : now,
+      lastSeen: typeof record.lastSeen === 'number' ? record.lastSeen : now,
+      ...(typeof record.promptedAt === 'number' ? { promptedAt: record.promptedAt } : {}),
+      ...(typeof record.dismissedAt === 'number' ? { dismissedAt: record.dismissedAt } : {}),
+    });
+  }
+  return rows.sort((a, b) => b.lastSeen - a.lastSeen).slice(0, 5);
+}
+
 const RUN_AT_VALUES = new Set(['document-idle', 'document-end', 'document-start']);
 const INJECT_VALUES = new Set(['auto', 'page', 'content']);
 const LOG_LEVELS = new Set(['error', 'warn', 'info', 'debug']);
@@ -110,6 +154,35 @@ export const STORAGE_FIELDS: { [K in StorageKey]: StorageFieldDef<K> } = {
     defaultValue: '',
     exportable: false,
     normalize: (raw) => (typeof raw === 'string' ? raw : ''),
+  },
+  agentSettings: {
+    key: 'agentSettings',
+    defaultValue: DEFAULT_AGENT_SETTINGS,
+    exportable: false,
+    normalize: (raw) => ({
+      enabled: raw?.enabled === true,
+      // Chrome extension IDs are 32 characters from a-p. Filtering here keeps a
+      // hand-edited or imported value from becoming an allowlist entry that can
+      // never match, and caps the list so the record stays bounded.
+      allowedExtensionIds: Array.from(
+        new Set(
+          (Array.isArray(raw?.allowedExtensionIds) ? raw.allowedExtensionIds : []).filter(
+            (id): id is string => typeof id === 'string' && /^[a-p]{32}$/.test(id),
+          ),
+        ),
+      ).slice(0, 16),
+      // Defaults are "writes on, review off"; an explicit stored value wins so
+      // a user who turned either switch the other way keeps that choice.
+      allowWrites: raw?.allowWrites !== false,
+      reviewWrites: raw?.reviewWrites === true,
+      promptOnRequest: raw?.promptOnRequest !== false,
+    }),
+  },
+  agentPendingRequests: {
+    key: 'agentPendingRequests',
+    defaultValue: [],
+    exportable: false,
+    normalize: (raw) => normalizeAgentPendingRequests(raw),
   },
   uiSettings: {
     key: 'uiSettings',

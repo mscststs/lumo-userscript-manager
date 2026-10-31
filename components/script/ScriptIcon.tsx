@@ -75,9 +75,14 @@ export function ScriptIcon({ src, dimmed = false, className }: ScriptIconProps) 
           onLoad={() => setStatus('loaded')}
           onError={() => setStatus('failed')}
           className={cn(
-            // Inset rather than `h-full w-full`: the tile keeps its 20px hit
-            // area, the artwork sits in the optical 14px core.
-            'absolute inset-[3px] h-auto w-auto rounded-[3px] object-contain',
+            // The bitmap gets an *explicit* 14px core and is centred by auto
+            // margins. Leaving the size to `h-auto w-auto` does not work: an
+            // `<img>` is a replaced element, so under `inset: 3px` it falls
+            // back to its intrinsic size (and to Tailwind's preflight
+            // `max-width: 100%`) instead of filling the inset box — a 64px
+            // favicon, or a multi-frame `.ico` whose largest frame is 256px,
+            // then paints edge to edge and is clipped at the bottom-right.
+            'absolute inset-0 m-auto h-3.5 w-3.5 rounded-[3px] object-contain',
             'transition-[opacity,filter] duration-150 ease-standard',
             status === 'loaded' ? 'opacity-100' : 'opacity-0',
             dimmed && status === 'loaded' && 'opacity-55 grayscale',

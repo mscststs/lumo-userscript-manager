@@ -24,7 +24,7 @@ import { AboutPage } from './About';
 import { AppearancePage } from './AppearancePage';
 
 type RouteName = 'scripts' | 'editor' | 'settings' | 'appearance' | 'logs' | 'about';
-type SettingsSection = 'general' | 'updates' | 'data';
+type SettingsSection = 'general' | 'updates' | 'data' | 'agent';
 
 interface Route {
   name: RouteName;
@@ -34,7 +34,7 @@ interface Route {
   section?: SettingsSection;
 }
 
-const SETTINGS_SECTIONS: SettingsSection[] = ['general', 'updates', 'data'];
+const SETTINGS_SECTIONS: SettingsSection[] = ['general', 'updates', 'data', 'agent'];
 
 function parseHash(): Route {
   const hash = window.location.hash.replace(/^#\/?/, '');
@@ -107,7 +107,6 @@ export default function App() {
       return (
         <ScriptsPage
           onOpenEditor={(uuid) => navigate({ name: 'editor', uuid })}
-          onOpenSettings={() => navigate({ name: 'settings', section: 'general' })}
         />
       );
     }
@@ -150,14 +149,19 @@ export default function App() {
             >
               <div
                 className={cn(
-                  'flex h-14 shrink-0 items-center gap-2.5 px-3',
-                  !collapsed && 'md:px-4',
+                  'flex h-14 shrink-0 items-center gap-2.5 pl-3.5 transition-[padding-left] duration-200 ease-standard',
+                  !collapsed && 'md:pl-4',
                 )}
               >
                 <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-control bg-primary/10 text-primary">
                   <FileCode2 className="h-3.5 w-3.5" aria-hidden="true" />
                 </div>
-                <div className={cn('min-w-0', collapsed ? 'hidden' : 'hidden md:block')}>
+                <div
+                  className={cn(
+                    'min-w-0 max-w-0 overflow-hidden opacity-0 transition-[max-width,opacity] duration-200 ease-standard',
+                    !collapsed && 'md:max-w-[11rem] md:opacity-100',
+                  )}
+                >
                   {/* Product wordmark stays English in every locale, like the
                       extension name in the Chrome UI. */}
                   <p className="truncate text-sm font-semibold leading-tight text-foreground">
@@ -178,12 +182,12 @@ export default function App() {
                             onClick={() => navigate({ name: item.name })}
                             aria-current={isActive ? 'page' : undefined}
                             className={cn(
-                              'relative flex h-9 w-full items-center gap-2.5 rounded-control px-2.5 text-sm',
-                              'transition-colors duration-150 ease-standard',
+                              'relative flex h-9 w-full items-center justify-start gap-2.5 rounded-control pl-3 text-sm',
+                              'transition-[color,background-color,padding-left] duration-200 ease-standard',
                               isActive
                                 ? 'font-medium text-foreground'
                                 : 'text-muted-foreground hover:bg-accent/70 hover:text-foreground',
-                              collapsed ? 'md:justify-center md:px-0' : 'md:justify-start',
+                              !collapsed && 'md:pl-2.5',
                             )}
                           >
                             {isActive && (
@@ -204,8 +208,9 @@ export default function App() {
                             </span>
                             <span
                               className={cn(
-                                'text-optical relative z-10 min-w-0 truncate',
-                                collapsed ? 'hidden' : 'hidden md:inline',
+                                'text-optical relative z-10 min-w-0 max-w-0 truncate opacity-0',
+                                'transition-[max-width,opacity] duration-200 ease-standard',
+                                !collapsed && 'md:max-w-48 md:opacity-100',
                               )}
                             >
                               {t(item.labelKey)}
@@ -223,8 +228,9 @@ export default function App() {
 
               <div
                 className={cn(
-                  'flex h-12 shrink-0 items-center border-t border-border px-2',
-                  collapsed ? 'md:justify-center' : 'md:justify-end',
+                  'flex h-12 shrink-0 items-center justify-end border-t border-border pl-2 pr-3.5',
+                  'transition-[padding-right] duration-200 ease-standard',
+                  !collapsed && 'md:pr-2',
                 )}
               >
                 <Tooltip>

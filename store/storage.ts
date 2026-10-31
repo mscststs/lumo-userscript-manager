@@ -1,4 +1,4 @@
-import type { UISettings } from '@/types';
+import type { AgentPendingRequest, AgentSettings, UISettings } from '@/types';
 import {
   STORAGE_FIELDS,
   EXPORTABLE_KEYS,
@@ -53,6 +53,25 @@ export const storage = {
   },
   async setUISettings(settings: UISettings): Promise<void> {
     await setField('uiSettings', settings);
+  },
+
+  // ----- Agent endpoint -----
+  async getAgentSettings(): Promise<AgentSettings> {
+    return getField('agentSettings');
+  },
+  async setAgentSettings(settings: AgentSettings): Promise<void> {
+    const field = STORAGE_FIELDS.agentSettings;
+    await setField('agentSettings', field.normalize ? field.normalize(settings) : settings);
+  },
+  async getAgentPendingRequests(): Promise<AgentPendingRequest[]> {
+    return getField('agentPendingRequests');
+  },
+  async setAgentPendingRequests(requests: AgentPendingRequest[]): Promise<void> {
+    const field = STORAGE_FIELDS.agentPendingRequests;
+    await setField(
+      'agentPendingRequests',
+      field.normalize ? field.normalize(requests) : requests,
+    );
   },
 
   // ----- Export / Import (driven by registry) -----

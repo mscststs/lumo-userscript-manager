@@ -34,7 +34,7 @@ import {
 import { getPageAccess, isFileUrl, type PageAccess } from '@/lib/page-access';
 import { byteLength, sha256Hex } from '@/lib/script/hash';
 import { getStorageName } from '@/lib/script/storage-name';
-import { unsupportedGrants } from '@/lib/script/grants';
+import { collectMetadataWarnings } from '@/lib/script/analyze';
 import { storage } from '@/store/storage';
 import { evaluateScripts } from './matching';
 import { refreshScriptResources } from './resources';
@@ -42,6 +42,7 @@ import { getValuesForScript } from './values';
 import { cacheScriptIcon, resolveScriptIcons } from './icons';
 import { requestRegistration } from './registry';
 import { getRuntimeStatus } from './registry';
+import { forgetInjectedScript } from './injected-state';
 
 export function broadcast(event: string, payload: Record<string, unknown> = {}): void {
   void chrome.runtime.sendMessage({ type: 'lumo:event', event, payload }).catch(() => undefined);
@@ -115,6 +116,9 @@ async function makeScriptRecord(
     antifeature: metadata.antifeature ?? [],
 
     enabled: existing?.enabled ?? true,
+    // Preserve the review marker across edits: an agent polishing its own
+    // pending script must not clear the user's review gate.
+    pendingReview: existing?.pendingReview,
     removedAt: undefined,
     sort: existing?.sort ?? -Date.now(),
 
@@ -168,10 +172,18 @@ export async function getScriptDetail(uuid: string) {
   return { script, resources, values: valueData.values, versions };
 }
 
+export interface SaveScriptOptions {
+  /** Force the initial enabled state instead of inheriting the previous one. */
+  enabled?: boolean;
+  /** Mark the script as awaiting user review. */
+  pendingReview?: boolean;
+}
+
 export async function saveScriptFromCode(
   uuid: string | null,
   code: string,
   sourceUrl = '',
+  options: SaveScriptOptions = {},
 ): Promise<UserScript> {
   const parsed = parseMetadata(code);
   if (parsed.errors.length) throw new Error(parsed.errors.join('\n'));
@@ -186,6 +198,8 @@ export async function saveScriptFromCode(
   }
 
   const record = await makeScriptRecord(metadata, code, existing, sourceUrl || existing?.origin || '');
+  if (options.enabled !== undefined) record.enabled = options.enabled;
+  if (options.pendingReview !== undefined) record.pendingReview = options.pendingReview;
   await saveScript(record, code);
   await refreshScriptResources(record.uuid, metadata);
   // Identity icon: warm the cache now so the popup paints a real favicon on
@@ -265,12 +279,45 @@ export async function updateSelfMetadata(uuid: string, selfMetadata: ScriptMetad
 
 export async function toggleScript(uuid: string, enabled: boolean): Promise<void> {
   await setScriptEnabled(uuid, enabled);
+  // A disabled script is not running any more, even in the documents it already
+  // entered; drop it from the badge instead of waiting for a reload.
+  if (!enabled) await forgetInjectedScript(uuid);
   await requestRegistration();
   broadcast('scripts-changed');
 }
 
+/**
+ * Batch enable/disable with one re-registration pass.
+ *
+ * Calling `toggleScript` per id would rebuild the whole `chrome.userScripts`
+ * registration table once per script; an agent batch of 20 would be 20 passes.
+ */
+export async function setScriptsEnabled(
+  uuids: string[],
+  enabled: boolean,
+): Promise<{ updated: string[]; missing: string[] }> {
+  const updated: string[] = [];
+  const missing: string[] = [];
+  for (const uuid of uuids) {
+    const script = await getScript(uuid);
+    if (!script) {
+      missing.push(uuid);
+      continue;
+    }
+    await setScriptEnabled(uuid, enabled);
+    if (!enabled) await forgetInjectedScript(uuid);
+    updated.push(uuid);
+  }
+  if (updated.length > 0) {
+    await requestRegistration();
+    broadcast('scripts-changed');
+  }
+  return { updated, missing };
+}
+
 export async function removeScript(uuid: string): Promise<void> {
   await moveScriptToTrash(uuid);
+  await forgetInjectedScript(uuid);
   await requestRegistration();
   broadcast('scripts-changed');
 }
@@ -292,8 +339,14 @@ export async function destroyScript(uuid: string): Promise<void> {
   broadcast('scripts-changed');
 }
 
-export async function markScriptRun(uuid: string, error?: string): Promise<void> {
-  await recordRun(uuid, error);
+/** A script started in a tab document. Counted once per document. */
+export async function markScriptRun(uuid: string): Promise<void> {
+  await recordRun(uuid);
+}
+
+/** A running script failed: record the message without counting another run. */
+export async function markScriptError(uuid: string, error: string): Promise<void> {
+  await recordRun(uuid, error, false);
 }
 
 export async function prepareInstall(input: {
@@ -330,33 +383,7 @@ export async function prepareInstall(input: {
   // the version they are still running.
   const draftUuid = crypto.randomUUID();
   const resourceRecords = await refreshScriptResources(draftUuid, metadata);
-  const warnings = [...parsed.warnings];
-  if (!metadata.match?.length && !metadata.include?.length) {
-    warnings.push('No @match or @include rule; the script will run on every page.');
-  }
-  for (const grant of unsupportedGrants(metadata.grant)) {
-    warnings.push(`Unsupported @grant: ${grant}`);
-  }
-  if (metadata.grant?.includes('unsafeWindow') && metadata['inject-into']?.[0] === 'content') {
-    warnings.push('unsafeWindow requires the page world; @inject-into content is ignored.');
-  }
-  for (const feature of metadata.antifeature ?? []) {
-    if (feature.trim()) warnings.push(`@antifeature: ${feature.trim()}`);
-  }
-  if (metadata['run-in']?.length) {
-    warnings.push('@run-in is not supported; the script runs in normal tabs.');
-  }
-  for (const tag of [
-    'background',
-    'crontab',
-    'cloudcat',
-    'cloudserver',
-    'exportvalue',
-    'exportcookie',
-    'scripturl',
-  ]) {
-    if (metadata[tag]?.length) warnings.push(`@${tag} is not supported.`);
-  }
+  const warnings = collectMetadataWarnings(metadata, parsed.warnings);
   const requireDetails = (metadata.require ?? []).map((url) => {
     const resource = resourceRecords.find((item) => item.url === url);
     return {
@@ -406,7 +433,7 @@ export async function prepareInstall(input: {
 
 export async function commitInstall(
   token: string,
-  options: { enabled?: boolean } = {},
+  options: { enabled?: boolean; pendingReview?: boolean } = {},
 ): Promise<{ uuid: string; updated: boolean }> {
   const draft = await getDraft(token);
   if (!draft) throw new Error('Install draft expired or not found.');
@@ -422,6 +449,7 @@ export async function commitInstall(
     draft.draftUuid,
   );
   if (options.enabled !== undefined) record.enabled = options.enabled;
+  if (options.pendingReview !== undefined) record.pendingReview = options.pendingReview;
   await saveScript(record, draft.code);
   void cacheScriptIcon(record.uuid, record.icon);
   if (draft.resourceRecords?.length) {

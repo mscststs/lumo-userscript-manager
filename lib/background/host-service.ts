@@ -7,7 +7,9 @@ import { getValuesForScript, setValueForScript, deleteValueForScript } from '@/l
 import { recordLog } from '@/lib/background/logs';
 import { registerMenuCommand, unregisterMenuCommand } from '@/lib/background/menus';
 import { handleGmApi } from '@/lib/background/gm';
-import { markScriptRun, broadcast } from '@/lib/background/scripts';
+import { markScriptError, markScriptRun, broadcast } from '@/lib/background/scripts';
+import { requestBadgeRefresh } from '@/lib/background/badge';
+import { noteInjection } from '@/lib/background/injected-state';
 import { verifyRuntimeToken } from '@/lib/background/runtime-token';
 import type { HostErrorCode } from '@/lib/runtime/protocol';
 
@@ -16,6 +18,8 @@ export interface HostContext {
   frameId: number;
   url: string;
   uuid: string;
+  /** Chrome document id of the sending frame, when the browser provides one. */
+  documentId?: string;
 }
 
 export class HostError extends Error {
@@ -38,6 +42,7 @@ export function createHostContext(
     frameId: sender?.frameId ?? 0,
     url: bridgeUrl || sender?.url || sender?.tab?.url || '',
     uuid: String(payload.uuid ?? ''),
+    documentId: sender?.documentId,
   };
 }
 
@@ -108,7 +113,21 @@ export async function handleHostRequest(
     }
     case 'host:run': {
       await requireToken(payload, ctx.uuid);
-      await markScriptRun(ctx.uuid, payload.error ? String(payload.error) : undefined);
+      const error = payload.error ? String(payload.error) : undefined;
+      if (error) {
+        // The script did start; only the outcome is bad. Recording the error
+        // must not count the run a second time.
+        await markScriptError(ctx.uuid, error);
+        return undefined;
+      }
+      // One report per frame, one run per tab document: `noteInjection`
+      // deduplicates across frames so five iframes do not inflate `runCount`.
+      const first = await noteInjection(ctx.tabId, ctx.frameId, ctx.uuid, {
+        documentId: ctx.documentId,
+        url: ctx.url,
+      });
+      if (first) await markScriptRun(ctx.uuid);
+      if (ctx.tabId >= 0) requestBadgeRefresh(ctx.tabId);
       return undefined;
     }
     case 'host:log': {
@@ -136,14 +155,18 @@ export async function handleHostRequest(
         tabId: ctx.tabId,
         frameId: ctx.frameId,
       };
-      registerMenuCommand(command);
-      broadcast('menus-changed', { tabId: ctx.tabId });
+      // Only broadcast when the merged list actually changed: one command in
+      // five frames is still one command.
+      if (registerMenuCommand(command)) {
+        broadcast('menus-changed', { tabId: ctx.tabId });
+      }
       return id;
     }
     case 'host:menu:unregister': {
       await requireToken(payload, ctx.uuid);
-      unregisterMenuCommand(ctx.tabId, ctx.frameId, ctx.uuid, String(payload.id ?? ''));
-      broadcast('menus-changed', { tabId: ctx.tabId });
+      if (unregisterMenuCommand(ctx.tabId, ctx.frameId, ctx.uuid, String(payload.id ?? ''))) {
+        broadcast('menus-changed', { tabId: ctx.tabId });
+      }
       return undefined;
     }
     default:

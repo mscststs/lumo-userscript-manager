@@ -12,6 +12,7 @@ import {
   type BridgeRpc,
   type HostResponse,
 } from '../protocol';
+import { observePageLifecycle } from '../lifecycle';
 
 const MAX_CLIENTS = 8;
 const BACKGROUND_PORT_NAME = 'lumo:bridge';
@@ -51,6 +52,7 @@ export function startContentBridge(): void {
   let retryDelay = RETRY_MIN_MS;
   let retryTimer: ReturnType<typeof setTimeout> | null = null;
   let disposed = false;
+  let unbindLifecycle: (() => void) | null = null;
 
   const postToClient = (record: ClientRecord, message: BridgeResult | BridgeEvent) => {
     try {
@@ -194,7 +196,13 @@ export function startContentBridge(): void {
   const handleHello = (event: MessageEvent) => {
     if (event.source !== window) return;
     if (!isBridgeHello(event.data) || !event.ports[0]) return;
-    if (clients.size >= MAX_CLIENTS) {
+
+    const data = event.data;
+    const clientId = typeof data.clientId === 'string' && data.clientId ? data.clientId : createId();
+    const previous = clients.get(clientId);
+    // A reconnect from an engine that already has a slot must never be turned
+    // away: it would otherwise retry forever against a full table.
+    if (!previous && clients.size >= MAX_CLIENTS) {
       try {
         event.ports[0].close();
       } catch {
@@ -203,15 +211,12 @@ export function startContentBridge(): void {
       return;
     }
 
-    const data = event.data;
-    const clientId = typeof data.clientId === 'string' && data.clientId ? data.clientId : createId();
     const record: ClientRecord = {
       id: clientId,
       port: event.ports[0],
       kind: typeof data.kind === 'string' ? data.kind : 'unknown',
     };
 
-    const previous = clients.get(clientId);
     if (previous) {
       try {
         previous.port.close();
@@ -241,6 +246,8 @@ export function startContentBridge(): void {
     if (disposed) return;
     disposed = true;
     clearRetry();
+    unbindLifecycle?.();
+    window.removeEventListener('message', handleHello);
     for (const record of clients.values()) {
       try {
         record.port.close();
@@ -259,9 +266,60 @@ export function startContentBridge(): void {
     }
   };
 
+  /**
+   * Back/forward cache restore.
+   *
+   * Nothing is injected into a restored document, so the only way the bridge
+   * can be whole again is by never having been torn down. Restoring therefore
+   * repairs at most the event channel, and only when there is something to
+   * repair:
+   *
+   *  - a document without a single engine handshake stays lazy; a back/forward
+   *    trip must not wake the service worker;
+   *  - a live port is pinged instead of replaced, because reconnecting would
+   *    drop the worker-side registrations, broadcast `menus-changed` and make
+   *    every menu row blink for no reason;
+   *  - a dead port (worker recycled) is replaced immediately instead of waiting
+   *    for the retry backoff, and the existing `notifyResume()` replay tells
+   *    every engine to re-register its menus.
+   */
+  const resumeBackgroundChannel = () => {
+    if (disposed) return;
+    // The extension was reloaded while the page sat in the cache: the runtime
+    // id is gone and no reconnection can ever succeed.
+    if (!chrome.runtime?.id) {
+      cleanup();
+      return;
+    }
+    if (!bgEverConnected) return;
+    if (bgPort) {
+      try {
+        // Harmless no-id keep-alive; the worker ignores it.
+        bgPort.postMessage({ type: 'host:ping' });
+        return;
+      } catch {
+        try {
+          bgPort.disconnect();
+        } catch {
+          // Already gone.
+        }
+        bgPort = null;
+      }
+    }
+    clearRetry();
+    connectBackground();
+  };
+
   window.addEventListener('message', handleHello);
-  window.addEventListener('pagehide', cleanup, { once: true });
-  window.addEventListener('unload', cleanup, { once: true });
+
+  // `pagehide` is not a terminal signal: a document that enters the
+  // back/forward cache keeps its realm and its ports, and nothing is injected
+  // into it again on restore. The bridge therefore suspends by doing nothing and
+  // only tears down when the document really goes away.
+  unbindLifecycle = observePageLifecycle({
+    onResume: resumeBackgroundChannel,
+    onTerminate: cleanup,
+  });
 }
 
 function createId(): string {

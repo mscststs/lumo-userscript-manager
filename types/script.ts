@@ -45,6 +45,11 @@ export interface UserScript {
   antifeature?: string[];
 
   enabled: boolean;
+  /**
+   * Set when an agent created the script (or installed it) while review is on.
+   * Cleared when the user enables it.
+   */
+  pendingReview?: boolean;
   /** Set when moved to the recycle bin. */
   removedAt?: number;
   sort: number;

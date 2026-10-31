@@ -4,6 +4,7 @@ import { createGmApi, type GmTransport } from '@/lib/runtime/gm-api';
 function makeTransport(): GmTransport & {
   call: ReturnType<typeof vi.fn>;
   registerMenuCommand: ReturnType<typeof vi.fn>;
+  unregisterMenuCommand: ReturnType<typeof vi.fn>;
 } {
   return {
     call: vi.fn(async () => undefined),
@@ -101,6 +102,39 @@ describe('GM API scoping', () => {
       unsafeWindow,
     });
     expect(api.GM.unsafeWindow).toBe(unsafeWindow);
+  });
+
+  it('keys menu commands by options.id or title so frames can be merged', async () => {
+    const { api, transport } = makeContext(['GM_registerMenuCommand']);
+
+    const byTitle = await api.GM.GM_registerMenuCommand('Toggle panel', () => {});
+    expect(byTitle).toBe('Toggle panel');
+    expect(transport.registerMenuCommand).toHaveBeenCalledWith('Toggle panel', 'Toggle panel', undefined);
+
+    // A legacy string third argument is an access key, not an id.
+    const withAccessKey = await api.GM.GM_registerMenuCommand('Other', () => {}, 'o');
+    expect(withAccessKey).toBe('Other');
+    expect(transport.registerMenuCommand).toHaveBeenLastCalledWith('Other', 'Other', { accessKey: 'o' });
+
+    // GM4's explicit id wins, and is stable across frames.
+    const explicit = await api.GM.GM_registerMenuCommand('Third', () => {}, { id: 'cmd-3' });
+    expect(explicit).toBe('cmd-3');
+  });
+
+  it('unregisters a menu command by its id or by its title', async () => {
+    const { api, transport } = makeContext(['GM_registerMenuCommand', 'GM_unregisterMenuCommand']);
+    await api.GM.GM_registerMenuCommand('By title', () => {});
+    await api.GM.GM_unregisterMenuCommand('By title');
+    expect(transport.unregisterMenuCommand).toHaveBeenLastCalledWith('By title');
+
+    await api.GM.GM_registerMenuCommand('With id', () => {}, { id: 'cmd-9' });
+    await api.GM.GM_unregisterMenuCommand('cmd-9');
+    expect(transport.unregisterMenuCommand).toHaveBeenLastCalledWith('cmd-9');
+
+    // An unknown key must not reach the background.
+    const calls = transport.unregisterMenuCommand.mock.calls.length;
+    await api.GM.GM_unregisterMenuCommand('missing');
+    expect(transport.unregisterMenuCommand.mock.calls.length).toBe(calls);
   });
 
   it('passes the log level and labels through GM_log', () => {

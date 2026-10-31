@@ -5,6 +5,7 @@ import {
   FileCode2,
   FilePlus2,
   Link2,
+  Loader2,
   MoreHorizontal,
   RefreshCw,
   RotateCcw,
@@ -54,7 +55,6 @@ const ROW_GRID =
 
 interface ScriptsPageProps {
   onOpenEditor: (uuid: string) => void;
-  onOpenSettings: () => void;
 }
 
 interface PendingAction {
@@ -62,7 +62,7 @@ interface PendingAction {
   script?: UserScript;
 }
 
-export function ScriptsPage({ onOpenEditor, onOpenSettings }: ScriptsPageProps) {
+export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const [scripts, setScripts] = useState<UserScript[]>([]);
@@ -73,6 +73,7 @@ export function ScriptsPage({ onOpenEditor, onOpenSettings }: ScriptsPageProps) 
   const [showTrash, setShowTrash] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
+  const [checking, setChecking] = useState(false);
   const [urlOpen, setUrlOpen] = useState(false);
   const [url, setUrl] = useState('');
   const [pending, setPending] = useState<PendingAction | null>(null);
@@ -146,7 +147,11 @@ export function ScriptsPage({ onOpenEditor, onOpenSettings }: ScriptsPageProps) 
   const toggle = async (script: UserScript, enabled: boolean) => {
     const previous = scripts;
     setScripts((prev) =>
-      prev.map((item) => (item.uuid === script.uuid ? { ...item, enabled } : item)),
+      prev.map((item) =>
+        item.uuid === script.uuid
+          ? { ...item, enabled, ...(enabled ? { pendingReview: undefined } : {}) }
+          : item,
+      ),
     );
     try {
       await sendBg('scripts:toggle', { uuid: script.uuid, enabled });
@@ -189,7 +194,7 @@ export function ScriptsPage({ onOpenEditor, onOpenSettings }: ScriptsPageProps) 
   };
 
   const checkUpdates = async () => {
-    setBusy(true);
+    setChecking(true);
     try {
       const result = await sendBg<{
         checked: number;
@@ -206,7 +211,7 @@ export function ScriptsPage({ onOpenEditor, onOpenSettings }: ScriptsPageProps) 
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
-      setBusy(false);
+      setChecking(false);
     }
   };
 
@@ -310,31 +315,24 @@ export function ScriptsPage({ onOpenEditor, onOpenSettings }: ScriptsPageProps) 
             <FilePlus2 className="h-3.5 w-3.5" />
             {t('scripts.new')}
           </Button>
-          <Button variant="outline" size="default" onClick={() => setUrlOpen(true)}>
-            <Link2 className="h-3.5 w-3.5" />
-            {t('scripts.importUrl')}
+          <Button
+            variant="outline"
+            size="default"
+            disabled={checking || loading}
+            onClick={() => void checkUpdates()}
+          >
+            {checking ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <RefreshCw className="h-3.5 w-3.5" />
+            )}
+            {t('scripts.checkUpdates')}
+            {!checking && counts.updates > 0 && (
+              <span className="rounded-full bg-primary/10 px-1.5 text-2xs tabular-nums text-primary">
+                {counts.updates}
+              </span>
+            )}
           </Button>
-          <Button variant="outline" size="default" onClick={() => fileInput.current?.click()}>
-            <Upload className="h-3.5 w-3.5" />
-            {t('scripts.import')}
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" aria-label={t('common.actions')}>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem disabled={busy} onClick={() => void checkUpdates()}>
-                <RefreshCw />
-                {t('scripts.checkUpdates')}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={onOpenSettings}>
-                {t('common.settings')}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </>
       }
     />
@@ -386,6 +384,24 @@ export function ScriptsPage({ onOpenEditor, onOpenSettings }: ScriptsPageProps) 
               : []),
           ]}
         />
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="default" disabled={busy}>
+              <Upload className="h-3.5 w-3.5" />
+              {t('scripts.import')}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onClick={() => setUrlOpen(true)}>
+              <Link2 />
+              {t('scripts.importUrl')}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => fileInput.current?.click()}>
+              <Upload />
+              {t('scripts.importFile')}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Button
           variant={showTrash ? 'secondary' : 'ghost'}
           size="default"
@@ -642,6 +658,9 @@ function ScriptRow({
             <Badge variant="accent">{t('scripts.updateAvailable')}</Badge>
           )}
           {removed && <Badge variant="default">{t('scripts.trash')}</Badge>}
+          {!removed && script.pendingReview && (
+            <Badge variant="warning">{t('scripts.pendingReview')}</Badge>
+          )}
           {!removed && !script.enabled && <Badge variant="default">{t('common.disabled')}</Badge>}
         </span>
         <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-2xs text-muted-foreground">

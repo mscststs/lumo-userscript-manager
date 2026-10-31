@@ -127,7 +127,6 @@ function normalizeXhrResult(result: any, responseType: string): any {
 
 export function createGmApi(options: GmApiOptions): GmApiHandle {
   const { grant, meta, metaStr, handlerVersion, values, resources, transport, document } = options;
-  const scriptUuid = options.uuid ?? 'script';
   const pageWindow = options.window;
   const unsafeWindow = options.unsafeWindow ?? pageWindow;
   const valueListeners = new Map<string, { key: string; fn: GMValueChangeListener }>();
@@ -439,7 +438,15 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
     options?: Record<string, unknown> | string,
   ) => {
     const opts = typeof options === 'string' ? { accessKey: options } : options;
-    const id = `${scriptUuid}:menu:${++menuCounter}`;
+    // The command id must be stable across frames: the same script registers
+    // the command in every matching frame and the background merges those
+    // registrations into one row (`lib/background/menus.ts`). A per-frame
+    // counter would produce identical ids only by luck, and a title-keyed id
+    // is what Violentmonkey uses too (`options.id || text`).
+    const custom = opts?.id;
+    const id = custom !== undefined && custom !== null && String(custom) !== ''
+      ? String(custom)
+      : String(title);
     menuCallbacks.set(id, fn);
     menuRegistrations.set(id, { title: String(title), options: opts });
     try {
@@ -452,7 +459,13 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
     return id;
   });
   define('GM_unregisterMenuCommand', async (id: string | number) => {
-    const key = String(id);
+    const raw = String(id);
+    // Scripts that predate `options.id` pass the title back in, so accept both
+    // spellings instead of silently doing nothing.
+    const key = menuCallbacks.has(raw)
+      ? raw
+      : [...menuRegistrations].find(([, item]) => item.title === raw)?.[0];
+    if (key === undefined) return;
     menuCallbacks.delete(key);
     menuRegistrations.delete(key);
     await transport.unregisterMenuCommand(key);
@@ -766,7 +779,6 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
     string,
     { title: string; options?: Record<string, unknown> }
   >();
-  let menuCounter = 0;
   const handleMenuCommand = (id: string) => {
     const fn = menuCallbacks.get(id);
     if (!fn) return;

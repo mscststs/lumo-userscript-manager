@@ -25,6 +25,38 @@ Service Worker（唯一数据/权限中心）
 - **ISOLATED bridge**：普通 `content_scripts`，`document_start` + `all_frames`。RPC 走 `chrome.runtime.sendMessage`，事件走一条惰性、可重连的 `connect` 端口。
 - **USER_SCRIPT 不直接调用 `chrome.runtime`**：即使配置了 `configureWorld({ messaging: true })`，Chromium 仍可能在部分版本返回 `Receiving end does not exist`。所有扩展调用都经 bridge 转发。
 
+### 1.1 文档生命周期
+
+`pagehide` 不是终态信号。进入 back/forward cache 的文档被**冻结**而非销毁：JS 域、`MessageChannel` 端口与 `chrome.runtime` 端口都保留，而且恢复时**不会重新注入**任何 content script / userScript。因此三个运行时组件（bridge、BridgeClient、engine）统一使用 `lib/runtime/lifecycle.ts` 的三态模型：
+
+```
+            pagehide(persisted=true)
+   active ─────────────────────────────▶ suspended（空操作）
+     ▲                                       │
+     └──────── pageshow(persisted=true) ─────┘
+
+   active/suspended ── pagehide(persisted=false) ──▶ terminated（一次性终态）
+```
+
+不变式：
+
+1. **suspend 必须是空操作。** 浏览器可能先派发 `pagehide(persisted=true)` 再拒绝缓存该页（此时没有 `pageshow`），任何破坏性动作都会留下悬挂状态。
+2. **terminate 最多一次且不可逆。** `persisted` 缺失（无 bfcache 环境）按真正卸载处理，与旧行为一致。
+3. **resume 只由 `pageshow(persisted=true)` 驱动。** 新文档的首次 `pageshow` 是 `persisted=false`，必须忽略，否则注册会被重放两次。
+4. **恢复只能靠幂等重放，不能靠重新注入。** 页面被从 bfcache 驱逐或关闭标签页时不会再派发事件，清理依赖浏览器与端口 `onDisconnect`。
+
+恢复路径（两条路径最终都汇聚到 `BridgeClient.onResume`，engine 只实现一个重放动作）：
+
+| 场景 | 恢复动作 |
+| --- | --- |
+| bfcache 往返，端口健康 | 无动作（零抖动，不产生多余 RPC） |
+| bfcache 往返，worker 曾被回收 | bridge `host:ping` 探活 → 立即重连 → `BRIDGE_RESUME` → 重放 |
+| bfcache 往返，引擎通道丢失 | BridgeClient 重建握手 → `onResume` → 重放 |
+| 从未建立过通道的文档 | 保持惰性，不唤醒 worker |
+| 冻结期间扩展被重载 | bridge 进入终态，引擎按 `BACKGROUND_UNAVAILABLE` 处理 |
+
+重放内容是瞬态注册（`GM_registerMenuCommand`）：`lib/background/menus.ts` 按 `(tab, frame, uuid, id)` 覆盖写入，因此重放幂等，且只有标签真正变化时才广播。
+
 ## 2. 注册模型
 
 每个启用脚本一个 `chrome.userScripts.RegisteredUserScript`：
@@ -73,7 +105,7 @@ Service Worker（唯一数据/权限中心）
 - **运行时令牌**：每次注册派生一个 HMAC 令牌，绑定脚本 `uuid` 与 world。background 校验令牌，并从 content script sender 推导 tab/frame，脚本之间不能互调 GM API。
 - 值存储按 `storageName`（缺省为 uuid）分区，支持多脚本共享；变更通过事件广播。
 - 网络：`GM_xmlhttpRequest` 在 SW 中执行，先校验 `@connect` 允许列表；需要受限头时使用 DNR session rule。`GM_cookie` 走 `chrome.cookies`，`GM_download` 走 `chrome.downloads`。
-- 菜单命令经由 host 注册并在 popup 中列出；事件端口在 SW 被回收后重连并重放注册。
+- 菜单命令经由 host 注册并在 popup 中列出。注册按 `(脚本, 命令 id)` 跨帧合并：同一条命令在 top 与 iframe 里各注册一次，popup 只显示一行，调用时依次投向 top 帧与注册过该命令的其它帧（`lib/background/menus.ts`）。命令 id 取 `options.id` 或标题，因此跨帧稳定。事件端口在 SW 被回收后重连并重放注册。
 
 ## 6. 安装与更新
 
@@ -88,14 +120,15 @@ Service Worker（唯一数据/权限中心）
 | 存储 | 内容 | 约束 |
 | --- | --- | --- |
 | `chrome.storage.local` | `uiSettings`（外观、语言、执行偏好）、`runtimeSecret` | 有界小数据，可被各上下文监听 |
+| `chrome.storage.session` | `injectedFrames`（每个 tab 已上报启动的脚本 id） | 仅后台可读，随浏览器会话结束清空；用于 service worker 重启后恢复角标 |
 | IndexedDB | `scripts`、`code`、`versions`、`values`、`resources`、`logs`、`drafts`、`icons` | 会增长的数据，禁止塞进单个 storage key |
 
-备份导出为 JSON 或 ZIP，包含脚本、代码、覆盖、值与资源；不导出 `runtimeSecret`。
+备份导出为 JSON 或 ZIP，包含脚本、代码、覆盖、值、资源、回收站与可导出设置；不导出 `runtimeSecret`，也不导出智能体允许列表。导入先在页面侧解析并展示预览，由用户选择同名脚本的覆盖/跳过策略与是否恢复设置，结果按导入/跳过/失败分组返回。
 
 ## 8. 界面结构
 
 - **Popup**：全局注入开关 → 当前页面只读条（域名 / 本页脚本数）→ 脚本行。作用域分离是硬规则。不可注入页面显示权限空态，不给虚假的脚本列表。脚本行首是脚本自己的 `@icon`（后台缓存，缺失时用矢量兜底）。
-- **工具栏角标**：扩展图标上显示当前页面生效的脚本数（与 popup 里读作启用的行一致；0 时不画，>99 为 `99+`；跟随主题色）。可在 外观 → 界面 关闭（`showBadge`）。判定与 popup 共用 `lib/background/matching.ts`。
+- **工具栏角标**：扩展图标上显示当前页面实际运行的脚本数 —— 引擎在脚本体执行前上报 `host:run`，background 按 tab 跨帧去重后计数，再与「已启用 / 未回收」求交集（`lib/background/injected-state.ts`）。主文档 commit 时清零并丢弃角标缓存（Chrome 会在新文档提交时清空 per-tab 角标）。0 时不画，>99 为 `99+`，跟随主题色；可在 外观 → 界面 关闭（`showBadge`）。
 - **Options**：导航顺序为 `#/scripts`、`#/settings/:section`、`#/appearance`、`#/logs`、`#/about`（日志紧靠关于：两者都是诊断/构建信息面），编辑器为 `#/script/:uuid`。
 - 脚本编辑器用标签页切换代码 / 元数据 / 值 / 资源 / 信息，不左右分栏。
 - 组件与令牌规范见 [`DESIGN.md`](DESIGN.md)。

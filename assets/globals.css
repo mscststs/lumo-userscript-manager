@@ -378,12 +378,19 @@
 
    The nudge is language-scoped: Latin ink is already where the eye expects it.
    `translate` is used instead of `transform` so it cannot fight a utility that
-   composes transform on the same element. */
-.text-optical {
-  display: inline-block;
-}
-:lang(zh) .text-optical {
-  translate: 0 var(--text-optical-shift, 0em);
+   composes transform on the same element.
+
+   Declared inside `@layer components` on purpose: as an unlayered rule it would
+   outrank every Tailwind utility, and `display: inline-block` would defeat the
+   sidebar's `hidden` on collapsed labels (icon and first character squeezed
+   into the 56px rail). */
+@layer components {
+  .text-optical {
+    display: inline-block;
+  }
+  :lang(zh) .text-optical {
+    translate: 0 var(--text-optical-shift, 0em);
+  }
 }
 
 /* ─── Scrollbar ──────────────────────────────────────────────────────────── */

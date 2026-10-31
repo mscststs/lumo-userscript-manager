@@ -41,6 +41,10 @@ export function matchPatternToRegExp(pattern: string): RegExp | null {
   const { scheme, host, path } = parsed;
 
   const schemeSource = scheme === '*' ? 'https?' : escapeRegExp(scheme);
+  // Chrome's match patterns ignore ports: `*://example.com/*` also matches
+  // `https://example.com:8443/`. Patterns that do spell out a port are compiled
+  // as globs by `compileUrlRules`, so `host` never contains one here.
+  const portSource = scheme === 'file' ? '' : '(?::\\d+)?';
   let hostSource: string;
   if (scheme === 'file') {
     hostSource = '';
@@ -58,7 +62,7 @@ export function matchPatternToRegExp(pattern: string): RegExp | null {
     else pathSource += escapeRegExp(char);
   }
 
-  return new RegExp(`^${schemeSource}://${hostSource}${pathSource}$`, 'i');
+  return new RegExp(`^${schemeSource}://${hostSource}${portSource}${pathSource}$`, 'i');
 }
 
 function normalizeInclude(value: string): UrlRule | null {

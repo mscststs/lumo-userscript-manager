@@ -1,13 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Download, RefreshCw, ShieldCheck, Upload } from 'lucide-react';
-import type { RuntimeStatus, UISettings } from '@/types';
+import {
+  Check,
+  Copy,
+  FileArchive,
+  FileJson,
+  Loader2,
+  Plus,
+  RefreshCw,
+  ShieldCheck,
+  Upload,
+  X,
+} from 'lucide-react';
+import type { AgentAuditEntry } from '@/lib/db';
+import type { AgentPendingRequest, AgentSettings, RuntimeStatus, UISettings } from '@/types';
 import { storage } from '@/store/storage';
 import { useStorageWatch } from '@/store/useStorageWatch';
 import { sendBg, onLumoEvent } from '@/lib/messages';
-import { createBackupZip, readBackupZip } from '@/lib/backup';
+import { createBackupZip, readBackupZip, type BackupData } from '@/lib/backup';
+import { BackupError, parseBackupJson, summarizeBackup } from '@/lib/backup-format';
+import { formatBytes, cn } from '@/lib/utils';
 import { formatDateTime } from '@/lib/format';
-import { cn } from '@/lib/utils';
 import { DEFAULT_RUN_AT_VALUES, INJECT_INTO_OPTIONS, RUN_AT_OPTIONS } from '@/lib/script/metadata-options';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageLayout } from '@/components/layout/PageLayout';
@@ -20,7 +33,17 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { SectionNav } from '@/components/layout/SectionNav';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Segmented } from '@/components/ui/segmented';
 import { useToast } from '@/components/ui/toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { isExtensionId } from '@/lib/agent/protocol';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Select,
@@ -30,11 +53,28 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-export type SettingsSection = 'general' | 'updates' | 'data';
+export type SettingsSection = 'general' | 'updates' | 'data' | 'agent';
 
 const RUN_AT = RUN_AT_OPTIONS.filter((option) => DEFAULT_RUN_AT_VALUES.includes(option.value));
 const INJECT_INTO = INJECT_INTO_OPTIONS;
 const LOG_LEVELS = ['error', 'warn', 'info', 'debug'] as const;
+
+interface BackupStats {
+  scripts: number;
+  trash: number;
+  values: number;
+  resources: number;
+  codeBytes: number;
+}
+
+interface ImportResult {
+  imported: number;
+  skipped: number;
+  settingsImported: boolean;
+  failed: { name: string; message: string }[];
+}
+
+type ImportConflict = 'overwrite' | 'skip';
 
 interface SettingsPageProps {
   section: SettingsSection;
@@ -54,8 +94,25 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const [settings, setSettings] = useState<UISettings | null>(null);
+  const [agent, setAgent] = useState<AgentSettings | null>(null);
+  const [agentId, setAgentId] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [audit, setAudit] = useState<AgentAuditEntry[]>([]);
+  const [pendingRequests, setPendingRequests] = useState<AgentPendingRequest[]>([]);
   const [runtime, setRuntime] = useState<RuntimeStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [backupStats, setBackupStats] = useState<BackupStats | null>(null);
+  const [backupPreview, setBackupPreview] = useState<{ data: BackupData; fileName: string } | null>(
+    null,
+  );
+  const [backupError, setBackupError] = useState<string | null>(null);
+  const [backupBusy, setBackupBusy] = useState<
+    'read' | 'export-zip' | 'export-json' | 'import' | null
+  >(null);
+  const [draggingBackup, setDraggingBackup] = useState(false);
+  const [importConflict, setImportConflict] = useState<ImportConflict>('overwrite');
+  const [importSettings, setImportSettings] = useState(true);
+  const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const loadRuntime = useCallback(async () => {
@@ -71,19 +128,46 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
       .getUISettings()
       .then(setSettings)
       .catch((e: Error) => setError(e.message));
+    storage
+      .getAgentSettings()
+      .then(setAgent)
+      .catch((e: Error) => setError(e.message));
     void loadRuntime();
   }, [loadRuntime]);
+
+  const loadBackupStats = useCallback(async () => {
+    try {
+      setBackupStats(await sendBg<BackupStats>('backup:stats'));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    if (section !== 'data') return;
+    void loadBackupStats();
+  }, [section, loadBackupStats]);
 
   useEffect(
     () =>
       onLumoEvent((event) => {
-        if (event === 'scripts-changed') void loadRuntime();
+        if (event !== 'scripts-changed') return;
+        void loadRuntime();
+        if (section === 'data') void loadBackupStats();
       }),
-    [loadRuntime],
+    [loadBackupStats, loadRuntime, section],
   );
 
   useStorageWatch<UISettings>('uiSettings', (next) => {
     if (next) setSettings(next);
+  });
+
+  useStorageWatch<AgentSettings>('agentSettings', (next) => {
+    if (next) setAgent(next);
+  });
+
+  useStorageWatch<AgentPendingRequest[]>('agentPendingRequests', (next) => {
+    setPendingRequests(next ?? []);
   });
 
   const update = async (patch: Partial<UISettings>) => {
@@ -111,13 +195,115 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
     }
   };
 
-  const exportBackup = async (format: 'json' | 'zip') => {
+  const updateAgent = async (patch: Partial<AgentSettings>) => {
+    if (!agent) return;
+    const next = { ...agent, ...patch };
+    setAgent(next);
+    setError(null);
     try {
-      const data = await sendBg<Record<string, unknown>>('backup:export');
+      await storage.setAgentSettings(next);
+      toast({ title: t('settings.saved'), variant: 'success' });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const addAllowedId = () => {
+    const id = agentId.trim();
+    if (!isExtensionId(id)) {
+      setError(t('settings.agent.invalidId'));
+      return;
+    }
+    if (agent?.allowedExtensionIds.includes(id)) {
+      setAgentId('');
+      return;
+    }
+    void updateAgent({ allowedExtensionIds: [...(agent?.allowedExtensionIds ?? []), id] });
+    setAgentId('');
+  };
+
+  const loadAudit = useCallback(async () => {
+    try {
+      setAudit(await sendBg<AgentAuditEntry[]>('agent:audit', { limit: 8 }));
+    } catch {
+      // Audit is diagnostic; a failure here must not break the settings page.
+    }
+  }, []);
+
+  useEffect(() => {
+    if (section !== 'agent') return;
+    void loadAudit();
+    void sendBg<AgentPendingRequest[]>('agent:pendingRequests')
+      .then(setPendingRequests)
+      .catch(() => undefined);
+  }, [section, loadAudit]);
+
+  const approveRequest = async (id: string) => {
+    try {
+      const next = await sendBg<AgentSettings | undefined>('agent:approveRequest', { id });
+      if (next) setAgent(next);
+      setPendingRequests((prev) => prev.filter((request) => request.id !== id));
+      toast({ title: t('settings.agent.approved'), variant: 'success' });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const dismissRequest = async (id: string) => {
+    try {
+      await sendBg('agent:dismissRequest', { id });
+      setPendingRequests((prev) =>
+        prev.map((request) =>
+          request.id === id ? { ...request, dismissedAt: Date.now() } : request,
+        ),
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const copyExtensionId = async () => {
+    try {
+      await navigator.clipboard.writeText(chrome.runtime.id);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  const describeBackupError = (error: unknown): string => {
+    if (error instanceof BackupError) {
+      switch (error.code) {
+        case 'zip-missing-manifest':
+          return t('settings.backupErrors.zipMissingManifest');
+        case 'invalid-format':
+          return t('settings.backupErrors.invalidFormat');
+        case 'invalid-json':
+          return t('settings.backupErrors.invalidJson');
+        default:
+          return t('settings.backupErrors.invalidShape');
+      }
+    }
+    // Errors crossing the runtime message boundary lose their class, so the
+    // service worker's coded failures arrive as plain strings.
+    const message = error instanceof Error ? error.message : String(error);
+    if (message === 'zip-missing-manifest') return t('settings.backupErrors.zipMissingManifest');
+    if (message === 'invalid-format') return t('settings.backupErrors.invalidFormat');
+    if (message === 'invalid-json') return t('settings.backupErrors.invalidJson');
+    if (message === 'invalid-shape') return t('settings.backupErrors.invalidShape');
+    return message;
+  };
+
+  const exportBackup = async (format: 'json' | 'zip') => {
+    setBackupError(null);
+    setBackupBusy(format === 'zip' ? 'export-zip' : 'export-json');
+    try {
+      const data = await sendBg<BackupData>('backup:export');
       const date = new Date().toISOString().slice(0, 10);
       const blob =
         format === 'zip'
-          ? new Blob([new Uint8Array(createBackupZip(data as never))], {
+          ? new Blob([new Uint8Array(createBackupZip(data))], {
               type: 'application/zip',
             })
           : new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -127,29 +313,57 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
       anchor.download = `lumo-userscripts-${date}.${format}`;
       anchor.click();
       URL.revokeObjectURL(href);
-      toast({ title: t('scripts.exportDone'), variant: 'success' });
+      toast({ title: t('settings.exportDone'), variant: 'success' });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setBackupError(describeBackupError(e));
+    } finally {
+      setBackupBusy(null);
     }
   };
 
-  const importBackup = async (file: File | undefined) => {
+  /** Read and validate first, then ask. Importing straight from the picker made
+   *  a same-name conflict or a settings overwrite impossible to see before it
+   *  had already happened. */
+  const readBackupFile = async (file: File | undefined) => {
     if (!file) return;
+    setBackupError(null);
+    setBackupBusy('read');
     try {
-      const data = file.name.toLowerCase().endsWith('.zip')
-        ? readBackupZip(await file.arrayBuffer())
-        : JSON.parse(await file.text());
-      const result = await sendBg<{ imported: number; errors: string[] }>('backup:import', {
-        data,
+      // Sniff the ZIP magic instead of trusting the extension: a backup renamed
+      // to .json (or a zip served with the wrong name) should still restore.
+      const buffer = await file.arrayBuffer();
+      const head = new Uint8Array(buffer, 0, Math.min(2, buffer.byteLength));
+      const isZip = head[0] === 0x50 && head[1] === 0x4b;
+      const data = isZip
+        ? readBackupZip(buffer)
+        : parseBackupJson(new TextDecoder().decode(buffer));
+      setImportConflict('overwrite');
+      setImportSettings(true);
+      setImportResult(null);
+      setBackupPreview({ data, fileName: file.name });
+    } catch (e) {
+      setBackupError(describeBackupError(e));
+    } finally {
+      setBackupBusy(null);
+    }
+  };
+
+  const runImport = async () => {
+    if (!backupPreview) return;
+    setBackupError(null);
+    setBackupBusy('import');
+    try {
+      const result = await sendBg<ImportResult>('backup:import', {
+        data: backupPreview.data,
+        options: { conflict: importConflict, importSettings },
       });
-      toast({
-        title: t('settings.importSuccess', { count: result.imported }),
-        description: result.errors.length ? result.errors.join('\n') : undefined,
-        variant: result.errors.length ? 'error' : 'success',
-      });
+      setImportResult(result);
+      await loadBackupStats();
       await loadRuntime();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setBackupError(describeBackupError(e));
+    } finally {
+      setBackupBusy(null);
     }
   };
 
@@ -167,10 +381,26 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
           { value: 'general', label: t('settings.sections.general') },
           { value: 'updates', label: t('settings.sections.updates') },
           { value: 'data', label: t('settings.sections.data') },
+          { value: 'agent', label: t('settings.sections.agent') },
         ]}
       />
     </div>
   );
+
+  const previewSummary = backupPreview ? summarizeBackup(backupPreview.data) : null;
+
+  const formatBackupDate = (value?: string) => {
+    if (!value) return '—';
+    const time = Date.parse(value);
+    return Number.isFinite(time) ? formatDateTime(time, i18n.language) : '—';
+  };
+
+  const closePreview = () => {
+    if (backupBusy === 'import') return;
+    setBackupPreview(null);
+    setImportResult(null);
+    setBackupError(null);
+  };
 
   if (!settings) {
     return (
@@ -381,35 +611,353 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
         </SettingsGroup>
       )}
 
-      {section === 'data' && (
+      {section === 'agent' && agent && (
         <>
-          <SettingsGroup title={t('settings.groups.data')} description={t('settings.dataHint')}>
+          {pendingRequests.some((request) => !request.dismissedAt) && (
+            <SettingsGroup
+              title={t('settings.agent.requests')}
+              description={t('settings.agent.requestsHint')}
+            >
+              {pendingRequests
+                .filter((request) => !request.dismissedAt)
+                .map((request) => (
+                  <div
+                    key={request.id}
+                    className="flex flex-wrap items-center justify-between gap-3 py-2.5"
+                  >
+                    <div className="min-w-0 flex-1 basis-52">
+                      <p className="text-sm font-medium">
+                        {request.name || t('settings.agent.unknownClient')}
+                      </p>
+                      <code className="mt-0.5 block truncate font-mono text-2xs text-muted-foreground">
+                        {request.id}
+                      </code>
+                    </div>
+                    <div className="flex shrink-0 gap-2">
+                      <Button size="sm" onClick={() => void approveRequest(request.id)}>
+                        {t('settings.agent.approve')}
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => void dismissRequest(request.id)}
+                      >
+                        {t('settings.agent.dismiss')}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+            </SettingsGroup>
+          )}
+
+          <SettingsGroup title={t('settings.groups.agent')}>
             <SettingRow
-              label={t('settings.export')}
-              description={t('settings.exportHint')}
+              label={t('settings.agent.enabled')}
+              description={t('settings.agent.enabledHint')}
               control={
-                <div className="flex gap-1.5">
-                  <Button variant="outline" size="sm" onClick={() => void exportBackup('json')}>
-                    <Download className="h-3.5 w-3.5" />
-                    JSON
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={() => void exportBackup('zip')}>
-                    <Download className="h-3.5 w-3.5" />
-                    ZIP
-                  </Button>
-                </div>
+                <Switch
+                  checked={agent.enabled}
+                  onCheckedChange={(checked) => void updateAgent({ enabled: checked })}
+                  aria-label={t('settings.agent.enabled')}
+                />
               }
             />
             <SettingRow
-              label={t('settings.import')}
-              description={t('settings.importHint')}
+              label={t('settings.agent.promptOnRequest')}
+              description={t('settings.agent.promptOnRequestHint')}
               control={
-                <Button variant="outline" size="sm" onClick={() => fileInput.current?.click()}>
-                  <Upload className="h-3.5 w-3.5" />
-                  {t('settings.import')}
+                <Switch
+                  checked={agent.promptOnRequest}
+                  onCheckedChange={(checked) => void updateAgent({ promptOnRequest: checked })}
+                  aria-label={t('settings.agent.promptOnRequest')}
+                />
+              }
+            />
+          </SettingsGroup>
+
+          {agent.enabled && (
+            <>
+              <SettingsGroup title={t('settings.agent.writes')}>
+                <SettingRow
+                  label={t('settings.agent.allowWrites')}
+                  description={t('settings.agent.allowWritesHint')}
+                  control={
+                    <Switch
+                      checked={agent.allowWrites}
+                      onCheckedChange={(checked) => void updateAgent({ allowWrites: checked })}
+                      aria-label={t('settings.agent.allowWrites')}
+                    />
+                  }
+                />
+                {agent.allowWrites && (
+                  <SettingRow
+                    label={t('settings.agent.reviewWrites')}
+                    description={t('settings.agent.reviewWritesHint')}
+                    control={
+                      <Switch
+                        checked={agent.reviewWrites}
+                        onCheckedChange={(checked) => void updateAgent({ reviewWrites: checked })}
+                        aria-label={t('settings.agent.reviewWrites')}
+                      />
+                    }
+                  />
+                )}
+              </SettingsGroup>
+
+              <SettingsGroup title={t('settings.agent.identity')}>
+                <SettingRow
+                  label={t('settings.agent.extensionId')}
+                  description={t('settings.agent.extensionIdHint')}
+                  control={
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <code className="max-w-[22ch] truncate rounded-md border border-border bg-muted/50 px-2 py-1 font-mono text-2xs text-muted-foreground">
+                        {chrome.runtime.id}
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0"
+                        onClick={() => void copyExtensionId()}
+                        aria-label={t('settings.agent.copyId')}
+                      >
+                        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                      </Button>
+                    </div>
+                  }
+                />
+              </SettingsGroup>
+
+              <SettingsGroup
+                title={t('settings.agent.allowed')}
+                description={t('settings.agent.allowedHint')}
+              >
+                {agent.allowedExtensionIds.length === 0 ? (
+                  <p className="py-2.5 text-xs text-muted-foreground">
+                    {t('settings.agent.noAllowed')}
+                  </p>
+                ) : (
+                  agent.allowedExtensionIds.map((id) => (
+                    <div
+                      key={id}
+                      className="flex items-center justify-between gap-3 py-2"
+                    >
+                      <code className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
+                        {id}
+                      </code>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() =>
+                          void updateAgent({
+                            allowedExtensionIds: agent.allowedExtensionIds.filter(
+                              (entry) => entry !== id,
+                            ),
+                          })
+                        }
+                        aria-label={t('settings.agent.remove')}
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))
+                )}
+                <div className="flex flex-wrap items-center gap-2 py-2.5">
+                  <Input
+                    value={agentId}
+                    onChange={(event) => setAgentId(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        addAllowedId();
+                      }
+                    }}
+                    placeholder={t('settings.agent.idPlaceholder')}
+                    aria-label={t('settings.agent.idPlaceholder')}
+                    className="min-w-0 flex-1 basis-48 font-mono text-xs"
+                    spellCheck={false}
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={addAllowedId}
+                    disabled={!agentId.trim()}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    {t('settings.agent.add')}
+                  </Button>
+                </div>
+              </SettingsGroup>
+
+              <SettingsGroup
+                title={t('settings.agent.activity')}
+                description={t('settings.agent.activityHint')}
+                action={
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => void loadAudit()}
+                    aria-label={t('settings.agent.activityRefresh')}
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                  </Button>
+                }
+              >
+                {audit.length === 0 ? (
+                  <p className="py-2.5 text-xs text-muted-foreground">
+                    {t('settings.agent.activityEmpty')}
+                  </p>
+                ) : (
+                  audit.map((entry) => (
+                    <div
+                      key={entry.id ?? `${entry.time}-${entry.tool}`}
+                      className="flex items-start gap-2 py-2"
+                    >
+                      <Badge variant={entry.result === 'ok' ? 'success' : 'destructive'}>
+                        {entry.tool}
+                      </Badge>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-mono text-2xs text-muted-foreground">
+                          {entry.targetUuid ?? '—'}
+                        </p>
+                        <p className="text-2xs tabular-nums text-muted-foreground">
+                          {formatDateTime(entry.time, i18n.language)}
+                        </p>
+                        {entry.message && (
+                          <p className="break-words text-2xs text-destructive">{entry.message}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
+              </SettingsGroup>
+            </>
+          )}
+        </>
+      )}
+
+      {section === 'data' && (
+        <>
+          <SettingsGroup
+            title={t('settings.groups.overview')}
+            description={t('settings.dataHint')}
+          >
+            <dl className="grid grid-cols-2 gap-x-4 gap-y-3 py-3 sm:grid-cols-3">
+              <Stat
+                label={t('settings.overviewScripts')}
+                value={backupStats?.scripts ?? '—'}
+              />
+              <Stat label={t('settings.overviewTrash')} value={backupStats?.trash ?? '—'} />
+              <Stat label={t('settings.overviewValues')} value={backupStats?.values ?? '—'} />
+              <Stat
+                label={t('settings.overviewResources')}
+                value={backupStats?.resources ?? '—'}
+              />
+              <Stat
+                label={t('settings.overviewCodeSize')}
+                value={backupStats ? formatBytes(backupStats.codeBytes) : '—'}
+              />
+            </dl>
+          </SettingsGroup>
+
+          <SettingsGroup title={t('settings.groups.export')} description={t('settings.exportHint')}>
+            <SettingRow
+              label={t('settings.exportZip')}
+              description={t('settings.exportZipHint')}
+              control={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={backupBusy !== null}
+                  onClick={() => void exportBackup('zip')}
+                >
+                  {backupBusy === 'export-zip' ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <FileArchive className="h-3.5 w-3.5" />
+                  )}
+                  {t('settings.export')}
                 </Button>
               }
             />
+            <SettingRow
+              label={t('settings.exportJson')}
+              description={t('settings.exportJsonHint')}
+              control={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={backupBusy !== null}
+                  onClick={() => void exportBackup('json')}
+                >
+                  {backupBusy === 'export-json' ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <FileJson className="h-3.5 w-3.5" />
+                  )}
+                  {t('settings.export')}
+                </Button>
+              }
+            />
+          </SettingsGroup>
+
+          <SettingsGroup
+            title={t('settings.groups.restore')}
+            description={t('settings.importHint')}
+          >
+            <div className="py-3">
+              <div
+                className={cn(
+                  'rounded-card border border-dashed px-4 py-5 text-center transition-colors duration-150 ease-standard',
+                  draggingBackup
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border bg-muted/20',
+                )}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  setDraggingBackup(true);
+                }}
+                onDragLeave={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                    setDraggingBackup(false);
+                  }
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  setDraggingBackup(false);
+                  void readBackupFile(event.dataTransfer.files?.[0]);
+                }}
+              >
+                {backupBusy === 'read' ? (
+                  <Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
+                ) : (
+                  <FileArchive className="mx-auto h-5 w-5 text-muted-foreground" />
+                )}
+                <p className="mt-2 text-sm font-medium text-foreground">
+                  {backupBusy === 'read'
+                    ? t('settings.importReading')
+                    : t('settings.importDrop')}
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="mt-2"
+                  disabled={backupBusy !== null}
+                  onClick={() => fileInput.current?.click()}
+                >
+                  <Upload className="h-3.5 w-3.5" />
+                  {t('settings.importChoose')}
+                </Button>
+              </div>
+              {backupError && !backupPreview && (
+                <p
+                  role="alert"
+                  className="mt-2 whitespace-pre-wrap break-words text-xs leading-relaxed text-destructive"
+                >
+                  {backupError}
+                </p>
+              )}
+            </div>
           </SettingsGroup>
 
           <input
@@ -417,11 +965,197 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
             type="file"
             accept="application/json,.json,.zip"
             className="hidden"
-            onChange={(event) => void importBackup(event.target.files?.[0])}
+            onChange={(event) => {
+              void readBackupFile(event.target.files?.[0]);
+              event.target.value = '';
+            }}
           />
+
+          <Dialog
+            open={backupPreview !== null}
+            onOpenChange={(open) => {
+              if (!open) closePreview();
+            }}
+          >
+            <DialogContent className="sm:max-w-md" closeLabel={t('common.close')}>
+              <DialogHeader>
+                <DialogTitle>
+                  {importResult
+                    ? t('settings.importResultTitle')
+                    : t('settings.importPreviewTitle')}
+                </DialogTitle>
+                <DialogDescription className="truncate font-mono text-2xs">
+                  {backupPreview?.fileName}
+                </DialogDescription>
+              </DialogHeader>
+
+              {backupPreview && !importResult && previewSummary && (
+                <div className="space-y-3">
+                  <dl className="grid grid-cols-2 gap-x-4 gap-y-2.5 rounded-card border border-border bg-muted/30 px-3 py-2.5">
+                    <BackupMeta
+                      label={t('settings.importExportedAt')}
+                      value={formatBackupDate(backupPreview.data.exportedAt)}
+                    />
+                    <BackupMeta
+                      label={t('settings.importFormat')}
+                      value={`v${backupPreview.data.version ?? 1}`}
+                    />
+                    <BackupMeta
+                      label={t('settings.importScriptCount')}
+                      value={String(previewSummary.scripts)}
+                    />
+                    <BackupMeta
+                      label={t('settings.importValues')}
+                      value={String(previewSummary.values)}
+                    />
+                    <BackupMeta
+                      label={t('settings.importResources')}
+                      value={String(previewSummary.resources)}
+                    />
+                    <BackupMeta
+                      label={t('settings.importIncludesSettings')}
+                      value={previewSummary.hasSettings ? t('common.yes') : t('common.no')}
+                    />
+                  </dl>
+
+                  <p className="text-xs text-muted-foreground">
+                    {t('settings.importStateBreakdown', {
+                      enabled: previewSummary.enabled,
+                      disabled: previewSummary.disabled,
+                      trash: previewSummary.trash,
+                    })}
+                  </p>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1 basis-40">
+                      <p className="text-sm font-medium text-foreground">
+                        {t('settings.importConflict')}
+                      </p>
+                      <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                        {t('settings.importConflictHint')}
+                      </p>
+                    </div>
+                    <Segmented
+                      size="sm"
+                      ariaLabel={t('settings.importConflict')}
+                      value={importConflict}
+                      onChange={setImportConflict}
+                      options={[
+                        {
+                          value: 'overwrite',
+                          label: t('settings.importConflictOverwrite'),
+                        },
+                        { value: 'skip', label: t('settings.importConflictSkip') },
+                      ]}
+                    />
+                  </div>
+
+                  {previewSummary.hasSettings && (
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1 basis-40">
+                        <label
+                          htmlFor="import-settings"
+                          className="text-sm font-medium text-foreground"
+                        >
+                          {t('settings.importSettingsToggle')}
+                        </label>
+                        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                          {t('settings.importSettingsHint')}
+                        </p>
+                      </div>
+                      <Switch
+                        id="import-settings"
+                        checked={importSettings}
+                        onCheckedChange={setImportSettings}
+                        aria-label={t('settings.importSettingsToggle')}
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {importResult && (
+                <div className="space-y-2" role="status">
+                  <p className="text-sm text-foreground">
+                    {t('settings.importResultSummary', {
+                      imported: importResult.imported,
+                      skipped: importResult.skipped,
+                      failed: importResult.failed.length,
+                    })}
+                  </p>
+                  {importResult.settingsImported && (
+                    <p className="text-xs text-muted-foreground">
+                      {t('settings.importResultSettings')}
+                    </p>
+                  )}
+                  {importResult.failed.length > 0 && (
+                    <div className="max-h-40 overflow-y-auto scrollbar-lumo rounded-card border border-destructive/25 bg-destructive/5 px-2 py-1">
+                      {importResult.failed.map((failure, index) => (
+                        <div
+                          key={`${failure.name}-${index}`}
+                          className="border-b border-destructive/15 py-1.5 last:border-b-0"
+                        >
+                          <p className="truncate text-2xs font-medium text-foreground">
+                            {failure.name}
+                          </p>
+                          <p className="whitespace-pre-wrap break-words text-2xs text-destructive">
+                            {failure.message}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {backupError && backupPreview && (
+                <p
+                  role="alert"
+                  className="whitespace-pre-wrap break-words text-xs leading-relaxed text-destructive"
+                >
+                  {backupError}
+                </p>
+              )}
+
+              <DialogFooter>
+                {importResult ? (
+                  <Button onClick={closePreview}>{t('common.close')}</Button>
+                ) : (
+                  <>
+                    <Button variant="ghost" onClick={closePreview} disabled={backupBusy === 'import'}>
+                      {t('common.cancel')}
+                    </Button>
+                    <Button
+                      onClick={() => void runImport()}
+                      disabled={
+                        backupBusy !== null || !previewSummary || previewSummary.scripts === 0
+                      }
+                    >
+                      {backupBusy === 'import' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      {t('settings.importAction', { count: previewSummary?.scripts ?? 0 })}
+                    </Button>
+                  </>
+                )}
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </>
       )}
     </PageLayout>
+  );
+}
+
+function BackupMeta({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="text-2xs uppercase tracking-wider text-muted-foreground">{label}</dt>
+      <dd
+        className="mt-0.5 truncate text-xs font-medium tabular-nums text-foreground"
+        title={value}
+      >
+        {value}
+      </dd>
+    </div>
   );
 }
 

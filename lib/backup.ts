@@ -1,17 +1,11 @@
 import { strFromU8, strToU8, unzipSync, zipSync } from 'fflate';
+import {
+  BackupError,
+  parseBackupJson,
+  type BackupData,
+} from './backup-format';
 
-interface BackupEntry {
-  script?: { uuid?: string; name?: string };
-  code?: string;
-}
-
-interface BackupData {
-  format?: string;
-  version?: number;
-  exportedAt?: string;
-  scripts?: BackupEntry[];
-  [key: string]: unknown;
-}
+export type { BackupData } from './backup-format';
 
 function safeName(value: string): string {
   return value.replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 80) || 'script';
@@ -25,7 +19,7 @@ export function createBackupZip(data: BackupData): Uint8Array {
     ),
   };
   for (const entry of data.scripts ?? []) {
-    if (!entry.script || !entry.code) continue;
+    if (!entry.script || typeof entry.code !== 'string') continue;
     const name = safeName(entry.script.name ?? entry.script.uuid ?? 'script');
     const uuid = safeName(entry.script.uuid ?? 'script');
     files[`scripts/${name}-${uuid}.user.js`] = strToU8(entry.code);
@@ -34,10 +28,13 @@ export function createBackupZip(data: BackupData): Uint8Array {
 }
 
 export function readBackupZip(buffer: ArrayBuffer): BackupData {
-  const files = unzipSync(new Uint8Array(buffer));
+  let files: Record<string, Uint8Array>;
+  try {
+    files = unzipSync(new Uint8Array(buffer));
+  } catch {
+    throw new BackupError('invalid-shape', 'The file is not a readable ZIP archive.');
+  }
   const raw = files['backup.json'];
-  if (!raw) throw new Error('The ZIP does not contain backup.json.');
-  const data = JSON.parse(strFromU8(raw)) as BackupData;
-  if (data.format !== 'lumo-userscripts') throw new Error('Unrecognized backup format.');
-  return data;
+  if (!raw) throw new BackupError('zip-missing-manifest');
+  return parseBackupJson(strFromU8(raw));
 }

@@ -12,6 +12,7 @@ import {
   BridgeUnavailableError,
   type BridgeScope,
 } from '@/lib/runtime/transport/bridge-client';
+import type { PageLifecycleScope } from '@/lib/runtime/lifecycle';
 
 interface FakeServerOptions {
   ignoreHellos?: number;
@@ -65,12 +66,20 @@ function createServer(scope: FakeScope, options: FakeServerOptions = {}) {
   };
 }
 
-function createClient(scope: FakeScope, options: { onEvent?: () => void; onResume?: () => void } = {}) {
+function createClient(
+  scope: FakeScope,
+  options: {
+    onEvent?: () => void;
+    onResume?: () => void;
+    lifecycle?: PageLifecycleScope | null;
+  } = {},
+) {
   return new BridgeClient({
     kind: 'main',
     scope,
     onEvent: options.onEvent ?? (() => undefined),
     onResume: options.onResume,
+    lifecycle: options.lifecycle ?? null,
     handshakeTimeoutMs: 1_000,
     handshakeRetryMs: 10,
     handshakeRetryMaxMs: 40,
@@ -160,5 +169,120 @@ describe('BridgeClient', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     client.dispose();
     await expect(pending).rejects.toBeInstanceOf(BridgeUnavailableError);
+  });
+});
+
+class FakeLifecycle implements PageLifecycleScope {
+  private readonly listeners = new Map<string, Set<(event: PageTransitionEvent) => void>>();
+
+  addEventListener(type: 'pagehide' | 'pageshow', listener: (event: PageTransitionEvent) => void): void {
+    const bucket = this.listeners.get(type) ?? new Set();
+    bucket.add(listener);
+    this.listeners.set(type, bucket);
+  }
+
+  removeEventListener(
+    type: 'pagehide' | 'pageshow',
+    listener: (event: PageTransitionEvent) => void,
+  ): void {
+    this.listeners.get(type)?.delete(listener);
+  }
+
+  suspend(): void {
+    for (const listener of [...(this.listeners.get('pagehide') ?? [])]) {
+      listener({ persisted: true } as PageTransitionEvent);
+    }
+  }
+
+  restore(): void {
+    for (const listener of [...(this.listeners.get('pageshow') ?? [])]) {
+      listener({ persisted: true } as PageTransitionEvent);
+    }
+  }
+
+  terminate(): void {
+    for (const listener of [...(this.listeners.get('pagehide') ?? [])]) {
+      listener({ persisted: false } as PageTransitionEvent);
+    }
+  }
+
+  count(): number {
+    let total = 0;
+    for (const bucket of this.listeners.values()) total += bucket.size;
+    return total;
+  }
+}
+
+describe('BridgeClient page lifecycle', () => {
+  it('keeps the channel across a back/forward cache round trip', async () => {
+    const scope = new FakeScope();
+    const server = createServer(scope, { answerRpc: (type) => type });
+    const lifecycle = new FakeLifecycle();
+    const onResume = vi.fn();
+    const client = createClient(scope, { onResume, lifecycle });
+
+    await expect(client.call('ping', {})).resolves.toBe('ping');
+    lifecycle.suspend();
+    // A frozen document keeps its port: the runtime was never torn down.
+    await expect(client.call('ping', {})).resolves.toBe('ping');
+
+    lifecycle.restore();
+    expect(server.helloCount).toBe(1);
+    // A healthy port needs no replay: the registrations never went away.
+    expect(onResume).not.toHaveBeenCalled();
+    client.dispose();
+  });
+
+  it('rebuilds a lost channel and replays after a restore', async () => {
+    const scope = new FakeScope();
+    const server = createServer(scope, { answerRpc: () => 'ok' });
+    const lifecycle = new FakeLifecycle();
+    const onResume = vi.fn();
+    const client = createClient(scope, { onResume, lifecycle });
+
+    await client.ensureReady();
+    expect(server.helloCount).toBe(1);
+
+    // Simulates a transport that dropped while the page was frozen.
+    (
+      client as unknown as { resetPort: (reason: Error) => void }
+    ).resetPort(new BridgeUnavailableError('port lost'));
+
+    lifecycle.restore();
+    await vi.waitFor(() => expect(onResume).toHaveBeenCalledTimes(1));
+    expect(server.helloCount).toBe(2);
+    client.dispose();
+  });
+
+  it('stays lazy on restore when it never connected', async () => {
+    const scope = new FakeScope();
+    const server = createServer(scope, { answerRpc: () => 'ok' });
+    const lifecycle = new FakeLifecycle();
+    const onResume = vi.fn();
+    const client = createClient(scope, { onResume, lifecycle });
+
+    lifecycle.restore();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    // A document without matching scripts must not wake the worker.
+    expect(server.helloCount).toBe(0);
+    expect(onResume).not.toHaveBeenCalled();
+    client.dispose();
+  });
+
+  it('disposes on a real unload and stops listening', async () => {
+    const scope = new FakeScope();
+    createServer(scope, { answerRpc: () => 'ok' });
+    const lifecycle = new FakeLifecycle();
+    const onResume = vi.fn();
+    const client = createClient(scope, { onResume, lifecycle });
+
+    await client.call('ping', {});
+    lifecycle.terminate();
+
+    await expect(client.call('ping', {})).rejects.toBeInstanceOf(BridgeUnavailableError);
+    expect(lifecycle.count()).toBe(0);
+    lifecycle.restore();
+    expect(onResume).not.toHaveBeenCalled();
   });
 });

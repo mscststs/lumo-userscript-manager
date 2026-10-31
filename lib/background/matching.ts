@@ -1,7 +1,6 @@
 import type { ScriptMetadata, UrlRule, UserScript } from '@/types';
 import { mergeMetadata } from '@/lib/script/metadata';
 import { compileUrlRules, urlMatches } from '@/lib/script/url-rules';
-import { getPageAccess } from '@/lib/page-access';
 
 export interface EvaluatedScript {
   script: UserScript;
@@ -18,11 +17,9 @@ export interface EvaluatedScript {
 /**
  * Evaluate the whole library against one URL.
  *
- * The popup and the toolbar badge answer the same question — "which scripts
- * apply here, and which of them are on?" — so they share one implementation.
- * Two copies would eventually disagree on an edge case (a `@run-at
- * context-menu` script, a script in the recycle bin, a privileged page) and the
- * badge would contradict the list the user is looking at.
+ * The popup answers "which scripts apply here, and which of them are on?". It
+ * shares the definition of "on" with the toolbar badge — one implementation,
+ * so a row the popup reads as enabled can never mean something else.
  */
 export function evaluateScripts(scripts: UserScript[], url: string | undefined): EvaluatedScript[] {
   return scripts.map((script) => {
@@ -38,18 +35,17 @@ export function evaluateScripts(scripts: UserScript[], url: string | undefined):
   });
 }
 
-/** Count the scripts that would run on `url`, given pre-compiled rules. */
-export function countActiveScripts(
-  entries: Pick<EvaluatedScript, 'active' | 'rules'>[],
-  url: string | undefined,
-): number {
-  if (!url) return 0;
-  // Privileged surfaces cannot receive injections, so their count is zero no
-  // matter how many rules technically match (`lib/page-access.ts` owns the list).
-  if (!getPageAccess(url).injectable) return 0;
-  let count = 0;
-  for (const entry of entries) {
-    if (entry.active && urlMatches(url, entry.rules)) count += 1;
+/**
+ * Ids of the scripts that may run right now: enabled and not in the recycle bin.
+ *
+ * The badge intersects this set with the scripts that actually reported a start
+ * in a tab (`lib/background/injected-state.ts`), so toggling a switch drops it
+ * from the count without waiting for a reload.
+ */
+export function activeScriptUuids(scripts: UserScript[]): Set<string> {
+  const result = new Set<string>();
+  for (const script of scripts) {
+    if (script.enabled && !script.removedAt) result.add(script.uuid);
   }
-  return count;
+  return result;
 }

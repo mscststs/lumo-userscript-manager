@@ -21,11 +21,19 @@
     </filter>
   </defs>
 
-  <g transform="translate(0 -28)">
-    <g transform="rotate(-20 256 452)">
+  <!--
+    Optical sizing for the toolbar icon: the artwork is scaled up until its
+    ink box fills ~96% of the canvas, and the back cards fan out around the
+    card centre (rotated ±18°, shifted ±18) instead of pivoting on the bottom
+    edge. Pivoting on the bottom edge made the art 1.2:1 wide and wasted the
+    top ~10% of the canvas. `scripts/build-icons.mjs` renders every size from
+    this file, so keep the outer scale in sync with the measured ink box.
+  -->
+  <g transform="translate(256 256) scale(1.2036) translate(-256 -274)">
+    <g transform="translate(-18 0) rotate(-18 256 274)">
       <rect x="106" y="96" width="300" height="356" rx="54" fill="url(#back)" stroke="#3b82f6" stroke-opacity=".55" stroke-width="4"/>
     </g>
-    <g transform="rotate(20 256 452)">
+    <g transform="translate(18 0) rotate(18 256 274)">
       <rect x="106" y="96" width="300" height="356" rx="54" fill="url(#back)" stroke="#3b82f6" stroke-opacity=".55" stroke-width="4"/>
     </g>
 

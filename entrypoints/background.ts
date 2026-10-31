@@ -1,19 +1,31 @@
-import type { ScriptMetadata } from '@/types';
+import type { ScriptMetadata, UISettings } from '@/types';
 import {
+  findByNameNamespace,
+  getAll,
   getDraft,
+  getScript,
   listLogs,
   clearLogs,
   clearStore,
   replaceResources,
   cleanupDrafts,
+  listAgentAudit,
 } from '@/lib/db';
+import { parseMetadata } from '@/lib/script/metadata';
+import { validateBackupData } from '@/lib/backup-format';
 import { storage } from '@/store/storage';
 import { getValuesForScript, setValueForScript, deleteValueForScript } from '@/lib/background/values';
-import { listMenuCommands, clearMenuCommands } from '@/lib/background/menus';
+import {
+  listMenuCommands,
+  clearMenuCommands,
+  dropMenuFrame,
+  menuRouteFrames,
+} from '@/lib/background/menus';
 import {
   registerHostPort,
   sendToHost,
   clearHostPortsForTab,
+  onHostPortClosed,
 } from '@/lib/background/host-ports';
 import {
   onDownloadChanged,
@@ -51,7 +63,27 @@ import {
   getRuntimeStatus,
   requestRegistration,
 } from '@/lib/background/registry';
-import { forgetBadge, refreshBadge } from '@/lib/background/badge';
+import {
+  forgetBadge,
+  refreshAllBadges,
+  refreshBadge,
+  requestBadgeRefresh,
+} from '@/lib/background/badge';
+import {
+  forgetInjectedState,
+  resetFrameInjectedState,
+  resetTabInjectedState,
+} from '@/lib/background/injected-state';
+import { createAgentMcpServer } from '@/lib/agent/mcp-server';
+import { resolveAgentAccess } from '@/lib/agent/policy';
+import {
+  approvePendingRequest,
+  dismissPendingRequest,
+} from '@/lib/agent/pending';
+import { handleProbe } from '@/lib/agent/probe';
+import { isProbeRequest, MCP_PORT_NAME } from '@/lib/agent/protocol';
+import { ChromePortTransport } from '@/lib/agent/transport';
+import { openOptionsTab } from '@/lib/options-tab';
 
 const INSTALL_RULE_ID = 1;
 
@@ -154,6 +186,9 @@ async function handleRuntimeMessage(
   switch (type) {
     case 'host:wake':
       return true;
+    case 'options:open':
+      await openOptionsTab(String(payload.hash ?? ''));
+      return true;
     case 'popup:getData': {
       const data = await getPopupData(Number(payload.tabId ?? -1), payload.url);
       const availability = await checkUserScriptsAvailable();
@@ -216,12 +251,26 @@ async function handleRuntimeMessage(
       return requestRegistration();
     case 'menus:list':
       return listMenuCommands(Number(payload.tabId ?? -1));
-    case 'menus:invoke':
-      return sendToHost(Number(payload.tabId ?? -1), Number(payload.frameId ?? 0), {
-        type: 'bg:event',
-        event: 'menu-command',
-        payload: { uuid: payload.uuid, id: payload.id },
-      });
+    case 'menus:invoke': {
+      const tabId = Number(payload.tabId ?? -1);
+      const uuid = String(payload.uuid ?? '');
+      const id = String(payload.id ?? '');
+      const preferred = payload.frameId === undefined ? undefined : Number(payload.frameId);
+      // A command may be registered in several frames; deliver it to the first
+      // one that still has a live port so an iframe-only command stays usable.
+      for (const frameId of menuRouteFrames(tabId, uuid, id, preferred)) {
+        if (
+          sendToHost(tabId, frameId, {
+            type: 'bg:event',
+            event: 'menu-command',
+            payload: { uuid, id },
+          })
+        ) {
+          return true;
+        }
+      }
+      return false;
+    }
     case 'updates:check':
       return checkScriptUpdates(payload.uuid ? String(payload.uuid) : undefined);
     case 'updates:setup':
@@ -240,8 +289,19 @@ async function handleRuntimeMessage(
     case 'logs:clear':
       await clearLogs(payload.uuid ? String(payload.uuid) : undefined);
       return true;
+    case 'agent:audit':
+      return listAgentAudit(Number(payload.limit ?? 20));
+    case 'agent:pendingRequests':
+      return storage.getAgentPendingRequests();
+    case 'agent:approveRequest':
+      return approvePendingRequest(String(payload.id ?? ''));
+    case 'agent:dismissRequest':
+      await dismissPendingRequest(String(payload.id ?? ''));
+      return true;
     case 'backup:export':
       return exportBackup();
+    case 'backup:stats':
+      return backupStats();
     case 'backup:import':
       return importBackup(payload);
     case 'storage:clear':
@@ -276,60 +336,134 @@ async function exportBackup(): Promise<Record<string, unknown>> {
   };
 }
 
-async function importBackup(payload: Record<string, any>): Promise<{ imported: number; errors: string[] }> {
-  const data = payload.data;
-  if (!data || data.format !== 'lumo-userscripts' || !Array.isArray(data.scripts)) {
-    throw new Error('Invalid backup file.');
-  }
-  if (data.settings && typeof data.settings === 'object') {
+interface BackupStats {
+  scripts: number;
+  trash: number;
+  values: number;
+  resources: number;
+  codeBytes: number;
+}
+
+interface ImportBackupOptions {
+  conflict?: 'overwrite' | 'skip';
+  importSettings?: boolean;
+}
+
+interface ImportBackupResult {
+  imported: number;
+  skipped: number;
+  settingsImported: boolean;
+  failed: { name: string; message: string }[];
+}
+
+async function backupStats(): Promise<BackupStats> {
+  const [scripts, values, resources] = await Promise.all([
+    getAllScripts(true),
+    getAll<{ storageName: string; key: string }>('values'),
+    getAll<unknown>('resources'),
+  ]);
+  const active = scripts.filter((script) => !script.removedAt);
+  return {
+    scripts: active.length,
+    trash: scripts.length - active.length,
+    values: values.length,
+    resources: resources.length,
+    codeBytes: scripts.reduce((total, script) => total + script.codeSize, 0),
+  };
+}
+
+async function importBackup(payload: Record<string, any>): Promise<ImportBackupResult> {
+  const data = validateBackupData(payload.data);
+  const options = (payload.options ?? {}) as ImportBackupOptions;
+  const conflict = options.conflict === 'skip' ? 'skip' : 'overwrite';
+
+  let settingsImported = false;
+  if (options.importSettings !== false && data.settings && typeof data.settings === 'object') {
     try {
-      await storage.importConfig({ uiSettings: data.settings });
+      await storage.importConfig({ uiSettings: data.settings as unknown as UISettings });
+      settingsImported = true;
     } catch {
       // A malformed settings block must not abort the script import.
     }
   }
+
   let imported = 0;
-  const errors: string[] = [];
-  for (const entry of data.scripts) {
+  let skipped = 0;
+  const failed: { name: string; message: string }[] = [];
+
+  for (const entry of data.scripts ?? []) {
+    let label = entry?.script?.name ?? entry?.script?.uuid ?? 'Script';
     try {
-      if (entry?.script && entry?.code) {
-        const record = await saveScriptFromCode(
-          entry.script.uuid ?? null,
-          String(entry.code),
-          entry.script.origin ?? '',
-        );
-        if (entry.script.selfMetadata) {
-          await updateSelfMetadata(record.uuid, entry.script.selfMetadata);
-        }
-        if (entry.values && typeof entry.values === 'object') {
-          for (const [key, value] of Object.entries(entry.values)) {
-            await setValueForScript(record.uuid, key, value);
-          }
-        }
-        if (Array.isArray(entry.resources)) {
-          await replaceResources(
-            record.uuid,
-            entry.resources.map((resource: any) => ({
-              ...resource,
-              uuid: record.uuid,
-            })),
-          );
-        }
-        if (entry.script.enabled === false) {
-          await toggleScript(record.uuid, false);
-        }
-        if (entry.script.removedAt) {
-          await removeScript(record.uuid);
-        }
-        imported += 1;
+      if (!entry?.script || typeof entry.code !== 'string') {
+        throw new Error('The backup entry has no script code.');
       }
+
+      // Parse before touching the database: the name and namespace decide
+      // whether this entry overwrites an installed script, and a broken
+      // metadata block must be reported as one failure instead of aborting
+      // the whole restore.
+      const parsed = parseMetadata(entry.code);
+      if (parsed.errors.length) throw new Error(parsed.errors.join('\n'));
+      const name = parsed.metadata.name?.[0] ?? entry.script.name ?? '';
+      const namespace = parsed.metadata.namespace?.[0] ?? entry.script.namespace ?? '';
+      label = name || label;
+
+      const byUuid = entry.script.uuid ? await getScript(entry.script.uuid) : undefined;
+      const byName = await findByNameNamespace(name, namespace);
+      const existing = byUuid ?? byName;
+
+      if (existing && conflict === 'skip') {
+        skipped += 1;
+        continue;
+      }
+
+      // Overwriting keeps the installed UUID, so values and resources that are
+      // written below land on the record the user already has.
+      const record = await saveScriptFromCode(
+        existing?.uuid ?? null,
+        entry.code,
+        String(entry.script.origin ?? ''),
+      );
+
+      if (entry.script.selfMetadata) {
+        await updateSelfMetadata(
+          record.uuid,
+          entry.script.selfMetadata as unknown as ScriptMetadata,
+        );
+      }
+      if (entry.values && typeof entry.values === 'object') {
+        for (const [key, value] of Object.entries(entry.values)) {
+          await setValueForScript(record.uuid, key, value);
+        }
+      }
+      if (Array.isArray(entry.resources)) {
+        await replaceResources(
+          record.uuid,
+          entry.resources.map((resource: any) => ({
+            ...resource,
+            uuid: record.uuid,
+          })),
+        );
+      }
+      if (entry.script.enabled === false) {
+        await toggleScript(record.uuid, false);
+      }
+      if (entry.script.removedAt) {
+        await removeScript(record.uuid);
+      }
+      imported += 1;
     } catch (error) {
-      errors.push(error instanceof Error ? error.message : String(error));
+      failed.push({
+        name: label,
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   }
+
+  if (settingsImported) await setupUpdateAlarm();
   await requestRegistration();
   broadcast('scripts-changed');
-  return { imported, errors };
+  return { imported, skipped, settingsImported, failed };
 }
 
 export default defineBackground(() => {
@@ -361,6 +495,44 @@ export default defineBackground(() => {
     return true;
   });
 
+  // ─── Agent endpoint (L0 probe + L1 MCP) ───────────────────────────────────
+  // Only extensions listed in `agentSettings.allowedExtensionIds` may open an
+  // MCP session. `externally_connectable` in the manifest decides who can even
+  // reach these listeners; this is the second, authoritative check.
+  chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
+    if (!isProbeRequest(message)) return false;
+    void handleProbe(message, sender).then(sendResponse, (error) =>
+      sendResponse({
+        ok: false,
+        error: {
+          code: 'INTERNAL',
+          message: error instanceof Error ? error.message : String(error),
+        },
+      }),
+    );
+    return true;
+  });
+
+  chrome.runtime.onConnectExternal.addListener((port) => {
+    if (port.name !== MCP_PORT_NAME) return;
+    const transport = new ChromePortTransport(port);
+    void (async () => {
+      const access = await resolveAgentAccess(port.sender?.id);
+      if (!access.enabled || !access.authorized) {
+        await transport.close();
+        return;
+      }
+      const server = createAgentMcpServer(port.sender?.id, access.settings);
+      transport.onclose = () => {
+        void server.close().catch(() => undefined);
+      };
+      await server.connect(transport);
+    })().catch((error) => {
+      console.error('[Lumo Userscripts] Agent MCP session failed:', error);
+      void transport.close();
+    });
+  });
+
   chrome.alarms?.onAlarm?.addListener((alarm) => {
     if (isUpdateAlarm(alarm.name)) void checkScriptUpdates();
   });
@@ -384,36 +556,71 @@ export default defineBackground(() => {
     clearMenuCommands(tabId);
     clearHostPortsForTab(tabId);
     forgetBadge(tabId);
+    void forgetInjectedState(tabId);
+  });
+
+  // A frame's port closed: its menu commands can no longer be delivered. The
+  // engine replays registrations after a bridge reconnect, so dropping them is
+  // safe and keeps the popup free of rows that would fail on click.
+  onHostPortClosed((tabId, frameId) => {
+    if (dropMenuFrame(tabId, frameId)) {
+      broadcast('menus-changed', { tabId });
+    }
   });
 
   // ─── Toolbar badge ────────────────────────────────────────────────────────
-  // The badge answers "how many scripts are active on the page in front of
-  // me", so it is recomputed when that page changes and when the script set
-  // changes (`requestRegistration`). Chrome keeps badges per tab, so a
-  // background tab is simply recomputed when it becomes active.
+  // The badge answers "how many scripts are actually running in the tab in
+  // front of me". That answer changes when a script reports a start
+  // (`host:run`), when a document commits, or when the script set / settings
+  // change — never because a URL merely changed. Chrome keeps badges per tab,
+  // so a background tab is recomputed when it becomes active.
   chrome.tabs?.onActivated?.addListener(({ tabId }) => {
     void refreshBadge(tabId);
-  });
-  chrome.tabs?.onUpdated?.addListener((tabId, changeInfo, tab) => {
-    // `onUpdated` fires for titles, favicons and load states too. Only a real
-    // navigation (new URL) or a finished load can change the answer.
-    if (!changeInfo.url && changeInfo.status !== 'complete') return;
-    void refreshBadge(tabId, tab.url);
   });
   chrome.windows?.onFocusChanged?.addListener((windowId) => {
     if (windowId === chrome.windows.WINDOW_ID_NONE) return;
     void refreshBadge();
   });
-  // The count depends on settings (`showBadge`, the master injection switch)
-  // and on the accent used for the badge's colour.
+  // Only the settings the badge reads matter here: `uiSettings` is one key, and
+  // the appearance panel writes it for font size and language too. Those are
+  // global, so a real change has to repaint every open tab, not just the front.
   chrome.storage?.onChanged?.addListener((changes, area) => {
     if (area !== 'local' || !changes.uiSettings) return;
-    void refreshBadge();
+    const before = changes.uiSettings.oldValue as Partial<UISettings> | undefined;
+    const after = changes.uiSettings.newValue as Partial<UISettings> | undefined;
+    if (
+      before &&
+      after &&
+      before.showBadge === after.showBadge &&
+      before.scriptsEnabled === after.scriptsEnabled &&
+      before.accent === after.accent &&
+      before.theme === after.theme
+    ) {
+      return;
+    }
+    void refreshAllBadges();
   });
 
+  // A commit is the moment Chrome discards a tab's badge and the moment every
+  // script of the previous document stops existing. Reset the reported state
+  // (and the cached badge text) here, then repaint; the new document's scripts
+  // report themselves as they start. Prerendered documents are not in front
+  // yet, so their commits must not clear the visible badge.
   chrome.webNavigation?.onCommitted?.addListener((details) => {
-    if (details.frameId === 0) clearMenuCommands(details.tabId);
-    else clearMenuCommands(details.tabId, details.frameId);
+    if (details.documentLifecycle && details.documentLifecycle !== 'active') return;
+    const report = { documentId: details.documentId, url: details.url };
+    if (details.frameId === 0) {
+      forgetBadge(details.tabId);
+      clearMenuCommands(details.tabId);
+      void resetTabInjectedState(details.tabId, report).then(() =>
+        requestBadgeRefresh(details.tabId),
+      );
+    } else {
+      clearMenuCommands(details.tabId, details.frameId);
+      void resetFrameInjectedState(details.tabId, details.frameId, report).then(() =>
+        requestBadgeRefresh(details.tabId),
+      );
+    }
   });
 
   // The service worker can be restarted without an onInstalled event. Make

@@ -2,13 +2,15 @@ import { describe, expect, it } from 'vitest';
 import type { UserScript } from '@/types';
 import { oklchToHex } from '@/lib/color';
 import { ACCENTS, normalizeAccent } from '@/lib/theme-registry';
-import { badgePalette, badgeTextFor } from '@/lib/background/badge';
-import { countActiveScripts, evaluateScripts } from '@/lib/background/matching';
+import { badgePalette, badgeTextFor, countActiveInjected } from '@/lib/background/badge';
+import { activeScriptUuids } from '@/lib/background/matching';
+import { InjectedRegistry } from '@/lib/background/injected-state';
 
 /**
  * The badge is the only surface that reports a number the popup also reports.
- * These tests pin the two properties a user can actually notice: the count
- * agrees with the list, and it disappears instead of showing zero.
+ * These tests pin the properties a user can actually notice: one script counts
+ * once however many frames it entered, turning a script off removes it at once,
+ * and the badge disappears instead of showing zero.
  */
 
 function script(overrides: Partial<UserScript>): UserScript {
@@ -42,10 +44,6 @@ function script(overrides: Partial<UserScript>): UserScript {
   };
 }
 
-function count(scripts: UserScript[], url: string | undefined): number {
-  return countActiveScripts(evaluateScripts(scripts, url), url);
-}
-
 describe('badge text', () => {
   it('renders nothing for zero and clamps the width', () => {
     expect(badgeTextFor(0)).toBe('');
@@ -56,42 +54,28 @@ describe('badge text', () => {
   });
 });
 
-describe('active script count', () => {
-  const matching = script({
-    metadata: { namespace: [''], match: ['*://example.com/*'] },
-  });
-  const otherSite = script({
-    metadata: { namespace: [''], match: ['*://other.test/*'] },
-  });
-
-  it('counts enabled, matching scripts', () => {
-    expect(count([matching], 'https://example.com/page')).toBe(1);
-    expect(count([matching], 'https://example.com.evil.test/page')).toBe(0);
-    expect(count([matching, otherSite], 'https://example.com/page')).toBe(1);
+describe('active scripts', () => {
+  it('keeps enabled scripts that are not in the recycle bin', () => {
+    const enabled = script({});
+    const disabled = script({ enabled: false });
+    const recycled = script({ removedAt: Date.now() });
+    expect([...activeScriptUuids([enabled, disabled, recycled])]).toEqual([enabled.uuid]);
   });
 
-  it('ignores disabled and recycled scripts', () => {
-    expect(count([script({ ...matching, enabled: false })], 'https://example.com/')).toBe(0);
-    expect(count([script({ ...matching, removedAt: Date.now() })], 'https://example.com/')).toBe(0);
+  it('counts a script once even when several frames reported it', () => {
+    const a = 'a';
+    const b = 'b';
+    const active = new Set([a, b]);
+    expect(countActiveInjected([a, a, b, a], active)).toBe(2);
   });
 
-  it('honours user overrides of the match rules', () => {
-    const overridden = script({
-      metadata: { namespace: [''], match: ['*://example.com/*'] },
-      selfMetadata: { match: ['*://override.test/*'] },
-    });
-    expect(count([overridden], 'https://example.com/')).toBe(0);
-    expect(count([overridden], 'https://override.test/')).toBe(1);
-  });
-
-  it('never counts on privileged pages', () => {
-    expect(count([{ ...matching, metadata: { namespace: [''], match: [] } }], 'chrome://extensions')).toBe(0);
-    expect(count([matching], 'chrome://extensions')).toBe(0);
-    expect(count([matching], undefined)).toBe(0);
-  });
-
-  it('treats a script with no rules as matching everything', () => {
-    expect(count([script({})], 'https://anything.test/')).toBe(1);
+  it('drops scripts that are no longer active without a reload', () => {
+    const registry = new InjectedRegistry();
+    registry.note(1, 0, 'stays');
+    registry.note(1, 0, 'switched-off');
+    // The registry keeps what ran; the active set decides what is still valid.
+    expect(countActiveInjected(registry.uuids(1), new Set(['stays']))).toBe(1);
+    expect(countActiveInjected(registry.uuids(1), new Set())).toBe(0);
   });
 });
 

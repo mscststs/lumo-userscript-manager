@@ -9,7 +9,7 @@ import type {
 } from '@/types';
 
 const DB_NAME = 'lumo-us';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -64,6 +64,12 @@ export function openDb(): Promise<IDBDatabase> {
       // v2: identity icons live beside the script records they belong to.
       if (!db.objectStoreNames.contains('icons')) {
         db.createObjectStore('icons', { keyPath: 'uuid' });
+      }
+
+      // v3: agent writes are audited separately from userscript console logs.
+      if (!db.objectStoreNames.contains('agentAudit')) {
+        const store = db.createObjectStore('agentAudit', { keyPath: 'id', autoIncrement: true });
+        store.createIndex('time', 'time');
       }
     };
 
@@ -190,7 +196,13 @@ export async function saveScript(
 export async function setScriptEnabled(uuid: string, enabled: boolean): Promise<void> {
   const script = await getScript(uuid);
   if (!script) return;
-  await putRecord('scripts', { ...script, enabled, updatedAt: Date.now() });
+  // Enabling a pending script is the user's review: drop the marker.
+  await putRecord('scripts', {
+    ...script,
+    enabled,
+    ...(enabled ? { pendingReview: undefined } : {}),
+    updatedAt: Date.now(),
+  });
 }
 
 export async function moveScriptToTrash(uuid: string): Promise<void> {
@@ -203,7 +215,12 @@ export async function restoreScript(uuid: string): Promise<void> {
   const script = await getScript(uuid);
   if (!script) return;
   const { removedAt: _removedAt, ...rest } = script;
-  await putRecord('scripts', { ...rest, enabled: true, updatedAt: Date.now() });
+  await putRecord('scripts', {
+    ...rest,
+    enabled: true,
+    pendingReview: undefined,
+    updatedAt: Date.now(),
+  });
 }
 
 export async function purgeScript(uuid: string): Promise<void> {
@@ -222,13 +239,18 @@ export async function listVersions(uuid: string): Promise<ScriptVersion[]> {
   return versions.filter((version) => version.uuid === uuid).sort((a, b) => b.createdAt - a.createdAt);
 }
 
-export async function recordRun(uuid: string, error?: string): Promise<void> {
+export async function recordRun(
+  uuid: string,
+  error?: string,
+  /** False records the outcome only; the run was already counted at start. */
+  countRun = true,
+): Promise<void> {
   const script = await getScript(uuid);
   if (!script) return;
   await putRecord('scripts', {
     ...script,
-    lastRunAt: Date.now(),
-    runCount: (script.runCount ?? 0) + 1,
+    lastRunAt: countRun ? Date.now() : script.lastRunAt,
+    runCount: countRun ? (script.runCount ?? 0) + 1 : (script.runCount ?? 0),
     lastError: error,
   });
 }
@@ -400,4 +422,56 @@ export async function cleanupDrafts(): Promise<void> {
   for (const draft of expired) {
     await replaceResources(draft.draftUuid, []);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Agent audit
+// ---------------------------------------------------------------------------
+
+export interface AgentAuditEntry {
+  id?: number;
+  time: number;
+  tool: string;
+  /** Extension ID of the calling agent host. */
+  senderId: string;
+  /** SHA-256 of the arguments; the code itself is never stored. */
+  argsHash: string;
+  targetUuid?: string;
+  result: 'ok' | 'error';
+  message?: string;
+}
+
+export async function addAgentAudit(entry: Omit<AgentAuditEntry, 'id'>): Promise<void> {
+  await putRecord('agentAudit', entry as AgentAuditEntry);
+}
+
+export async function listAgentAudit(limit = 50): Promise<AgentAuditEntry[]> {
+  const rows = await getAll<AgentAuditEntry>('agentAudit');
+  return rows.sort((a, b) => b.time - a.time).slice(0, limit);
+}
+
+/**
+ * Keep the audit bounded: it grows with every agent call, so it is stored in
+ * IndexedDB and trimmed to the newest `maxEntries` within `maxAgeMs`.
+ */
+export async function pruneAgentAudit(
+  maxAgeMs = 30 * 24 * 60 * 60 * 1000,
+  maxEntries = 1000,
+): Promise<void> {
+  const rows = await getAll<AgentAuditEntry>('agentAudit');
+  const cutoff = Date.now() - maxAgeMs;
+  const keep = new Set(
+    rows
+      .filter((row) => row.time >= cutoff)
+      .sort((a, b) => b.time - a.time)
+      .slice(0, maxEntries)
+      .map((row) => row.id),
+  );
+  const remove = rows.filter((row) => row.id !== undefined && !keep.has(row.id));
+  if (remove.length === 0) return;
+
+  const db = await openDb();
+  const tx = db.transaction('agentAudit', 'readwrite');
+  for (const row of remove) tx.objectStore('agentAudit').delete(row.id!);
+  await txDone(tx);
 }

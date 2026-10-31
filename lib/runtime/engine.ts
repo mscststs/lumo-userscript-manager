@@ -1,5 +1,6 @@
 import type { RuntimeScriptPayload } from '@/types';
 import { urlMatches } from '@/lib/script/url-rules';
+import { observePageLifecycle } from './lifecycle';
 import { createGmApi, type GmApiHandle, type GmTransport } from './gm-api';
 import {
   BridgeClient,
@@ -224,10 +225,16 @@ export function installEngine(options: EngineOptions): void {
       });
       apis.set(payload.uuid, api);
 
-      await payload.run!.call(window, api.GM, api.GM_info, window);
+      // Report the start *before* the body runs. The badge and the menu list
+      // must not wait for a script that awaits a network round trip (or never
+      // settles), and one report per frame is what makes a frame-only script
+      // visible at all. Errors are reported separately below, so this call is
+      // never repeated for the same document unless the script really restarts.
       void client
         .call('host:run', { uuid: payload.uuid, token: payload.runtimeToken })
         .catch(() => undefined);
+
+      await payload.run!.call(window, api.GM, api.GM_info, window);
     } catch (error) {
       const message =
         error instanceof Error ? `${error.message}\n${error.stack ?? ''}` : String(error);
@@ -267,15 +274,19 @@ export function installEngine(options: EngineOptions): void {
   }
 
   if (typeof window !== 'undefined') {
-    window.addEventListener(
-      'pagehide',
-      () => {
+    // Only a real unload tears the engine down. A document that enters the
+    // back/forward cache keeps running (the browser freezes it), and it is
+    // never re-injected on restore, so disposing its GM APIs here would leave a
+    // live script talking to a dead transport. The replay after a resume is
+    // driven by `BridgeClient.onResume`, which covers both a worker restart and
+    // a lost engine channel.
+    observePageLifecycle({
+      onTerminate: () => {
         for (const api of apis.values()) api.dispose();
         apis.clear();
         client.dispose();
       },
-      { once: true },
-    );
+    });
   }
 }
 
