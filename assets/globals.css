@@ -31,19 +31,24 @@
 
   /* A compact, tool-scale ramp. Steps are ~1.125–1.2 apart (Bringhurst's
      modular scale), with an extra 11px stop for metadata that must not compete
-     with body copy. `body` sits at 13px, which is the density a list-and-form
-     product needs; headings jump to 20px so the hierarchy survives the noise. */
+     with body copy. `body` sits at 14px, which is the density a list-and-form
+     product needs; headings jump to 20px so the hierarchy survives the noise.
+
+     `xs`–`lg` deliberately equal Tailwind's defaults (12/14/16/18) rather than
+     sitting one step below them: the same user font-size has to read the same
+     here as on every other Lumo surface, and a private ramp made 18px render
+     like 16px. Only the 11px metadata stop is ours. */
   --text-2xs: 0.6875rem; /* 11 */
   --text-2xs--line-height: 1rem;
   --text-2xs--letter-spacing: 0.01em;
   --text-xs: 0.75rem; /* 12 */
   --text-xs--line-height: 1.125rem;
-  --text-sm: 0.8125rem; /* 13 */
-  --text-sm--line-height: 1.25rem;
-  --text-base: 0.9375rem; /* 15 */
-  --text-base--line-height: 1.4375rem;
-  --text-lg: 1.0625rem; /* 17 */
-  --text-lg--line-height: 1.5rem;
+  --text-sm: 0.875rem; /* 14 */
+  --text-sm--line-height: 1.3125rem;
+  --text-base: 1rem; /* 16 */
+  --text-base--line-height: 1.5rem;
+  --text-lg: 1.125rem; /* 18 */
+  --text-lg--line-height: 1.625rem;
   --text-xl: 1.25rem; /* 20 */
   --text-xl--line-height: 1.625rem;
   --text-xl--letter-spacing: -0.01em;
@@ -78,7 +83,7 @@
   --color-popover: oklch(1 0 0);
   --color-popover-foreground: oklch(0.205 0.008 285);
   --color-muted: oklch(0.962 0.003 95);
-  /* 4.9:1 on `--color-background` — metadata stays legible at 11–13px. */
+  /* 4.9:1 on `--color-background` — metadata stays legible at 11–12px. */
   --color-muted-foreground: oklch(0.5 0.011 285);
   --color-secondary: oklch(0.955 0.004 95);
   --color-secondary-foreground: oklch(0.235 0.008 285);
@@ -98,7 +103,7 @@
   --color-destructive-foreground: oklch(0.99 0.005 26);
   --color-success: oklch(0.52 0.13 158);
   --color-success-foreground: oklch(0.99 0.005 158);
-  /* Dark amber, not the usual yellow: `text-warning` is used for 11–13px state
+  /* Dark amber, not the usual yellow: `text-warning` is used for 11–14px state
      copy on the page *and* on a 10% tint, and a bright yellow fails AA in both
      places. 0.545 keeps 4.9:1 on paper and 4.5:1 on its own badge tint. */
   --color-warning: oklch(0.545 0.14 65);

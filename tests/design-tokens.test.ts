@@ -170,7 +170,12 @@ describe('accessibility invariants', () => {
 
   it('scales the entire UI from `html` font-size', () => {
     expect(CSS).toMatch(/html\s*\{[^}]*font-size:\s*16px/);
-    expect(CSS).toMatch(/--text-sm:\s*0\.8125rem/);
+    // The ramp must match Tailwind's defaults for body-sized text: the same user
+    // font size has to read the same here as on every other Lumo surface, so a
+    // private step-down ramp (13/15/17) is a regression, not a density choice.
+    expect(CSS).toMatch(/--text-sm:\s*0\.875rem/);
+    expect(CSS).toMatch(/--text-base:\s*1rem/);
+    expect(CSS).toMatch(/--text-lg:\s*1\.125rem/);
   });
 
   it('honours reduced motion', () => {
