@@ -7,10 +7,6 @@
       <stop offset=".64" stop-color="#3b82f6"/>
       <stop offset="1" stop-color="#4338ca"/>
     </linearGradient>
-    <linearGradient id="back" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#1e3a8a"/>
-      <stop offset="1" stop-color="#0a1024"/>
-    </linearGradient>
     <linearGradient id="sheen" x1="0" y1="0" x2=".8" y2="1">
       <stop offset="0" stop-color="#fff" stop-opacity=".34"/>
       <stop offset=".45" stop-color="#fff" stop-opacity=".05"/>
@@ -22,21 +18,15 @@
   </defs>
 
   <!--
-    Optical sizing for the toolbar icon: the artwork is scaled up until its
-    ink box fills ~96% of the canvas, and the back cards fan out around the
-    card centre (rotated ±18°, shifted ±18) instead of pivoting on the bottom
-    edge. Pivoting on the bottom edge made the art 1.2:1 wide and wasted the
-    top ~10% of the canvas. `scripts/build-icons.mjs` renders every size from
-    this file, so keep the outer scale in sync with the measured ink box.
+    One card, no stack. The fanned back cards used to carry the "layer"
+    metaphor, but they only showed up as dark overlaps peeking out at the
+    bottom and stole width from the real subject. The card (and the braces it
+    holds) is now the whole icon: scaled until its height fills ~90% of the
+    canvas, which keeps the portrait proportion while reading larger in the
+    toolbar. `scripts/build-icons.mjs` renders every size from this file, so
+    keep the outer scale in sync with that ink box.
   -->
-  <g transform="translate(256 256) scale(1.2036) translate(-256 -274)">
-    <g transform="translate(-18 0) rotate(-18 256 274)">
-      <rect x="106" y="96" width="300" height="356" rx="54" fill="url(#back)" stroke="#3b82f6" stroke-opacity=".55" stroke-width="4"/>
-    </g>
-    <g transform="translate(18 0) rotate(18 256 274)">
-      <rect x="106" y="96" width="300" height="356" rx="54" fill="url(#back)" stroke="#3b82f6" stroke-opacity=".55" stroke-width="4"/>
-    </g>
-
+  <g transform="translate(256 256) scale(1.30) translate(-256 -274)">
     <rect x="106" y="96" width="300" height="356" rx="54" fill="url(#front)"/>
     <rect x="106" y="96" width="300" height="356" rx="54" fill="url(#sheen)"/>
     <rect x="108" y="98" width="296" height="352" rx="52" fill="none" stroke="#fff" stroke-opacity=".32" stroke-width="4"/>
