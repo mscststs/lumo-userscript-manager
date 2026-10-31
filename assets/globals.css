@@ -88,7 +88,10 @@
   --color-accent-foreground: oklch(0.235 0.008 285);
   --color-border: oklch(0.902 0.004 95);
   --color-input: oklch(0.885 0.005 95);
-  --color-sidebar: oklch(0.972 0.003 95);
+  /* The options window frame (sidebar + the gutter around the content panel).
+     One step *below* the page so the panel reads as a sheet lifted off the
+     desk, not as a second column of the same paper. */
+  --color-sidebar: oklch(0.962 0.004 95);
   --color-sidebar-foreground: oklch(0.205 0.008 285);
 
   --color-destructive: oklch(0.535 0.196 26);
@@ -126,10 +129,19 @@
 
 /* ─── Accent presets ─────────────────────────────────────────────────────── */
 @layer base {
-  /* Elevation. Three steps only — more invites shadow soup. Declared as plain
-     custom properties (not `@theme`) because the `shadow-elev*` utilities below
-     read them at runtime: a theme-scale value would be inlined at build time,
-     which would make the dark overrides dead code. */
+  /* Elevation. Three floating steps only — more invites shadow soup. Declared
+     as plain custom properties (not `@theme`) because the `shadow-*` utilities
+     below read them at runtime: a theme-scale value would be inlined at build
+     time, which would make the dark overrides dead code.
+
+     Four *resting* treatments sit below the floating steps. They are not
+     elevation (nothing floats), they are material: light from above.
+       surface — cards and grouped lists resting on the panel
+       panel   — the options content panel resting on the window frame
+       control — outline buttons
+       button  — solid buttons: a lit top edge plus a contact shadow
+     On light palettes the cue is a soft contact shadow; on dark palettes a
+     shadow is invisible, so the same cue becomes a 1px top highlight. */
   :root {
     --shadow-elev1: 0 1px 2px -1px oklch(0.24 0.02 270 / 0.1),
       0 1px 1px oklch(0.24 0.02 270 / 0.04);
@@ -137,6 +149,13 @@
       0 2px 6px -3px oklch(0.24 0.02 270 / 0.08);
     --shadow-elev3: 0 24px 56px -16px oklch(0.24 0.02 270 / 0.24),
       0 6px 16px -8px oklch(0.24 0.02 270 / 0.12);
+
+    --shadow-surface: 0 1px 2px -1px oklch(0.24 0.02 270 / 0.07);
+    --shadow-panel: 0 1px 2px -1px oklch(0.24 0.02 270 / 0.06),
+      0 6px 20px -12px oklch(0.24 0.02 270 / 0.1);
+    --shadow-control: 0 1px 2px -1px oklch(0.24 0.02 270 / 0.1);
+    --shadow-button: inset 0 1px 0 0 oklch(1 0 0 / 0.16),
+      0 1px 2px -1px oklch(0.24 0.02 270 / 0.4);
   }
 
   :root,
@@ -182,6 +201,18 @@
 }
 @utility shadow-elev3 {
   box-shadow: var(--shadow-elev3);
+}
+@utility shadow-surface {
+  box-shadow: var(--shadow-surface);
+}
+@utility shadow-panel {
+  box-shadow: var(--shadow-panel);
+}
+@utility shadow-control {
+  box-shadow: var(--shadow-control);
+}
+@utility shadow-button {
+  box-shadow: var(--shadow-button);
 }
 
 @layer base {
@@ -232,10 +263,20 @@
     --color-chat-user: oklch(0.32 0.02 var(--accent-h));
     --color-chat-user-foreground: oklch(0.962 0.002 270);
 
-    /* Dark elevation needs a tighter, heavier falloff to register at all. */
-    --shadow-elev1: 0 1px 2px -1px oklch(0 0 0 / 0.55), 0 1px 1px oklch(0 0 0 / 0.3);
-    --shadow-elev2: 0 8px 20px -8px oklch(0 0 0 / 0.6), 0 2px 6px -3px oklch(0 0 0 / 0.45);
-    --shadow-elev3: 0 28px 64px -20px oklch(0 0 0 / 0.75), 0 8px 20px -10px oklch(0 0 0 / 0.5);
+    /* Dark elevation needs a tighter, heavier falloff to register at all, and
+       a hairline of light on the top edge: on a near-black page the drop
+       shadow alone is invisible, so "raised" is drawn as "catches the light". */
+    --shadow-elev1: inset 0 1px 0 0 oklch(1 0 0 / 0.05), 0 1px 2px -1px oklch(0 0 0 / 0.55),
+      0 1px 1px oklch(0 0 0 / 0.3);
+    --shadow-elev2: inset 0 1px 0 0 oklch(1 0 0 / 0.05), 0 8px 20px -8px oklch(0 0 0 / 0.6),
+      0 2px 6px -3px oklch(0 0 0 / 0.45);
+    --shadow-elev3: inset 0 1px 0 0 oklch(1 0 0 / 0.06), 0 28px 64px -20px oklch(0 0 0 / 0.75),
+      0 8px 20px -10px oklch(0 0 0 / 0.5);
+
+    --shadow-surface: inset 0 1px 0 0 oklch(1 0 0 / 0.035);
+    --shadow-panel: inset 0 1px 0 0 oklch(1 0 0 / 0.045), 0 1px 3px oklch(0 0 0 / 0.45);
+    --shadow-control: inset 0 1px 0 0 oklch(1 0 0 / 0.04);
+    --shadow-button: inset 0 1px 0 0 oklch(1 0 0 / 0.3), 0 1px 2px oklch(0 0 0 / 0.5);
   }
 
   /* ─── Midnight ──────────────────────────────────────────────────────────
@@ -551,6 +592,22 @@
     font-family: inherit;
     font-size: inherit;
     line-height: inherit;
+    counter-reset: line;
+  }
+
+  /* Line numbers are drawn by CSS rather than emitted as text, so selecting
+     and copying the preview yields the script and nothing else. */
+  .code-view[data-line-numbers] .shiki .line::before {
+    counter-increment: line;
+    content: counter(line);
+    display: inline-block;
+    width: 2.25rem;
+    margin-right: 1rem;
+    text-align: right;
+    color: var(--color-muted-foreground);
+    opacity: 0.55;
+    font-variant-numeric: tabular-nums;
+    user-select: none;
   }
 
   .dark .code-view .shiki {
@@ -585,7 +642,18 @@
   color: var(--color-muted-foreground);
 }
 
+.cm-editor .cm-lineNumbers .cm-gutterElement {
+  padding: 0 0.75rem 0 1rem;
+  font-variant-numeric: tabular-nums;
+}
+
 .cm-editor .cm-activeLine,
 .cm-editor .cm-activeLineGutter {
   background-color: color-mix(in oklch, var(--color-primary) 6%, transparent);
+}
+
+/* The current line number is the one the eye returns to: full ink, not the
+   muted gutter grey. */
+.cm-editor .cm-activeLineGutter {
+  color: var(--color-foreground);
 }

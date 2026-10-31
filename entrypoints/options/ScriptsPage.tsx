@@ -14,11 +14,13 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import type { UserScript } from '@/types';
+import type { ManagerScript } from '@/types';
 import { sendBg, onLumoEvent } from '@/lib/messages';
-import { formatBytes } from '@/lib/utils';
-import { formatDateTime, formatDateTimeShort } from '@/lib/format';
+import { cn, formatBytes } from '@/lib/utils';
+import { formatDateTime, formatRelativeTime } from '@/lib/format';
+import { useNow } from '@/lib/use-now';
 import { mergeMetadata } from '@/lib/script/metadata';
+import { ScriptIcon } from '@/components/script/ScriptIcon';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
@@ -49,9 +51,19 @@ import {
 
 type Filter = 'all' | 'enabled' | 'disabled' | 'updates';
 
-/** One grid template for the header *and* every row, so columns cannot drift. */
+/**
+ * One grid template for the skeleton and every row. The time column only
+ * exists from `sm` up; below that the actions take its place.
+ */
 const ROW_GRID =
-  'grid grid-cols-[1.75rem_minmax(0,1fr)_auto] items-center gap-2 sm:grid-cols-[1.75rem_minmax(0,1fr)_7.5rem_5rem] sm:gap-3';
+  'grid grid-cols-[1.75rem_minmax(0,1fr)_auto] items-center gap-x-3 sm:grid-cols-[1.75rem_minmax(0,1fr)_auto_auto]';
+
+/**
+ * Past this size rows stop animating in and out. A filter switch on a large
+ * library would otherwise run hundreds of height animations at once — motion
+ * that costs frames and explains nothing.
+ */
+const ROW_MOTION_LIMIT = 80;
 
 interface ScriptsPageProps {
   onOpenEditor: (uuid: string) => void;
@@ -59,13 +71,13 @@ interface ScriptsPageProps {
 
 interface PendingAction {
   kind: 'delete' | 'purge' | 'batch-delete';
-  script?: UserScript;
+  script?: ManagerScript;
 }
 
 export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
   const { t, i18n } = useTranslation();
   const toast = useToast();
-  const [scripts, setScripts] = useState<UserScript[]>([]);
+  const [scripts, setScripts] = useState<ManagerScript[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -78,12 +90,15 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
   const [url, setUrl] = useState('');
   const [pending, setPending] = useState<PendingAction | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const now = useNow(60_000);
 
+  // Skeleton on first load only. Later reloads (every toggle echoes back as
+  // `scripts-changed`) keep the current rows on screen until the fresh list
+  // lands, so the list never blinks to placeholders under the pointer.
   const load = useCallback(async () => {
-    setLoading(true);
     setError(null);
     try {
-      setScripts(await sendBg<UserScript[]>('scripts:list', { includeRemoved: showTrash }));
+      setScripts(await sendBg<ManagerScript[]>('scripts:list', { includeRemoved: showTrash }));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -108,6 +123,18 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
     setSelected(new Set());
   }, [filter, showTrash, query]);
 
+  // Escape leaves selection mode, as in every list that has one. Dialogs own
+  // their own Escape, so the selection survives cancelling a batch confirm.
+  const selecting = selected.size > 0;
+  const dialogOpen = urlOpen || pending !== null;
+  useEffect(() => {
+    if (!selecting || dialogOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.defaultPrevented) setSelected(new Set());
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [dialogOpen, selecting]);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -144,7 +171,7 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
     if (filter === 'updates' && !loading && counts.updates === 0) setFilter('all');
   }, [counts.updates, filter, loading]);
 
-  const toggle = async (script: UserScript, enabled: boolean) => {
+  const toggle = async (script: ManagerScript, enabled: boolean) => {
     const previous = scripts;
     setScripts((prev) =>
       prev.map((item) =>
@@ -165,7 +192,7 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
     }
   };
 
-  const remove = async (script: UserScript) => {
+  const remove = async (script: ManagerScript) => {
     try {
       await sendBg('scripts:delete', { uuid: script.uuid });
       toast({ title: t('scripts.movedToTrash'), description: script.name, variant: 'success' });
@@ -175,7 +202,7 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
     }
   };
 
-  const purge = async (script: UserScript) => {
+  const purge = async (script: ManagerScript) => {
     try {
       await sendBg('scripts:purge', { uuid: script.uuid });
       await load();
@@ -184,7 +211,7 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
     }
   };
 
-  const restore = async (script: UserScript) => {
+  const restore = async (script: ManagerScript) => {
     try {
       await sendBg('scripts:restore', { uuid: script.uuid });
       await load();
@@ -259,7 +286,7 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
     }
   };
 
-  const openUpdate = (script: UserScript) => {
+  const openUpdate = (script: ManagerScript) => {
     if (!script.pendingInstallToken) return;
     void chrome.tabs.create({
       url: `${chrome.runtime.getURL('install.html')}?token=${script.pendingInstallToken}`,
@@ -308,7 +335,6 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
   const header = (
     <PageHeader
       title={t('scripts.title')}
-      description={t('scripts.description')}
       actions={
         <>
           <Button size="default" onClick={() => onOpenEditor('new')}>
@@ -427,17 +453,18 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
         </div>
       )}
 
-      <div className="mt-3 overflow-hidden rounded-card border border-border bg-card">
+      <div className="mt-3 rounded-card border border-border bg-card p-1 shadow-surface">
         {loading ? (
           <div>
             {[0, 1, 2, 3].map((index) => (
-              <div key={index} className={`${ROW_GRID} border-b border-border px-3 py-3 last:border-b-0`}>
-                <Skeleton className="h-4 w-4" />
+              <div key={index} className={cn(ROW_GRID, 'px-2.5 py-2')}>
+                <Skeleton className="h-7 w-7 rounded-[7px]" />
                 <div className="min-w-0 space-y-1.5">
                   <Skeleton className="h-3.5 w-2/5" />
                   <Skeleton className="h-2.5 w-3/5" />
                 </div>
-                <Skeleton className="h-4 w-8" />
+                <Skeleton className="hidden h-2.5 w-12 sm:block" />
+                <Skeleton className="h-4 w-7 rounded-full" />
               </div>
             ))}
           </div>
@@ -468,27 +495,27 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
             }
           />
         ) : (
-          <>
-            <div
-              className={`${ROW_GRID} border-b border-border px-3 py-1.5 text-2xs font-medium uppercase tracking-wider text-muted-foreground`}
-            >
-              <Checkbox
-                checked={allSelected}
-                indeterminate={someSelected}
-                onCheckedChange={toggleAll}
-                label={t('scripts.selectAll')}
-              />
-              <span className="min-w-0 truncate">{t('common.name')}</span>
-              <span className="hidden text-right sm:block">{t('scripts.lastUpdated')}</span>
-              <span className="hidden text-right sm:block">{t('common.actions')}</span>
-            </div>
-
-            <div>
-              {filtered.map((script) => (
+          // No column header: every cell explains itself (identity, name, time,
+          // switch), and "select all" lives in the batch bar, the one place a
+          // selection is acted on.
+          <AnimatePresence initial={false}>
+            {filtered.map((script) => (
+              <motion.div
+                key={script.uuid}
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={
+                  filtered.length > ROW_MOTION_LIMIT
+                    ? { duration: 0 }
+                    : { duration: 0.2, ease: [0.16, 1, 0.3, 1] }
+                }
+                className="overflow-hidden"
+              >
                 <ScriptRow
-                  key={script.uuid}
                   script={script}
                   selected={selected.has(script.uuid)}
+                  selecting={selecting}
                   onSelect={() => toggleOne(script.uuid)}
                   onToggle={(enabled) => void toggle(script, enabled)}
                   onOpen={() => onOpenEditor(script.uuid)}
@@ -497,25 +524,34 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
                   onDelete={() => setPending({ kind: 'delete', script })}
                   onPurge={() => setPending({ kind: 'purge', script })}
                   locale={i18n.language}
+                  now={now}
                 />
-              ))}
-            </div>
-          </>
+              </motion.div>
+            ))}
+          </AnimatePresence>
         )}
       </div>
 
       {/* Batch bar: appears only with a selection, and occupies the bottom edge
-          where the pointer already is after dragging across rows. */}
+          where the pointer already is after dragging across rows. It carries
+          the master checkbox, so selecting everything is one more click from
+          the first selection rather than a header nobody else needs. */}
       <AnimatePresence>
-        {selected.size > 0 && (
+        {selecting && (
           <motion.div
             initial={{ y: 16, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 16, opacity: 0 }}
             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            className="sticky bottom-3 z-30 mx-auto mt-3 flex w-fit max-w-full flex-wrap items-center gap-1.5 rounded-card border border-border bg-popover px-2 py-1.5 shadow-elev3"
+            className="sticky bottom-3 z-30 mx-auto mt-3 flex w-fit max-w-full flex-wrap items-center gap-1 rounded-card border border-border bg-popover py-1 pl-1 pr-1.5 shadow-elev3"
           >
-            <span className="px-1.5 text-xs tabular-nums text-muted-foreground">
+            <Checkbox
+              checked={allSelected}
+              indeterminate={someSelected}
+              onCheckedChange={toggleAll}
+              label={t('scripts.selectAll')}
+            />
+            <span className="pr-1.5 text-xs tabular-nums text-muted-foreground">
               {t('scripts.selected', { count: selected.size })}
             </span>
             <span className="mx-0.5 h-5 w-px bg-border" aria-hidden="true" />
@@ -600,6 +636,7 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
 function ScriptRow({
   script,
   selected,
+  selecting,
   onSelect,
   onToggle,
   onOpen,
@@ -608,9 +645,12 @@ function ScriptRow({
   onDelete,
   onPurge,
   locale,
+  now,
 }: {
-  script: UserScript;
+  script: ManagerScript;
   selected: boolean;
+  /** Any row is selected: every row shows its checkbox, not just the hovered one. */
+  selecting: boolean;
   onSelect: () => void;
   onToggle: (enabled: boolean) => void;
   onOpen: () => void;
@@ -619,41 +659,63 @@ function ScriptRow({
   onDelete: () => void;
   onPurge: () => void;
   locale: string;
+  now: number;
 }) {
   const { t } = useTranslation();
   const removed = Boolean(script.removedAt);
+  const off = removed || !script.enabled;
   const effective = mergeMetadata(script.metadata, script.selfMetadata);
   const matches = [...(effective.match ?? []), ...(effective.include ?? [])];
 
   return (
     <div
-      className={`${ROW_GRID} group relative border-b border-border px-3 py-2.5 transition-colors duration-100 last:border-b-0 hover:bg-muted/40 ${
-        selected ? 'bg-primary/[0.06]' : ''
-      }`}
+      className={cn(
+        ROW_GRID,
+        'group relative rounded-control px-2.5 py-2 transition-colors duration-100 ease-standard',
+        selected ? 'bg-primary/[0.07]' : 'hover:bg-accent/60',
+      )}
     >
-      <Checkbox
-        checked={selected}
-        onCheckedChange={onSelect}
-        label={script.name}
-        className="relative z-10"
-      />
+      {/* The leading slot is the script's identity until the row is about to be
+          selected: under the pointer, on keyboard focus, or while any selection
+          exists, the icon hands its place to the checkbox. The checkbox comes
+          first in the DOM so the icon can react to its focus (`peer`). */}
+      <div className="relative h-7 w-7">
+        <Checkbox
+          checked={selected}
+          onCheckedChange={onSelect}
+          label={script.name}
+          className={cn(
+            'peer absolute inset-0 z-10 transition-opacity duration-100 ease-standard',
+            selecting ? 'opacity-100' : 'opacity-0 focus-visible:opacity-100 group-hover:opacity-100',
+          )}
+        />
+        <ScriptIcon
+          src={script.iconUrl}
+          size="md"
+          dimmed={off}
+          className={cn(
+            'transition-opacity duration-100 ease-standard',
+            selecting ? 'opacity-0' : 'group-hover:opacity-0 peer-focus-visible:opacity-0',
+          )}
+        />
+      </div>
 
       <button
         type="button"
         onClick={onOpen}
         disabled={removed}
-        className="min-w-0 text-left disabled:cursor-default"
+        className="min-w-0 rounded-sm text-left disabled:cursor-default"
       >
-        <span className="flex min-w-0 items-center gap-1.5">
+        <span className="flex min-w-0 items-center gap-2">
           <span
-            className={`min-w-0 truncate text-sm font-medium ${
-              removed || !script.enabled ? 'text-muted-foreground' : 'text-foreground'
-            }`}
+            className={cn(
+              'min-w-0 truncate text-sm font-medium',
+              off ? 'text-muted-foreground' : 'text-foreground',
+            )}
             title={script.name}
           >
             {script.name}
           </span>
-          {script.version && <Badge variant="outline">v{script.version}</Badge>}
           {script.updateState === 'update-available' && (
             <Badge variant="accent">{t('scripts.updateAvailable')}</Badge>
           )}
@@ -661,10 +723,15 @@ function ScriptRow({
           {!removed && script.pendingReview && (
             <Badge variant="warning">{t('scripts.pendingReview')}</Badge>
           )}
-          {!removed && !script.enabled && <Badge variant="default">{t('common.disabled')}</Badge>}
         </span>
         <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-2xs text-muted-foreground">
-          <span className="truncate">{script.namespace || t('scripts.noSource')}</span>
+          {script.version && (
+            <>
+              <span className="shrink-0 tabular-nums">v{script.version}</span>
+              <span aria-hidden="true">·</span>
+            </>
+          )}
+          <span className="min-w-0 truncate">{script.namespace || t('scripts.noSource')}</span>
           <span aria-hidden="true">·</span>
           <span className="shrink-0 tabular-nums">{formatBytes(script.codeSize)}</span>
           <span aria-hidden="true" className="hidden sm:inline">
@@ -682,10 +749,10 @@ function ScriptRow({
       </button>
 
       <span
-        className="hidden truncate text-right text-2xs tabular-nums text-muted-foreground sm:block"
-        title={formatDateTime(script.updatedAt, locale)}
+        className="hidden whitespace-nowrap text-right text-2xs tabular-nums text-muted-foreground sm:block"
+        title={t('scripts.updatedAt', { time: formatDateTime(script.updatedAt, locale) })}
       >
-        {formatDateTimeShort(script.updatedAt, locale)}
+        {formatRelativeTime(script.updatedAt, locale, now)}
       </span>
 
       <div className="flex items-center justify-end gap-1">
@@ -697,46 +764,46 @@ function ScriptRow({
             aria-label={`${t('scripts.toggle')}: ${script.name}`}
           />
         )}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="iconSm"
-              aria-label={t('common.actions')}
-              className="opacity-60 group-hover:opacity-100"
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            {removed ? (
-              <>
-                <DropdownMenuItem onClick={onRestore}>
-                  <RotateCcw />
-                  {t('scripts.restore')}
-                </DropdownMenuItem>
-                <DropdownMenuItem destructive onClick={onPurge}>
-                  <Trash2 />
-                  {t('scripts.purge')}
-                </DropdownMenuItem>
-              </>
-            ) : (
-              <>
-                <DropdownMenuItem onClick={onOpen}>{t('scripts.edit')}</DropdownMenuItem>
-                {script.updateState === 'update-available' && script.pendingInstallToken && (
-                  <DropdownMenuItem onClick={onReviewUpdate}>
-                    {t('scripts.reviewUpdate')}
+        {/* Row actions surface with the row: under the pointer, on focus, and
+            for as long as their menu is open. Without a hovering pointer
+            (touch) there is nothing to surface them, so they stay visible. */}
+        <div className="opacity-0 transition-opacity duration-100 ease-standard focus-within:opacity-100 group-hover:opacity-100 has-[[data-state=open]]:opacity-100 [@media(hover:none)]:opacity-100">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="iconSm" aria-label={t('common.actions')}>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              {removed ? (
+                <>
+                  <DropdownMenuItem onClick={onRestore}>
+                    <RotateCcw />
+                    {t('scripts.restore')}
                   </DropdownMenuItem>
-                )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem destructive onClick={onDelete}>
-                  <Trash2 />
-                  {t('scripts.delete')}
-                </DropdownMenuItem>
-              </>
-            )}
-          </DropdownMenuContent>
-        </DropdownMenu>
+                  <DropdownMenuItem destructive onClick={onPurge}>
+                    <Trash2 />
+                    {t('scripts.purge')}
+                  </DropdownMenuItem>
+                </>
+              ) : (
+                <>
+                  <DropdownMenuItem onClick={onOpen}>{t('scripts.edit')}</DropdownMenuItem>
+                  {script.updateState === 'update-available' && script.pendingInstallToken && (
+                    <DropdownMenuItem onClick={onReviewUpdate}>
+                      {t('scripts.reviewUpdate')}
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem destructive onClick={onDelete}>
+                    <Trash2 />
+                    {t('scripts.delete')}
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </div>
   );

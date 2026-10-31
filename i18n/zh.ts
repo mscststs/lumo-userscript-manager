@@ -83,6 +83,8 @@ export const zh: TranslationSchema = {
       about: '关于',
       collapse: '收起侧栏',
       expand: '展开侧栏',
+      label: '导航',
+      unreadErrors: '{{label}}，{{count}} 条未读错误',
     },
     general: {
       title: '通用',
@@ -92,7 +94,6 @@ export const zh: TranslationSchema = {
     },
     appearance: {
       title: '外观',
-      description: '统一设置所有扩展页面的主题、语言与界面缩放。',
       mode: '外观模式',
       modeHint: '选择浅色、深色，或跟随操作系统。',
       modeLight: '浅色',
@@ -135,7 +136,6 @@ export const zh: TranslationSchema = {
     },
     about: {
       title: '关于',
-      description: '此扩展的构建信息。',
       intro:
         '一个 Chrome 原生的用户脚本管理器：安装、编辑、启停与更新都在浏览器内完成，数据只保存在本机。',
       openExtensions: '扩展设置',
@@ -150,7 +150,6 @@ export const zh: TranslationSchema = {
   },
   scripts: {
     title: '脚本',
-    description: '安装、编辑并管理所有用户脚本。',
     new: '新建脚本',
     import: '导入',
     importUrl: '从 URL',
@@ -184,13 +183,13 @@ export const zh: TranslationSchema = {
     toggle: '启用/禁用脚本',
     tags: '标签',
     matches: '匹配',
-    lastUpdated: '更新时间',
     selected: '已选择 {{count}} 个',
     batchEnable: '启用',
     batchDisable: '禁用',
     batchDelete: '删除',
     clearSelection: '清除',
     selectAll: '全选',
+    updatedAt: '更新于 {{time}}',
     created: '创建时间',
     namespace: '命名空间',
     noSource: '本地脚本',
@@ -310,7 +309,6 @@ export const zh: TranslationSchema = {
   },
   settings: {
     title: '设置',
-    description: '运行时、注入与数据偏好。',
     sections: {
       general: '通用',
       updates: '更新',
@@ -441,7 +439,6 @@ export const zh: TranslationSchema = {
   },
   logs: {
     title: '日志',
-    description: '捕获用户脚本的控制台输出与错误。',
     empty: '暂无日志。',
     clear: '清空日志',
     clearConfirm: '清空所有日志？',
@@ -452,7 +449,6 @@ export const zh: TranslationSchema = {
   },
   install: {
     title: '安装脚本',
-    subtitle: '安装前先确认将运行什么。',
     fetching: '正在获取脚本…',
     installing: '正在安装…',
     errorTitle: '安装失败',
@@ -466,6 +462,7 @@ export const zh: TranslationSchema = {
     noNetwork: '无额外网络访问',
     none: '无',
     count: '{{count}} 个文件',
+    lines: '{{count}} 行',
     allPages: '所有页面',
     codePreview: '代码预览',
     enableAfter: '安装后启用',

@@ -73,6 +73,13 @@ export const storage = {
       field.normalize ? field.normalize(requests) : requests,
     );
   },
+  // ----- Log view pointer -----
+  async getLogsSeenAt(): Promise<number> {
+    return getField('logsSeenAt');
+  },
+  async setLogsSeenAt(time: number): Promise<void> {
+    await setField('logsSeenAt', time);
+  },
 
   // ----- Export / Import (driven by registry) -----
 

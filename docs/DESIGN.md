@@ -33,7 +33,7 @@
 5. 文本对比度：正文/元数据 ≥ 4.5:1，大字 ≥ 3:1，禁用态豁免但不得低于 3:1。
 6. 标签允许换行/换行到下一行，**控件不允许把标签挤成省略号**。
 7. 任何加载态必须有与最终内容**同高**的骨架，禁止布局跳动。
-8. 长列表的页面标题吸顶；滚动容器独立，避免标题随内容消失。
+8. 页头固定在内容面板顶部，滚动只发生在页头下方的页体里；标题永远不随内容滚走。
 9. 颜色只从语义令牌取；组件内不出现十六进制、`rgb()`、`hsl()` 字面量。
 10. 动画时长 90–240ms；`prefers-reduced-motion` 下全部降为 1ms。
 
@@ -50,9 +50,9 @@
 | `text-2xs` | 11 | 16px | 元数据、时间戳、徽标、键帽 |
 | `text-xs` | 12 | 18px | 辅助说明、次级按钮、日志正文 |
 | `text-sm` | 13 | 20px | **正文默认**、列表标题、控件文字 |
-| `text-base` | 15 | 23px | 强调正文、对话框标题 |
-| `text-lg` | 17 | 24px | 品牌名、卡片大标题 |
-| `text-xl` | 20 | 26px | 页面标题（唯一） |
+| `text-base` | 15 | 23px | **页面标题**（单行页头）、强调正文、对话框标题 |
+| `text-lg` | 17 | 24px | 卡片大标题（安装页脚本名、关于页品牌名） |
+| `text-xl` | 20 | 26px | 保留，当前不使用 |
 | `text-2xl` | 24 | 30px | 保留，仅空态插画标题可用 |
 
 阶梯近似 1.125–1.2 的模数（Bringhurst 的 modular scale），并额外插入 11px 一档：脚本管理器里「大小 / 版本 / 时间」必须能读，但不能与名称竞争。
@@ -204,7 +204,8 @@ DARK_THEME_OPTIONS  = dark | midnight
 新增**亮色**调色板（目前只有 Paper）：
 
 1. `types/index.ts` 扩展 `ResolvedTheme`；
-2. `theme-registry.ts` 增加定义（TypeScript 强制补 label/description/swatch）；
+2. `theme-registry.ts` 增加定义（TypeScript 强制补 label/description/swatch；swatch 的
+   `frame` / `background` / `surface` / `foreground` 由测试钉死到对应的 CSS 令牌）；
 3. `globals.css` 增加 `[data-theme="…"]` 块，必须重声明全部 `--color-*`；
 4. 在 `resolveTheme` 的 light 分支里可选；
 5. `public/theme-preload.js` **不需要改**（只认镜像我）；
@@ -255,14 +256,24 @@ DARK_THEME_OPTIONS  = dark | midnight
 | `shadow-elev2` | Popover / Dropdown / Tooltip / Toast |
 | `shadow-elev3` | Dialog、批量操作条 |
 
-阴影通过 `@utility` 读取运行时变量，因此暗色可以替换为更硬的落影（软灰色阴影在近黑表面上不可见）。
+`elev*` 之下还有四档**静置材质**（不是层级，没有东西在“浮起”，只是光从上方来）：
+
+| Token | 用途 | 亮色 | 暗色 |
+| --- | --- | --- | --- |
+| `shadow-surface` | 静置在面板上的卡片、分组列表 | 极轻接触阴影 | 1px 顶部高光 |
+| `shadow-panel` | Options 内容面板（静置在窗口框上） | 接触阴影 + 柔和环境阴影 | 顶部高光 + 紧落影 |
+| `shadow-control` | outline 按钮 | 极轻接触阴影 | 顶部高光 |
+| `shadow-button` | 实心按钮（primary / destructive） | 顶部受光边 + 接触阴影 | 更亮的受光边 + 深落影 |
+
+阴影通过 `@utility` 读取运行时变量，因此暗色可以替换为更硬的落影或顶部高光（软灰色阴影在近黑表面上不可见）。
+注意：这些 utility 会整体覆盖 `box-shadow`，与 `ring-*` 互斥；需要描边时用 `border`。
 
 层级约定：
 
 | z | 层 |
 | --- | --- |
-| 10 | 行内浮层（下拉菜单触发） |
-| 20 | 吸顶页头 |
+| 10 | 行内浮层、吸顶的日志日期标题 |
+| 20 | 安装页顶栏 |
 | 30 | 批量操作条 |
 | 50 | Dialog / Popover portal |
 | 70 | Toast |
@@ -289,7 +300,11 @@ DARK_THEME_OPTIONS  = dark | midnight
 | Popover | 按 `data-side` 从触发方向位移 4px + 缩放 .985 | 空间关系可读 |
 | Toast | 底部上移 8px + 淡入；列表用 `layout` 推动 | 出现不遮挡主内容 |
 | 折叠 | 高度 + 透明度；`ease-standard` | 关闭时高度归零，后续元素上移 |
-| 导航指示器 | motion `layoutId` + spring(520, 40) | 一个物体滑动，而非两个按钮闪烁 |
+| 导航指示器 | motion `layoutId` + spring(560, 44) | 侧栏选中是一枚凸起芯片（同分段滑块），在行间滑动而非两个按钮闪烁 |
+| 分节下划线 | `SectionNav` 的 `layoutId` 下划线 + spring(520, 40) | 下划线滑动，内容区即时切换 |
+| 列表增删 | 行高度 + 透明度 200ms（`ease-emphasis`），`AnimatePresence initial={false}` | 消失的行收起高度，下方行被平滑推上来；>80 行时降为 0ms，避免一次几百个高度动画 |
+| 行内显隐 | 透明度 100ms | 勾选框替换图标、行菜单浮现：高频微交互只用最短最轻的过渡 |
+| 安装页状态 | 透明度 + 6px 位移 180ms，`mode="wait"` | 加载 → 审阅 → 结果是整页级切换，只做一次短暂的落定 |
 | 页面切换 | 无动效（同步提交路由） | 切换必须是即时硬切：旧页不得以快照形式盖在新页上 |
 | 批量条 | 从底部 16px 推入 | 与「从底部出现」的方向一致 |
 
@@ -314,6 +329,8 @@ DARK_THEME_OPTIONS  = dark | midnight
 | `link` | 正文内跳转 | 透明 | `primary` |
 
 尺寸：`xs` 24 / `sm` 28 / `default` 32 / `lg` 40 / `icon` 32×32 / `iconSm` 28×28。
+材质：实心按钮带 `shadow-button`（顶部受光边 + 接触阴影），读作一枚实体按键而不是一块色块；
+outline 带更安静的 `shadow-control`；ghost 无阴影。
 状态：`hover` 背景过渡 150ms；`active` `scale(0.98)`；`disabled` opacity 45% 且 `pointer-events: none`；`focus-visible` 全局 2px ring + 2px offset。
 
 ### 6.2 表单控件
@@ -341,20 +358,31 @@ DARK_THEME_OPTIONS  = dark | midnight
 
 两者形状必须不同：同形不同义会让用户必须先读文字才能预判点击后果。筛选与偏好
 都可以是“原地选择”，但**页面级分区永远是 tab**，且绝不放进页头 `actions` 槽
-（那里只放动作）。tab 条放进吸顶页头时传 `-mb-3.5`，让选中下划线正好压在页头分隔线上。
+（那里只放动作）。tab 条作为页头的第二行直接放进 `PageLayout` 的 `header`，组件自带
+`-mb-px`，选中下划线正好压在页头分隔线上；下划线是一个 `layoutId` 物体，在 tab 间滑动。
+所有 tab 恒为 `font-medium`，选中只改颜色，不改字重（否则标签变宽、挤动邻居）。
 
 ### 6.4 容器
 
-- `PageLayout`：**页框恒为 100% 宽**，页头与内容之间的横线、毛玻璃背景贯穿整个窗口；
-  只有内容列受 `width` 档位约束。横线在 74rem 处截断会被读成卡片边缘，而不是应用骨架。
+- **Options 外壳（内嵌面板）**：窗口本身是框（`bg-sidebar`），侧栏与之同色、无右边框；
+  页面放在一块凸起的内容面板里（`my-2 mr-2 rounded-card border-border/70 bg-background
+  shadow-panel`）。导航因此读作窗口的一部分，而不是与内容争夺注意力的第二个窗格。
+  面板本身不滚动，圆角与页头始终不动。
+- `PageLayout`：页头是面板顶部的**固定栏**，页体是其下方独立的滚动容器。滚动条只出现
+  在页头下方，所以页头分隔线贯穿整块面板，不会在滚动条槽处断开。
   - `width="full"`：代码编辑器，独占整幅。
   - `width="content"`（默认）：列表 / 表格，74rem。
   - `width="form"`：设置与元数据表单，48rem（标签与控件保持一次眼动之内）。
-  - 页头内容与内容列共用同一档位（同左内边距），左边缘永远对齐；需要切 tab 不变的
-    页面（编辑器）把页框设为 `full`，由面板自己在内部收窄到 48rem。
-- `Card`（flat）：边框 + `card` 表面。设置分组、列表容器默认用它。
+  - 页头内容与内容列共用同一档位（同左内边距），左边缘永远对齐。
+  - `scroll={false}`：页体变成填满面板的 flex 列，由页面自己管理滚动区域（编辑器）。
+- `PageHeader`：**单行** —— `leading`（返回 / 身份图标）+ 标题（`text-base` 600）+ `meta`
+  （版本、状态徽标）+ 右侧 `actions`。没有描述槽：导航已经说明位置，内容已经说明用途，
+  复述它们的一句话正是 §0 要消灭的提示文本。窄宽度下动作换到第二行，标题不被挤压。
+- `Card`（flat）：边框 + `card` 表面 + `shadow-surface`。设置分组、列表容器默认用它。
 - `Card`（elevated）：+ `elev1`。仅用于悬浮在页面之上的独立内容。
-- `SettingsGroup`：小号大写标题 + 一列用 `divide-y` 分隔的 `SettingRow`。分组宽度受限（≤74rem 内容区）。
+- `SettingsGroup`：`text-sm` 600 标题（不再是 11px 大写眉标——对 CJK 无意义，还会让中文标题
+  成为页面最小的字）+ 一列 `divide-border/70` 分隔的 `SettingRow`，表面带 `shadow-surface`。
+  运行时状态等非表单内容也用分组承载（状态徽标放在分组的 `action` 槽），不另起一套卡片结构。
 - `SettingRow`：标签 + 说明在左（`basis-52`），控件在右；空间不足时整行换行，**控件换行而不是标签截断**。
 
 ### 6.5 反馈
@@ -370,21 +398,32 @@ DARK_THEME_OPTIONS  = dark | midnight
 脚本行是产品的核心单元：
 
 ```
-[switch] [名称 · 版本 · 徽标]        [版本] [更新时间] [switch][菜单]
-         [命名空间 · 大小 · @match]
-         [错误行（如有）]
+[图标|勾选] [名称 · 徽标]                         [相对时间] [switch][⋯]
+            [版本 · 命名空间 · 大小 · @match]
+            [错误行（如有）]
 ```
 
-- 整行 hover `muted/40`；选中行 `primary/6`。
-- 行内动作只保留 `⋯` 一个入口。脚本的启用状态只影响**下一次页面加载**；本产品不
-  提供“手动补注入”，避免同一脚本在同一页执行两次（对非幂等脚本有破坏性）。
-- 行内动作默认 60% 不透明度，hover 100%（降低视觉噪音，但保持可发现）。
-- 列宽由**同一个 grid 模板**驱动表头与行，禁止两套 flex 布局。
+- **没有表头**：每个单元格自解释（身份、名称、时间、开关），表头只是第二行装饰。
+- 列表容器 `rounded-card border bg-card p-1 shadow-surface`；行是内缩的 `rounded-control`
+  块，hover `accent/60`，选中 `primary/7`。行之间不画分隔线。
+- 首列是 28px 的**身份图标**（`ScriptIcon md`）。指针悬停、键盘聚焦勾选框、或已存在
+  任何选择时，图标位让位给勾选框（Gmail / Linear 模式）；一旦进入多选，所有行都显示勾选框。
+- 「全选」在批量条里（主勾选框，支持 `mixed`），批量条只在有选择时存在；`Esc` 退出多选。
+- 时间列显示相对时间（「3 天前」），完整时间放在 `title`；`<sm` 时隐藏。
+- 行内动作只保留 `⋯` 一个入口：随行浮现（hover / focus / 菜单打开期间常显），无悬停能力的
+  设备（`hover: none`）上常显。脚本的启用状态只影响**下一次页面加载**；本产品不提供
+  “手动补注入”，避免同一脚本在同一页执行两次（对非幂等脚本有破坏性）。
+- 禁用状态由三处共同表达：图标斜线、名称变灰、开关；不再额外挂「已禁用」徽标。
+- 骨架与行使用**同一个 grid 模板**，禁止两套布局。
 
 ### 6.7 代码
 
 - CodeMirror 主题按 `.dark` 切换（github light/dark）；容器背景 `--color-code-bg`。
-- Shiki 输出同时带 `--shiki-dark`，由 `.dark` 覆盖。
+- 只读代码统一用 `components/code/CodeView.tsx`（Shiki）：细粒度动态导入（`shiki/core` +
+  JavaScript 正则引擎，无 WASM，仅 javascript / json 两种语法与 github 两套主题），从不显示
+  代码的页面不付出成本。输出同时带 `--shiki-dark`，由 `.dark` 覆盖，切主题无需重新分词。
+  语法加载前以同样的行结构画无高亮文本，切换为彩色时高度不变；行号由 CSS 计数器绘制
+  （`data-line-numbers`），复制时只得到代码本身。超过 2000 字符的行停止分词。
 - 代码字号继承 `--font-mono` 与 rem 缩放。
 - `Mod+S`（macOS ⌘S / 其它 Ctrl+S）保存当前主操作：代码 tab 保存脚本，元数据 tab
   在有未保存覆盖时保存覆盖。快捷键用 `Kbd` 显示在对应按钮的 tooltip 里——按键是
@@ -397,13 +436,16 @@ DARK_THEME_OPTIONS  = dark | midnight
 
 | 项 | 值 | 理由 |
 | --- | --- | --- |
-| 图块 | 20px，`rounded-[5px]`，底 `muted` | 与 40px 行高同节奏，命中区不变 |
-| 位图内核 | `inset-[2px]`（16px），`rounded-[3px]`，`object-contain` | 实心色块的视觉重量高于线性 glyph，必须比兜底图标的外接盒更大但比值更小 |
+| 尺寸 | `sm` 20px（popup 行）/ `md` 28px（脚本列表、编辑器页头）/ `lg` 48px（安装页） | 三档同一几何：圆角 ≈ 25%，位图内核 ≈ 70% |
+| 图块 | `sm` 20px `rounded-[5px]`，底 `muted` | 与 40px 行高同节奏，命中区不变 |
+| 位图内核 | `sm` `inset-[3px]`（14px）/ `md` `inset-[4px]` / `lg` `inset-[7px]`，`object-contain` | 实心色块的视觉重量高于线性 glyph，必须比兜底图标的外接盒更大但比值更小 |
 | 兜底 | `FileCode2` 12px，常驻底层 | 缺失、解码中、加载失败三种状态都不会出现空白块 |
 | 入场 | 位图 `onLoad` 后 150ms 淡入 | 用状态而非占位骨架表达「图已经到位」 |
 | 禁用态 | 图块画斜线（tile 色 4.5px 底衬 + `foreground/70` 1.75px 线），图 `grayscale` + 55% 不透明 | 14px 的淡化几乎不可见；斜线是产品里既有的「关闭」词汇，且在彩色、浅色、透明图标上都可读 |
 | 缓存 | IndexedDB `icons`，data URL，≤192KB，TTL 30 天，失败 6 小时退避 | 打开 popup 不付出网络往返；`chrome.storage.local` 只放有界小数据 |
 
+管理页通过 `scripts:list` / `scripts:getDetail` 拿到 `iconUrl`（`ManagerScript`），
+与 popup 走同一个解析函数；备份导出与更新检查走不读图标缓存的 `getAllScripts`。
 后台在安装、保存元数据与 popup 首次请求时预热缓存（`lib/background/icons.ts`），
 因此第一行渲染就能拿到已解码的 data URL；未命中时先画兜底并显示远程地址，
 缓存落地后下一次打开即是本地图。
@@ -445,10 +487,10 @@ Chrome 在每次新文档 commit 时清空该 tab 的角标，因此 commit 时�
 
 | 场景 | 行为 |
 | --- | --- |
-| Options 导航 | `<768px` 固定 56px 图标栏；`≥768px` 224px，可折叠到 56px |
-| Options 内容 | 页框 100% 宽；内容列按 `PageLayout.width` 取 `full` / 74rem / 48rem；内边距 20px → 28px |
+| Options 导航 | `<768px` 固定 56px 图标栏（底栏隐藏，日志角标退化为红点）；`≥768px` 224px，可折叠到 56px |
+| Options 内容 | 内容面板四周留 8px 露出窗口框；内容列按 `PageLayout.width` 取 `full` / 74rem / 48rem；内边距 20px → 28px |
 | 设置项 | 标签 `basis-52`，控件 `shrink-0`；不足则换行 |
-| 脚本行 | 移动端 3 列（勾选/主体/动作），`sm` 起 5 列 |
+| 脚本行 | `<sm` 3 列（图标/主体/动作），`sm` 起 4 列（+ 相对时间） |
 | Popup | 固定 360px 宽；高度 `max-h-600px`，列表在内部滚动；行高 40px、全宽 hover 底色 |
 | 编辑器 | 单列 tab；代码面满幅无内边距，表单面在面板内收窄到 48rem |
 
@@ -459,8 +501,8 @@ Chrome 在每次新文档 commit 时清空该 tab 的角标，因此 commit 时�
 
 ### 7.3 HiDPI
 
-- 图标使用矢量（lucide），不依赖位图。唯一的位图是脚本身份图标（用户 `@icon`
-  提供的 favicon）：它限制在 20px 容器的 16px 内核里渲染，矢量兜底常驻其下，
+- 图标使用矢量（lucide），不依赖位图。品牌标记是 `assets/logo.svg`（`BrandMark`）。唯一的
+  位图是脚本身份图标（用户 `@icon` 提供的 favicon）：它限制在图块的 ≈70% 内核里渲染，矢量兜底常驻其下，
   因此任何缩放/缺失都不会留下空白方块。
 - 1px 边框保持逻辑 1px，通过颜色差而非宽度表达边界。
 - 阴影在 2x 下不会变模糊到消失（暗色使用更紧的落影）。
@@ -558,26 +600,49 @@ Popup 与浏览器自带的扩展面板同构：**一张 40px 行高的平铺列
 ### 10.2 Options
 
 ```
-[导航 56/224px] [──────── 内容 ────────]
-                 吸顶页头：标题 + 描述 + 页面动作
-                 内容（≤74rem）
+┌ 窗口框（bg-sidebar）──────────────────────────────────────────────┐
+│ [logo] Lumo Userscripts  ┌ 内容面板（bg-background · shadow-panel）┐ │
+│ ▣ 脚本    ← 凸起芯片      │ 标题 · meta               [页面动作]    │ │
+│ ⚙ 设置                    │ [分节 tab（如有）]                      │ │
+│ ◐ 外观                    ├────────────────────────────────────────┤ │
+│ ≡ 日志        [2]         │ 页体（独立滚动，≤74rem / 48rem）        │ │
+│ ⓘ 关于                    │                                        │ │
+│ v0.1.0             [⇤]    └────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────┘
 ```
+
+- 侧栏：品牌行用真实 logo（`BrandMark`）+ 英文字标；选中项是 `layoutId` 凸起芯片；
+  底栏是版本号（链接到源码仓库）+ 折叠按钮，折叠后只留按钮。
+- 日志角标：自上次看过日志页以来新增的 **error** 条数（`logs:unread`）。「看过」是
+  `chrome.storage.local` 里的一个时间戳 `logsSeenAt`（有界、不导出），日志页每次加载
+  后推进到最新一条的时间；后台写日志后以 1 秒合并窗口广播 `logs-changed`。为 0 时不渲染，
+  正在日志页时不显示；图标栏形态下退化为红点。
 
 | 路由 | 内容 |
 | --- | --- |
-| `#/scripts` | 页头动作槽只放**新建脚本 / 检查更新**；从 URL 与导入文件收进工具栏 `导入 ▾`。工具栏为搜索 + 筛选分段 + 导入 + 回收站开关，列表列宽一致，批量条贴底。备份属于全局数据，放在设置 → 数据 |
-| `#/logs` | 搜索 + 等级分段（带计数）+ 时间轴列表 |
-| `#/script/:uuid[/panel]` | 吸顶工具栏（返回 / 标题 / 保存 / 保存覆盖）+ 页签条；**代码 / 元数据 / 值 / 资源 / 信息** 各占整列。代码面满幅；表单面按功能分组（运行范围 / 执行 / 标识与存储 / 权限；值 / 资源 / 信息各成组），空输入即「继承源码声明」，占位符显示声明值，有覆盖时出现「恢复继承」 |
-| `#/settings/:section` | 通用 / 更新 / 数据 / 智能体；分区用**下划线标签**放在标题下方，不塞进页头动作槽。数据页分「概览 / 导出 / 恢复」三组：概览先给出脚本、回收站、值、资源与代码体积；导出显式区分 ZIP / JSON；恢复是拖放区 + 预览对话框（同名策略、是否恢复设置） + 结构化结果，不静默覆盖 |
-| `#/appearance` | 独立页面：外观模式、深色主题、主题色、语言与字号。表单列宽限制在 48rem |
-| `#/about` | 品牌卡 + 元数据 + 权限透明清单 |
+| `#/scripts` | 页头动作槽只放**新建脚本 / 检查更新**；从 URL 与导入文件收进工具栏 `导入 ▾`。工具栏为搜索 + 筛选分段 + 导入 + 回收站开关；列表无表头（§6.6），行首是脚本身份图标，批量条贴底并承载全选。动作只覆盖**脚本生命周期**，备份属于全局数据，放在设置 → 数据 |
+| `#/logs` | 搜索 + 等级分段（带计数）+ **按天分组**：日期标题吸顶（今天 / 昨天 / 10月28日 周三）并带条数；每条左侧等级图标，error / warn 另有前缘色条；今天的条目显示相对时间，更早的显示时钟时间，完整时间在 `title` |
+| `#/script/:uuid[/panel]` | 单行页头（返回 / 身份图标 / 名称 / 版本 / 未保存徽标 / 保存 · 保存覆盖）+ 页签条；**代码 / 元数据 / 值 / 资源 / 信息** 各占整列。代码面满幅；表单面按功能分组（运行范围 / 执行 / 标识与存储 / 权限；值 / 资源 / 信息各成组），空输入即「继承源码声明」，占位符显示声明值，有覆盖时出现「恢复继承」；值以 Shiki JSON 呈现 |
+| `#/settings/:section` | 通用 / 更新 / 数据 / 智能体；分区用**下划线标签**放在标题下方，不塞进页头动作槽；运行时状态是一个设置分组。数据页分「概览 / 导出 / 恢复」三组：概览先给出脚本、回收站、值、资源与代码体积；导出显式区分 ZIP / JSON；恢复是拖放区 + 预览对话框（同名策略、是否恢复设置） + 结构化结果，不静默覆盖 |
+| `#/appearance` | 外观模式与深色主题都用**同一种预览卡**（窗口缩略图：框 / 侧栏芯片 / 面板 / 主题色按钮，颜色取自主题注册表；「跟随系统」为浅深对角拼接），同一网格；主题色芯片选中态与侧栏芯片同形；语言与字号。表单列宽 48rem |
+| `#/about` | 品牌卡（真实 logo）+ 元数据 + 许可 |
 
-所有页面内容**左对齐**于导航栏，`max-w-[74rem]`；不再水平居中。表单页进一步收到
+所有页面内容**左对齐**于面板，`max-w-[74rem]`；不再水平居中。表单页进一步收到
 `max-w-3xl`，避免标签与控件相隔近千像素。
 
 ### 10.3 Install
 
-与 options 同一套 Card / Badge / Button / Dialog 规范；逐步展示：加载 → 摘要（权限/网络/运行范围/预览）→ 安装 → 成功。
+与 options 同一套 Card / Badge / Button / Checkbox 规范。页面只回答一个问题——「这个脚本将被允许做什么」，自上而下：
+
+1. 顶栏：logo + 字标 / 安装脚本 + 关闭。
+2. 身份卡：`ScriptIcon lg`（远程 `@icon`，失败即兜底）、名称、版本或「更新 vA → vB」、作者 · 命名空间、描述、来源。
+3. 能力清单：权限 / 网络 / 外部代码 / 运行范围，每行图标 + 固定标签列 + 值（芯片或「无」）。
+4. 警告：`warning` 色调提示块。
+5. 代码预览：折叠卡，标题行显示行数与大小；**展开时才挂载** Shiki（`CodeView`，带行号）。
+6. 决策条：浮动卡片（与列表批量条同一种「对眼前内容执行动作」的形态），粘在底边；
+   「安装后启用」用设计系统 Checkbox。
+
+状态：加载 → 与审阅同形的骨架；安装中 → 审阅保持在屏，按钮自身变为进度；成功 / 失败 → 结果卡（成功带脚本身份）。状态间切换见 §5.2。
 
 ---
 
@@ -589,7 +654,9 @@ Popup 与浏览器自带的扩展面板同构：**一张 40px 行高的平铺列
 - [ ] 所有按钮/输入有可访问名称，键盘可达
 - [ ] 加载态骨架与最终内容同高
 - [ ] 长文本在 360px / 56px 导航宽度下不破坏布局
-- [ ] 页框 100% 宽；内容列只用 `PageLayout.width` 收窄，不在页面里写 `max-w-*`
+- [ ] 页框填满内容面板；内容列只用 `PageLayout.width` 收窄，不在页面里写 `max-w-*`
+- [ ] 页头单行，不写描述句；分节 tab 作为页头第二行
+- [ ] 静置表面用材质令牌（`shadow-surface` / `shadow-control` / `shadow-button`），浮层才用 `elev*`
 - [ ] 枚举值同时展示翻译标签与 `rawValue`
 - [ ] 破坏性操作走 `ConfirmDialog`，默认焦点在取消
 - [ ] `prefers-reduced-motion` 下仍可用
@@ -606,8 +673,13 @@ Popup 与浏览器自带的扩展面板同构：**一张 40px 行高的平铺列
 | 应用/镜像/preload 契约 | `lib/theme.ts`、`public/theme-preload.js` |
 | 首帧流水线 | `lib/page-bootstrap.ts`、`lib/build/theme-preload-plugin.ts` |
 | 基础组件 | `components/ui/*` |
-| 页面骨架 | `components/layout/PageLayout.tsx`、`PageHeader.tsx`、`EmptyState.tsx` |
+| 页面骨架 | `components/layout/PageLayout.tsx`、`PageHeader.tsx`、`SectionNav.tsx`、`EmptyState.tsx` |
+| 品牌标记 / 脚本身份图标 | `components/brand/BrandMark.tsx`、`components/script/ScriptIcon.tsx` |
+| 只读代码高亮 | `components/code/CodeView.tsx` |
+| 相对时间 / 日分组 | `lib/format.ts`、`lib/use-now.ts` |
+| 后台事件（含 `logs-changed` 合并） | `lib/background/events.ts` |
 | Popup | `entrypoints/popup/App.tsx` |
 | Options 外壳与路由 | `entrypoints/options/App.tsx` |
 | Options 页面 | `entrypoints/options/{Scripts,Editor,Logs,Settings,AppearancePage,About}.tsx` |
+| 安装页 | `entrypoints/install/App.tsx` |
 | 对比度与主题守卫 | `tests/theme.test.ts`、`tests/design-tokens.test.ts` |

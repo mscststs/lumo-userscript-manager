@@ -17,6 +17,11 @@ import { opticalLabels } from '@/components/ui/optical';
  * WCAG 2.2 minimum, 44px is the touch ideal). Dense list rows use `sm`, which
  * still clears the minimum because the whole row is also clickable.
  *
+ * Solid fills carry `shadow-button`: a 1px lit top edge plus a contact shadow,
+ * so a primary action reads as a physical key rather than a coloured rectangle.
+ * Outline buttons get the quieter `shadow-control`. Both are theme tokens, so
+ * dark palettes swap the contact shadow for a highlight automatically.
+ *
  * Focus is not styled here — `:focus-visible` is global (see globals.css) so
  * keyboard users get the same ring on buttons, inputs, links and rows.
  */
@@ -30,13 +35,13 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-primary text-primary-foreground shadow-elev1 hover:bg-primary-hover',
+        default: 'bg-primary text-primary-foreground shadow-button hover:bg-primary-hover',
         secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/75',
         outline:
-          'border border-input bg-card text-foreground hover:border-border hover:bg-accent hover:text-accent-foreground',
+          'border border-border bg-card text-foreground shadow-control hover:border-input hover:bg-accent hover:text-accent-foreground',
         ghost: 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
         destructive:
-          'bg-destructive text-destructive-foreground shadow-elev1 hover:bg-destructive/90',
+          'bg-destructive text-destructive-foreground shadow-button hover:bg-destructive/90',
         link: 'text-primary underline-offset-4 hover:underline',
       },
       size: {

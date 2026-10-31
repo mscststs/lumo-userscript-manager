@@ -7,7 +7,8 @@ import { getValuesForScript, setValueForScript, deleteValueForScript } from '@/l
 import { recordLog } from '@/lib/background/logs';
 import { registerMenuCommand, unregisterMenuCommand } from '@/lib/background/menus';
 import { handleGmApi } from '@/lib/background/gm';
-import { markScriptError, markScriptRun, broadcast } from '@/lib/background/scripts';
+import { markScriptError, markScriptRun } from '@/lib/background/scripts';
+import { broadcast } from '@/lib/background/events';
 import { requestBadgeRefresh } from '@/lib/background/badge';
 import { noteInjection } from '@/lib/background/injected-state';
 import { verifyRuntimeToken } from '@/lib/background/runtime-token';

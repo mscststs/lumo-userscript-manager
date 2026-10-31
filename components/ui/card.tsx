@@ -10,8 +10,9 @@ import { cn } from '@/lib/utils';
  * section break.
  *
  * Two variants:
- *   `flat`     — border only. The default for lists and settings blocks, where
- *                the page already has enough depth.
+ *   `flat`     — border + `shadow-surface`. The default for lists and settings
+ *                blocks: the card rests on the panel (a contact shadow on light
+ *                palettes, a top highlight on dark) but does not float.
  *   `elevated` — border + `elev1`. For content that floats over the page
  *                (standalone previews, the theme picker).
  */
@@ -30,7 +31,7 @@ export function Card({
     <Tag
       className={cn(
         'rounded-card border border-border bg-card text-card-foreground',
-        variant === 'elevated' && 'shadow-elev1',
+        variant === 'elevated' ? 'shadow-elev1' : 'shadow-surface',
         className,
       )}
     >

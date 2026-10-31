@@ -145,6 +145,7 @@ describe('theme tokens in globals.css', () => {
             ? '.dark {'
             : `[data-theme="${name}"] {`;
       const tokens = block(selector);
+      expect(tokens).toContain(`--color-sidebar: ${definition.swatch.frame}`);
       expect(tokens).toContain(`--color-background: ${definition.swatch.background}`);
       expect(tokens).toContain(`--color-card: ${definition.swatch.surface}`);
       expect(tokens).toContain(`--color-foreground: ${definition.swatch.foreground}`);

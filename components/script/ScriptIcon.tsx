@@ -2,6 +2,37 @@ import { useEffect, useState } from 'react';
 import { FileCode2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+/**
+ * Three sizes, one geometry. Each keeps the same ratios as the 20px popup tile
+ * (corner ≈ 25% of the tile, artwork core ≈ 70%), so a script reads as the
+ * same object in the popup row, the manager list and the install hero.
+ *
+ * `art` is an *explicit* box rather than an inset: a replaced element under
+ * `inset` falls back to its intrinsic size (and to Tailwind's `max-width`
+ * preflight) instead of filling the inset box, so a 64px favicon or a
+ * multi-frame `.ico` would paint edge to edge and clip. Auto margins centre it.
+ */
+const SIZES = {
+  /** 20px — popup rows. */
+  sm: {
+    tile: 'h-5 w-5 rounded-[5px]',
+    art: 'h-3.5 w-3.5 rounded-[3px]',
+    glyph: 'h-3 w-3',
+  },
+  /** 28px — manager list rows and the editor header. */
+  md: {
+    tile: 'h-7 w-7 rounded-[7px]',
+    art: 'h-5 w-5 rounded-[4px]',
+    glyph: 'h-3.5 w-3.5',
+  },
+  /** 48px — the install page hero. */
+  lg: {
+    tile: 'h-12 w-12 rounded-[12px]',
+    art: 'h-[34px] w-[34px] rounded-[7px]',
+    glyph: 'h-5 w-5',
+  },
+} as const;
+
 interface ScriptIconProps {
   /**
    * What to paint: the cached `data:` URL once the background has warmed it,
@@ -14,6 +45,7 @@ interface ScriptIconProps {
    * product already uses for "off" everywhere else.
    */
   dimmed?: boolean;
+  size?: keyof typeof SIZES;
   className?: string;
 }
 
@@ -42,10 +74,11 @@ interface ScriptIconProps {
  * under a foreground line) so it stays legible on any artwork — including a
  * white or fully transparent icon.
  */
-export function ScriptIcon({ src, dimmed = false, className }: ScriptIconProps) {
+export function ScriptIcon({ src, dimmed = false, size = 'sm', className }: ScriptIconProps) {
   const [status, setStatus] = useState<'loading' | 'loaded' | 'failed'>(
     src ? 'loading' : 'failed',
   );
+  const geometry = SIZES[size];
 
   // A changed source is a different image: the previous decode result is stale.
   useEffect(() => {
@@ -56,13 +89,15 @@ export function ScriptIcon({ src, dimmed = false, className }: ScriptIconProps) 
     <span
       aria-hidden="true"
       className={cn(
-        'relative flex h-5 w-5 shrink-0 items-center justify-center overflow-hidden rounded-[5px] bg-muted',
+        'relative flex shrink-0 items-center justify-center overflow-hidden bg-muted',
+        geometry.tile,
         className,
       )}
     >
       <FileCode2
         className={cn(
-          'h-3 w-3 text-muted-foreground transition-opacity duration-150 ease-standard',
+          'text-muted-foreground transition-opacity duration-150 ease-standard',
+          geometry.glyph,
           dimmed && 'opacity-55',
         )}
       />
@@ -75,14 +110,9 @@ export function ScriptIcon({ src, dimmed = false, className }: ScriptIconProps) 
           onLoad={() => setStatus('loaded')}
           onError={() => setStatus('failed')}
           className={cn(
-            // The bitmap gets an *explicit* 14px core and is centred by auto
-            // margins. Leaving the size to `h-auto w-auto` does not work: an
-            // `<img>` is a replaced element, so under `inset: 3px` it falls
-            // back to its intrinsic size (and to Tailwind's preflight
-            // `max-width: 100%`) instead of filling the inset box — a 64px
-            // favicon, or a multi-frame `.ico` whose largest frame is 256px,
-            // then paints edge to edge and is clipped at the bottom-right.
-            'absolute inset-0 m-auto h-3.5 w-3.5 rounded-[3px] object-contain',
+            // Explicit core per size, centred by auto margins (see SIZES).
+            'absolute inset-0 m-auto object-contain',
+            geometry.art,
             'transition-[opacity,filter] duration-150 ease-standard',
             status === 'loaded' ? 'opacity-100' : 'opacity-0',
             dimmed && status === 'loaded' && 'opacity-55 grayscale',

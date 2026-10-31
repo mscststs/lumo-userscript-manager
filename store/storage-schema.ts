@@ -49,6 +49,7 @@ export interface StorageSchema {
    */
   runtimeSecret: string;
   /**
+  /**
    * Agent endpoint trust configuration: master switch + extension ID allowlist.
    * Deliberately not exportable — importing a backup must not grant another
    * machine's extensions access to this browser.
@@ -56,6 +57,12 @@ export interface StorageSchema {
   agentSettings: AgentSettings;
   /** Bounded queue of extensions waiting for the user's approval. */
   agentPendingRequests: AgentPendingRequest[];
+  /**
+   * When the log view was last on screen (epoch ms). Errors written after it
+   * are "unread" and counted on the sidebar. A single timestamp — the entries
+   * themselves stay in IndexedDB. Device-local, so never exported.
+   */
+  logsSeenAt: number;
 }
 
 /** Union of all valid storage key strings. */
@@ -183,6 +190,12 @@ export const STORAGE_FIELDS: { [K in StorageKey]: StorageFieldDef<K> } = {
     defaultValue: [],
     exportable: false,
     normalize: (raw) => normalizeAgentPendingRequests(raw),
+  },
+  logsSeenAt: {
+    key: 'logsSeenAt',
+    defaultValue: 0,
+    exportable: false,
+    normalize: (raw) => (typeof raw === 'number' && Number.isFinite(raw) && raw > 0 ? raw : 0),
   },
   uiSettings: {
     key: 'uiSettings',

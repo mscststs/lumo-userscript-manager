@@ -3,42 +3,44 @@ import { cn } from '@/lib/utils';
 
 interface PageHeaderProps {
   title: string;
-  description?: string;
-  /** Page-level actions. Right-aligned on wide layouts, wrapped below on narrow. */
+  /** Before the title: a back button, the identity icon of the open object. */
+  leading?: ReactNode;
+  /** Inline after the title: a version, a status badge. Never a sentence. */
+  meta?: ReactNode;
+  /** Page-level actions. Right-aligned; wrap below the title on narrow panels. */
   actions?: ReactNode;
   className?: string;
 }
 
 /**
- * Page heading shared by every options surface.
+ * Page heading shared by every options surface: one line, title and actions.
  *
- * The description is capped at 68ch (Bringhurst's comfortable measure) so a long
- * sentence never stretches into a line the eye has to track. Actions wrap below
- * the title instead of squeezing it: at rail widths the title is the thing that
- * must stay readable, and the buttons are allowed to take a second row.
+ * There is no description slot. The navigation already says where you are and
+ * the content says what it is for; a sentence restating either is the
+ * "explanatory text" the product principles rule out, and it cost every page
+ * a second line of chrome above the content.
+ *
+ * Actions wrap below the title instead of squeezing it: at rail widths the
+ * title is the thing that must stay readable, and the buttons are allowed to
+ * take a second row.
  */
-export function PageHeader({ title, description, actions, className }: PageHeaderProps) {
+export function PageHeader({ title, leading, meta, actions, className }: PageHeaderProps) {
   return (
     <header
       className={cn(
-        'flex flex-wrap items-start justify-between gap-x-6 gap-y-3',
+        'flex min-h-14 flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2.5',
         className,
       )}
     >
-      <div className="min-w-0 flex-1 basis-64">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground text-balance">
+      <div className="flex min-w-0 flex-1 basis-48 items-center gap-2.5">
+        {leading}
+        <h1 className="min-w-0 truncate text-base font-semibold text-foreground" title={title}>
           {title}
         </h1>
-        {description && (
-          <p className="mt-1 max-w-[68ch] text-sm leading-relaxed text-muted-foreground text-pretty">
-            {description}
-          </p>
-        )}
+        {meta}
       </div>
       {actions && (
-        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
-          {actions}
-        </div>
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">{actions}</div>
       )}
     </header>
   );

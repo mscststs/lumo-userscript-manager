@@ -1,6 +1,7 @@
 import type { LogEntry, UserScript } from '@/types';
 import { addLog, getScript } from '@/lib/db';
 import { storage } from '@/store/storage';
+import { announceLogsChanged } from './events';
 
 const LEVEL_WEIGHT: Record<string, number> = { debug: 10, info: 20, warn: 30, error: 40 };
 
@@ -34,4 +35,5 @@ export async function recordLog(
     url,
     time: Date.now(),
   });
+  announceLogsChanged();
 }

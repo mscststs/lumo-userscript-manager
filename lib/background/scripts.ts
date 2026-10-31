@@ -1,4 +1,4 @@
-import type { ScriptMetadata, UserScript } from '@/types';
+import type { ManagerScript, ScriptMetadata, UserScript } from '@/types';
 import {
   addLog,
   replaceResources,
@@ -43,10 +43,7 @@ import { cacheScriptIcon, resolveScriptIcons } from './icons';
 import { requestRegistration } from './registry';
 import { getRuntimeStatus } from './registry';
 import { forgetInjectedScript } from './injected-state';
-
-export function broadcast(event: string, payload: Record<string, unknown> = {}): void {
-  void chrome.runtime.sendMessage({ type: 'lumo:event', event, payload }).catch(() => undefined);
-}
+import { announceLogsChanged, broadcast } from './events';
 
 function firstMeta(metadata: ScriptMetadata, key: string): string | undefined {
   return getMeta(metadata, key);
@@ -161,6 +158,17 @@ export async function getAllScripts(includeRemoved = false): Promise<UserScript[
   return listScripts(includeRemoved);
 }
 
+/**
+ * The library as the manager renders it: every record plus the icon to paint.
+ * Kept apart from `getAllScripts`, which backup export and the updater walk —
+ * neither should read (or warm) the icon cache.
+ */
+export async function getManagerScripts(includeRemoved = false): Promise<ManagerScript[]> {
+  const scripts = await listScripts(includeRemoved);
+  const icons = await resolveScriptIcons(scripts);
+  return scripts.map((script) => ({ ...script, iconUrl: icons.get(script.uuid) }));
+}
+
 export async function getScriptDetail(uuid: string) {
   const script = await getScriptWithCode(uuid);
   if (!script) return null;
@@ -170,6 +178,14 @@ export async function getScriptDetail(uuid: string) {
     listVersions(uuid),
   ]);
   return { script, resources, values: valueData.values, versions };
+}
+
+/** Editor payload: the detail plus the icon for the page heading. */
+export async function getEditorDetail(uuid: string) {
+  const detail = await getScriptDetail(uuid);
+  if (!detail) return null;
+  const icons = await resolveScriptIcons([detail.script]);
+  return { ...detail, iconUrl: icons.get(uuid) };
 }
 
 export interface SaveScriptOptions {
@@ -471,6 +487,7 @@ export async function commitInstall(
     uuid: record.uuid,
     name: record.name,
   });
+  announceLogsChanged();
   return { uuid: record.uuid, updated: Boolean(target) };
 }
 
