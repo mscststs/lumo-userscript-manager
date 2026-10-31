@@ -91,7 +91,7 @@ export function AppearancePage() {
       contentClassName="space-y-7"
       width="form"
     >
-      <Section title={t('options.appearance.mode')} hint={t('options.appearance.modeHint')}>
+      <Section title={t('options.appearance.mode')}>
         <div
           role="radiogroup"
           aria-label={t('options.appearance.mode')}
@@ -140,7 +140,7 @@ export function AppearancePage() {
         )}
       </Section>
 
-      <Section title={t('options.appearance.accent')} hint={t('options.appearance.accentHint')}>
+      <Section title={t('options.appearance.accent')}>
         <div
           role="radiogroup"
           aria-label={t('options.appearance.accent')}

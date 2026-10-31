@@ -691,7 +691,6 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
                 {agent.allowWrites && (
                   <SettingRow
                     label={t('settings.agent.reviewWrites')}
-                    description={t('settings.agent.reviewWritesHint')}
                     control={
                       <Switch
                         checked={agent.reviewWrites}
@@ -790,7 +789,6 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
 
               <SettingsGroup
                 title={t('settings.agent.activity')}
-                description={t('settings.agent.activityHint')}
                 action={
                   <Button
                     variant="ghost"
