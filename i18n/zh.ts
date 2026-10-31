@@ -49,7 +49,7 @@ export const zh: TranslationSchema = {
   },
   app: {
     name: 'Lumo 用户脚本管理器',
-    tagline: '本地优先的用户脚本管理',
+    tagline: '一个开源的脚本管理器',
   },
   popup: {
     unknownPage: '当前页面',
@@ -136,7 +136,6 @@ export const zh: TranslationSchema = {
     },
     about: {
       title: '关于',
-      intro: '在浏览器内完成用户脚本的安装、编辑、启停与更新。',
       openExtensions: '扩展设置',
       manageData: '管理数据',
       version: '版本',

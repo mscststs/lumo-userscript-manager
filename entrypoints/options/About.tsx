@@ -32,9 +32,6 @@ export function AboutPage({ onOpenData }: { onOpenData: () => void }) {
                 <Badge variant="accent">v{version}</Badge>
               </div>
               <p className="mt-0.5 text-sm text-muted-foreground">{t('app.tagline')}</p>
-              <p className="mt-3 max-w-[64ch] text-sm leading-relaxed text-muted-foreground text-pretty">
-                {t('options.about.intro')}
-              </p>
             </div>
           </div>
 

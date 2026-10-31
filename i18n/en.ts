@@ -47,7 +47,7 @@ export const en = {
   },
   app: {
     name: 'Lumo Userscripts',
-    tagline: 'Local-first userscript management',
+    tagline: 'An open-source userscript manager',
   },
   popup: {
     unknownPage: 'Current page',
@@ -135,8 +135,6 @@ export const en = {
     },
     about: {
       title: 'About',
-      intro:
-        'Install, edit, enable, and update userscripts inside the browser.',
       openExtensions: 'Extension settings',
       manageData: 'Manage data',
       version: 'Version',
