@@ -117,7 +117,7 @@ export const en = {
       groupTypography: 'Language and scale',
       groupInterface: 'Interface',
       showBadge: 'Toolbar badge',
-      showBadgeHint: 'Shows how many scripts are active on the current page. Nothing is drawn when a page has none.',
+      showBadgeHint: 'Shows how many scripts are active on the current page.',
       language: 'Language',
       languageHint: 'Applies to every extension surface.',
       languageAuto: 'Auto',

@@ -118,7 +118,7 @@ export const zh: TranslationSchema = {
       groupTypography: '语言与字号',
       groupInterface: '界面',
       showBadge: '工具栏角标',
-      showBadgeHint: '在扩展图标上显示当前页面生效的脚本数量。页面没有脚本时不占位置。',
+      showBadgeHint: '在扩展图标上显示当前页面生效的脚本数量。',
       language: '语言',
       languageHint: '作用于所有扩展页面。',
       languageAuto: '自动',
