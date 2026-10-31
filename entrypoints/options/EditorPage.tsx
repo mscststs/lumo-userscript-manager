@@ -8,7 +8,9 @@ import { parseMetadata } from '@/lib/script/metadata';
 import { newScriptTemplate } from '@/lib/script/template';
 import { CodeEditor } from '@/components/editor/CodeEditor';
 import { SectionNav } from '@/components/layout/SectionNav';
+import { PageHeader } from '@/components/layout/PageHeader';
 import { PageLayout } from '@/components/layout/PageLayout';
+import { ScriptIcon } from '@/components/script/ScriptIcon';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/kbd';
@@ -26,6 +28,8 @@ interface ScriptDetail {
   resources: StoredResource[];
   values: Record<string, unknown>;
   versions: ScriptVersion[];
+  /** Display URL for the identity icon (see `ManagerScript.iconUrl`). */
+  iconUrl?: string;
 }
 
 interface EditorPageProps {
@@ -88,6 +92,7 @@ export function EditorPage({ uuid, initialPanel, onBack, onSaved }: EditorPagePr
   const [code, setCode] = useState(() => newScriptTemplate());
   const [originalCode, setOriginalCode] = useState('');
   const [script, setScript] = useState<(UserScript & { code: string }) | null>(null);
+  const [iconUrl, setIconUrl] = useState<string | undefined>(undefined);
   const [selfMetadata, setSelfMetadata] = useState<ScriptMetadata>({});
   const [savedSelfMetadata, setSavedSelfMetadata] = useState<ScriptMetadata>({});
   const [resources, setResources] = useState<StoredResource[]>([]);
@@ -109,6 +114,7 @@ export function EditorPage({ uuid, initialPanel, onBack, onSaved }: EditorPagePr
       setCode(template);
       setOriginalCode(template);
       setScript(null);
+      setIconUrl(undefined);
       setSelfMetadata({});
       setSavedSelfMetadata({});
       setResources([]);
@@ -121,6 +127,7 @@ export function EditorPage({ uuid, initialPanel, onBack, onSaved }: EditorPagePr
       const detail = await sendBg<ScriptDetail | null>('scripts:getDetail', { uuid });
       if (!detail) throw new Error(t('editor.notFound'));
       setScript(detail.script);
+      setIconUrl(detail.iconUrl);
       setCode(detail.script.code);
       setOriginalCode(detail.script.code);
       setSelfMetadata(detail.script.selfMetadata ?? {});
@@ -268,16 +275,45 @@ export function EditorPage({ uuid, initialPanel, onBack, onSaved }: EditorPagePr
     onBack();
   };
 
+  const tabs = (
+    <SectionNav
+      ariaLabel={t('editor.title')}
+      value={tab}
+      onChange={setTab}
+      items={TAB_IDS.map((item) => ({
+        value: item,
+        label: t(item === 'code' ? 'editor.code' : `editor.${item}`),
+      }))}
+    />
+  );
+
   if (loading) {
+    // Same frame as the loaded editor — heading, tab strip, flush code surface —
+    // so the page settles in place instead of growing a second header row.
     return (
       <PageLayout
         width="full"
-        className="h-full min-h-0"
-        header={<Skeleton className="h-8 w-64" />}
-        contentClassName="space-y-4"
+        scroll={false}
+        header={
+          <>
+            <div className="flex min-h-14 items-center gap-2.5 py-2.5">
+              <Skeleton className="h-7 w-7 rounded-md" />
+              <Skeleton className="h-7 w-7 rounded-[7px]" />
+              <Skeleton className="h-4 w-48" />
+            </div>
+            <div className="flex h-8 items-start gap-5 pt-1.5">
+              {['w-8', 'w-10', 'w-8', 'w-8', 'w-8'].map((width, index) => (
+                <Skeleton key={index} className={`h-3 ${width}`} />
+              ))}
+            </div>
+          </>
+        }
       >
-        <Skeleton className="h-8 w-72" />
-        <Skeleton className="min-h-64 flex-1 rounded-card" />
+        <div className="min-h-0 flex-1 space-y-3 bg-code-bg px-5 py-4 sm:px-7">
+          {['w-2/5', 'w-3/5', 'w-1/3', 'w-1/2', 'w-2/5', 'w-1/4'].map((width, index) => (
+            <Skeleton key={index} className={`h-3 ${width}`} />
+          ))}
+        </div>
       </PageLayout>
     );
   }
@@ -287,73 +323,71 @@ export function EditorPage({ uuid, initialPanel, onBack, onSaved }: EditorPagePr
   return (
     <PageLayout
       width="full"
-      className="h-full min-h-0"
-      contentClassName="flex min-h-0 flex-1 flex-col p-0 sm:p-0"
+      scroll={false}
       header={
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-2">
-              <Button variant="ghost" size="iconSm" onClick={requestBack} aria-label={t('editor.back')}>
-                <ArrowLeft className="h-4 w-4" />
-              </Button>
-              <div className="min-w-0">
-                <div className="flex min-w-0 items-center gap-1.5">
-                  <h1 className="min-w-0 truncate text-sm font-semibold text-foreground">
-                    {script?.name ?? t('editor.newTitle')}
-                  </h1>
-                  {unsaved && <Badge variant="warning">{t('editor.unsaved')}</Badge>}
-                </div>
-                <p className="min-w-0 truncate text-2xs text-muted-foreground">
-                  {script?.namespace || t('scripts.noSource')}
-                  {script?.version ? ` · v${script.version}` : ''}
-                </p>
-              </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-1.5">
-              {tab === 'metadata' && (
+        <>
+          <PageHeader
+            title={script?.name ?? t('editor.newTitle')}
+            leading={
+              <>
+                <Button
+                  variant="ghost"
+                  size="iconSm"
+                  onClick={requestBack}
+                  aria-label={t('editor.back')}
+                  className="-ml-1.5"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                </Button>
+                <ScriptIcon src={iconUrl} size="md" dimmed={script ? !script.enabled : false} />
+              </>
+            }
+            meta={
+              <>
+                {script?.version && (
+                  <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                    v{script.version}
+                  </span>
+                )}
+                {unsaved && <Badge variant="warning">{t('editor.unsaved')}</Badge>}
+              </>
+            }
+            actions={
+              <>
+                {tab === 'metadata' && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="outline"
+                        onClick={() => void saveOverrides()}
+                        disabled={!script || saving || !overridesDirty}
+                      >
+                        {t('editor.saveMetadata')}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" className="flex items-center gap-1.5">
+                      {t('editor.saveMetadata')}
+                      <Kbd>{saveShortcutLabel}</Kbd>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => void saveOverrides()}
-                      disabled={!script || saving || !overridesDirty}
-                    >
-                      {t('editor.saveMetadata')}
+                    <Button onClick={() => void save()} disabled={saving}>
+                      <Save className="h-3.5 w-3.5" />
+                      {saving ? t('editor.saving') : t('editor.save')}
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom" className="flex items-center gap-1.5">
-                    {t('editor.saveMetadata')}
+                    {t('editor.save')}
                     <Kbd>{saveShortcutLabel}</Kbd>
                   </TooltipContent>
                 </Tooltip>
-              )}
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button size="sm" onClick={() => void save()} disabled={saving}>
-                    <Save className="h-3.5 w-3.5" />
-                    {saving ? t('editor.saving') : t('editor.save')}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" className="flex items-center gap-1.5">
-                  {t('editor.save')}
-                  <Kbd>{saveShortcutLabel}</Kbd>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          </div>
-
-          <SectionNav
-            ariaLabel={t('editor.title')}
-            value={tab}
-            onChange={setTab}
-            className="-mb-3.5"
-            items={TAB_IDS.map((item) => ({
-              value: item,
-              label: t(item === 'code' ? 'editor.code' : `editor.${item}`),
-            }))}
+              </>
+            }
           />
-        </div>
+          {tabs}
+        </>
       }
     >
       {(error || parsed.errors.length > 0) && (

@@ -21,7 +21,6 @@ import { Switch } from '@/components/ui/switch';
 import { SectionNav } from '@/components/layout/SectionNav';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -156,29 +155,29 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
   // Sections are document tabs, not page actions: they sit under the title and
   // are shaped like tabs, so the action slot stays reserved for actions.
   const header = (
-    <div className="space-y-3">
-      <PageHeader title={t('settings.title')} description={t('settings.description')} />
+    <>
+      <PageHeader title={t('settings.title')} />
       <SectionNav
         ariaLabel={t('settings.title')}
         value={section}
         onChange={onNavigate}
-        className="-mb-3.5"
         items={[
           { value: 'general', label: t('settings.sections.general') },
           { value: 'updates', label: t('settings.sections.updates') },
           { value: 'data', label: t('settings.sections.data') },
         ]}
       />
-    </div>
+    </>
   );
 
   if (!settings) {
     return (
       <PageLayout header={header} width="form">
-        <div className="space-y-3">
+        <Skeleton className="mb-2.5 h-4 w-24" />
+        <div className="divide-y divide-border/70 rounded-card border border-border bg-card px-4 shadow-surface">
           {[0, 1, 2, 3].map((index) => (
-            <div key={index} className="rounded-card border border-border bg-card px-4 py-3">
-              <Skeleton className="h-4 w-1/3" />
+            <div key={index} className="py-3">
+              <Skeleton className="h-3.5 w-1/3" />
               <Skeleton className="mt-2 h-3 w-2/3" />
             </div>
           ))}
@@ -276,52 +275,52 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
             />
           </SettingsGroup>
 
-          <Card>
-            <CardHeader>
-              <div className="min-w-0">
-                <CardTitle>{t('settings.runtime')}</CardTitle>
-                <CardDescription>{t('settings.runtimeHint')}</CardDescription>
-              </div>
+          {/* Runtime health is a settings group like its neighbours — same
+              heading, same surface — with the status where a group keeps its
+              action, instead of a one-off card with its own anatomy. */}
+          <SettingsGroup
+            title={t('settings.runtime')}
+            description={t('settings.runtimeHint')}
+            action={
               <Badge variant={runtime?.userScriptsAvailable ? 'success' : 'destructive'}>
                 <ShieldCheck className="h-3 w-3" />
                 {runtime?.userScriptsAvailable
                   ? t('settings.runtimeAvailable')
                   : t('settings.runtimeUnavailable')}
               </Badge>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                <Stat label={t('settings.registered')} value={runtime?.registeredCount ?? 0} />
-                <Stat label={t('settings.engines')} value={runtime?.engineCount ?? 0} />
-                <Stat
-                  label={t('settings.lastChecked')}
-                  value={
-                    runtime?.lastCheckedAt
-                      ? formatDateTime(runtime.lastCheckedAt, i18n.language)
-                      : '—'
-                  }
-                />
-              </dl>
-              {runtime?.lastError && (
-                <p className="whitespace-pre-wrap break-words rounded-md border border-destructive/25 bg-destructive/5 px-2.5 py-2 text-2xs leading-relaxed text-destructive">
-                  {runtime.lastError}
-                </p>
-              )}
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={async () => {
-                    await sendBg('runtime:refresh');
-                    await loadRuntime();
-                  }}
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  {t('settings.reRegister')}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+            }
+          >
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-3 py-3 sm:grid-cols-3">
+              <Stat label={t('settings.registered')} value={runtime?.registeredCount ?? 0} />
+              <Stat label={t('settings.engines')} value={runtime?.engineCount ?? 0} />
+              <Stat
+                label={t('settings.lastChecked')}
+                value={
+                  runtime?.lastCheckedAt
+                    ? formatDateTime(runtime.lastCheckedAt, i18n.language)
+                    : '—'
+                }
+              />
+            </dl>
+            {runtime?.lastError && (
+              <p className="whitespace-pre-wrap break-words py-2.5 text-2xs leading-relaxed text-destructive">
+                {runtime.lastError}
+              </p>
+            )}
+            <div className="flex flex-wrap items-center justify-end gap-2 py-2.5">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={async () => {
+                  await sendBg('runtime:refresh');
+                  await loadRuntime();
+                }}
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                {t('settings.reRegister')}
+              </Button>
+            </div>
+          </SettingsGroup>
 
           <SettingsGroup title={t('settings.groups.logging')}>
             <SettingRow
@@ -428,7 +427,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
 function Stat({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="min-w-0">
-      <dt className="text-2xs uppercase tracking-wider text-muted-foreground">{label}</dt>
+      <dt className="text-2xs text-muted-foreground">{label}</dt>
       <dd className={cn('mt-0.5 truncate text-sm font-medium tabular-nums text-foreground')}>
         {value}
       </dd>

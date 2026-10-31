@@ -1,45 +1,82 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { RefreshCw, ScrollText, Search, Trash2, X } from 'lucide-react';
+import {
+  Bug,
+  CircleX,
+  Info,
+  RefreshCw,
+  ScrollText,
+  Search,
+  Trash2,
+  TriangleAlert,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 import type { LogEntry } from '@/types';
 import { sendBg, onLumoEvent } from '@/lib/messages';
-import { formatDateTime } from '@/lib/format';
+import {
+  formatClockTime,
+  formatDateTime,
+  formatDayLabel,
+  formatRelativeTime,
+  startOfDay,
+} from '@/lib/format';
+import { useNow } from '@/lib/use-now';
 import { cn } from '@/lib/utils';
+import { storage } from '@/store/storage';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Segmented } from '@/components/ui/segmented';
+import { Skeleton } from '@/components/ui/skeleton';
 import { EmptyState } from '@/components/layout/EmptyState';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useToast } from '@/components/ui/toast';
 
 type Level = 'all' | 'error' | 'warn' | 'info' | 'debug';
 
-const LEVEL_VARIANT: Record<string, 'default' | 'accent' | 'destructive' | 'warning' | 'outline'> =
-  {
-    debug: 'outline',
-    info: 'accent',
-    warn: 'warning',
-    error: 'destructive',
-  };
+/**
+ * Severity is carried by an icon on every row and, for the two levels that
+ * need attention, a rail on the row's leading edge — the rail is what the eye
+ * catches when scanning a day of mostly-info output. Info and debug stay
+ * unmarked so the rails keep meaning something.
+ */
+const LEVEL_STYLE: Record<LogEntry['level'], { icon: LucideIcon; ink: string; rail?: string }> = {
+  error: { icon: CircleX, ink: 'text-destructive', rail: 'bg-destructive' },
+  warn: { icon: TriangleAlert, ink: 'text-warning', rail: 'bg-warning' },
+  info: { icon: Info, ink: 'text-muted-foreground' },
+  debug: { icon: Bug, ink: 'text-muted-foreground/70' },
+};
+
+interface DayGroup {
+  day: number;
+  entries: LogEntry[];
+}
 
 export function LogsPage() {
   const { t, i18n } = useTranslation();
   const toast = useToast();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [level, setLevel] = useState<Level>('all');
   const [query, setQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
+  const now = useNow(30_000);
 
+  // Skeleton on first load only; live reloads swap the rows in place.
   const load = useCallback(async () => {
-    setLoading(true);
     try {
-      setLogs(await sendBg<LogEntry[]>('logs:list', { limit: 500 }));
+      const entries = await sendBg<LogEntry[]>('logs:list', { limit: 500 });
+      setLogs(entries);
       setError(null);
+      // Everything on screen has now been seen: advance the pointer the
+      // sidebar badge counts from. The newest entry's time, not `Date.now()`,
+      // so an error written while this request was in flight still counts.
+      const newest = entries[0]?.time;
+      if (newest) void storage.setLogsSeenAt(newest).catch(() => undefined);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -51,7 +88,19 @@ export function LogsPage() {
     void load();
   }, [load]);
 
-  useEffect(() => onLumoEvent(() => void load()), [load]);
+  useEffect(
+    () =>
+      onLumoEvent((event) => {
+        if (event === 'logs-changed') void load();
+      }),
+    [load],
+  );
+
+  const refresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
+  };
 
   const counts = useMemo(() => {
     const base: Record<Level, number> = { all: logs.length, error: 0, warn: 0, info: 0, debug: 0 };
@@ -74,6 +123,20 @@ export function LogsPage() {
     });
   }, [level, logs, query]);
 
+  // Entries arrive newest first, so one pass yields the days in order.
+  const groups = useMemo(() => {
+    const result: DayGroup[] = [];
+    for (const entry of filtered) {
+      const day = startOfDay(entry.time);
+      const last = result[result.length - 1];
+      if (last && last.day === day) last.entries.push(entry);
+      else result.push({ day, entries: [entry] });
+    }
+    return result;
+  }, [filtered]);
+
+  const today = startOfDay(now);
+
   const clear = async () => {
     await sendBg('logs:clear');
     setLogs([]);
@@ -83,11 +146,15 @@ export function LogsPage() {
   const header = (
     <PageHeader
       title={t('logs.title')}
-      description={t('logs.description')}
       actions={
         <>
-          <Button variant="outline" size="default" onClick={() => void load()} disabled={loading}>
-            <RefreshCw className={cn('h-3.5 w-3.5', loading && 'animate-spin')} />
+          <Button
+            variant="outline"
+            size="default"
+            onClick={() => void refresh()}
+            disabled={loading || refreshing}
+          >
+            <RefreshCw className={cn('h-3.5 w-3.5', refreshing && 'animate-spin')} />
             {t('common.refresh')}
           </Button>
           <Button
@@ -147,63 +214,57 @@ export function LogsPage() {
         </p>
       )}
 
-      <div className="mt-3 overflow-hidden rounded-card border border-border bg-card">
-        {loading ? (
-          <div className="divide-y divide-border">
+      {loading ? (
+        <div className="mt-4">
+          <Skeleton className="mb-2 h-3.5 w-20" />
+          <div className="divide-y divide-border/70 rounded-card border border-border bg-card shadow-surface">
             {[0, 1, 2, 3, 4].map((index) => (
-              <div key={index} className="flex gap-3 px-3 py-2.5">
-                <div className="h-5 w-14 shrink-0 animate-pulse rounded bg-muted motion-reduce:animate-none" />
+              <div key={index} className="flex gap-2.5 px-4 py-2.5">
+                <Skeleton className="mt-0.5 h-3.5 w-3.5 shrink-0 rounded-full" />
                 <div className="min-w-0 flex-1 space-y-1.5">
-                  <div className="h-2.5 w-1/3 animate-pulse rounded bg-muted motion-reduce:animate-none" />
-                  <div className="h-3 w-3/4 animate-pulse rounded bg-muted motion-reduce:animate-none" />
+                  <Skeleton className="h-2.5 w-1/3" />
+                  <Skeleton className="h-3 w-3/4" />
                 </div>
               </div>
             ))}
           </div>
-        ) : filtered.length === 0 ? (
+        </div>
+      ) : groups.length === 0 ? (
+        <div className="mt-3 rounded-card border border-border bg-card shadow-surface">
           <EmptyState
             icon={ScrollText}
             title={query || level !== 'all' ? t('logs.noMatches') : t('logs.empty')}
             description={query || level !== 'all' ? undefined : t('logs.noLogs')}
           />
-        ) : (
-          <ol className="divide-y divide-border">
-            {filtered.map((entry, index) => (
-              <li
-                key={`${entry.time}-${index}`}
-                className="flex items-start gap-3 px-3 py-2.5 transition-colors hover:bg-muted/30"
-              >
-                <Badge
-                  variant={LEVEL_VARIANT[entry.level] ?? 'default'}
-                  className="mt-0.5 w-14 shrink-0 justify-center uppercase"
-                >
-                  {entry.level}
-                </Badge>
-                <div className="min-w-0 flex-1">
-                  <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5 text-2xs text-muted-foreground">
-                    <time className="shrink-0 font-mono tabular-nums">
-                      {formatDateTime(entry.time, i18n.language)}
-                    </time>
-                    {entry.name && (
-                      <span className="min-w-0 truncate font-medium text-foreground">
-                        {entry.name}
-                      </span>
-                    )}
-                    {entry.url && (
-                      <span className="min-w-0 truncate font-mono opacity-80" title={entry.url}>
-                        {entry.url}
-                      </span>
-                    )}
-                  </div>
-                  <pre className="mt-0.5 whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground">
-                    {entry.message}
-                  </pre>
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
-      </div>
+        </div>
+      ) : (
+        groups.map((group) => (
+          <section key={group.day} aria-label={formatDayLabel(group.day, i18n.language, now)}>
+            {/* The day heading pins to the top of the scroll area while its
+                entries pass underneath, so a long day never loses its date. */}
+            <h2 className="sticky top-0 z-10 -mx-1 flex items-baseline gap-2 bg-background/90 px-1 pb-2 pt-4 backdrop-blur-md">
+              <span className="text-xs font-semibold text-foreground">
+                {formatDayLabel(group.day, i18n.language, now)}
+              </span>
+              <span className="text-2xs tabular-nums text-muted-foreground">
+                {group.entries.length}
+              </span>
+            </h2>
+            <ol className="divide-y divide-border/70 overflow-hidden rounded-card border border-border bg-card shadow-surface">
+              {group.entries.map((entry, index) => (
+                <LogRow
+                  key={entry.id ?? `${entry.time}-${index}`}
+                  entry={entry}
+                  relative={group.day === today}
+                  locale={i18n.language}
+                  now={now}
+                  levelLabel={t(`settings.logLevels.${entry.level}`)}
+                />
+              ))}
+            </ol>
+          </section>
+        ))
+      )}
 
       <ConfirmDialog
         open={confirmClear}
@@ -215,5 +276,60 @@ export function LogsPage() {
         onConfirm={clear}
       />
     </PageLayout>
+  );
+}
+
+function LogRow({
+  entry,
+  relative,
+  locale,
+  now,
+  levelLabel,
+}: {
+  entry: LogEntry;
+  /** Today's entries read as distance ("5 minutes ago"); older ones as a clock. */
+  relative: boolean;
+  locale: string;
+  now: number;
+  levelLabel: string;
+}) {
+  const style = LEVEL_STYLE[entry.level] ?? LEVEL_STYLE.info;
+  const Icon = style.icon;
+
+  return (
+    <li className="relative flex items-start gap-2.5 px-4 py-2.5">
+      {style.rail && (
+        <span
+          aria-hidden="true"
+          className={cn('absolute bottom-2 left-0 top-2 w-[3px] rounded-r-full', style.rail)}
+        />
+      )}
+      <Icon className={cn('mt-0.5 h-3.5 w-3.5 shrink-0', style.ink)} aria-hidden="true" />
+      <span className="sr-only">{levelLabel}</span>
+      <div className="min-w-0 flex-1">
+        <div className="flex min-w-0 items-baseline gap-x-2 text-2xs text-muted-foreground">
+          {entry.name && (
+            <span className="max-w-[45%] shrink-0 truncate font-medium text-foreground">
+              {entry.name}
+            </span>
+          )}
+          {entry.url && (
+            <span className="min-w-0 flex-1 truncate font-mono opacity-80" title={entry.url}>
+              {entry.url}
+            </span>
+          )}
+          <time
+            dateTime={new Date(entry.time).toISOString()}
+            title={formatDateTime(entry.time, locale)}
+            className="ml-auto shrink-0 pl-2 tabular-nums"
+          >
+            {relative ? formatRelativeTime(entry.time, locale, now) : formatClockTime(entry.time, locale)}
+          </time>
+        </div>
+        <pre className="mt-0.5 whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground">
+          {entry.message}
+        </pre>
+      </div>
+    </li>
   );
 }

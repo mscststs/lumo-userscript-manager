@@ -1,20 +1,39 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Download, FileCode2, RefreshCw, ShieldAlert, X } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import {
+  ChevronRight,
+  CircleCheck,
+  Crosshair,
+  Download,
+  Globe,
+  KeyRound,
+  Link2,
+  LoaderCircle,
+  Package,
+  ShieldAlert,
+  TriangleAlert,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 import type { InstallDraftSummary } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { BrandMark } from '@/components/brand/BrandMark';
+import { ScriptIcon } from '@/components/script/ScriptIcon';
+import { CodeView } from '@/components/code/CodeView';
 import { sendBg } from '@/lib/messages';
 import { ThemeInit } from '@/lib/theme';
 import { FontSizeInit } from '@/lib/font-size';
-import { formatBytes } from '@/lib/utils';
+import { cn, formatBytes } from '@/lib/utils';
 
 type State =
   | { status: 'loading' }
-  | { status: 'ready'; token: string; summary: InstallDraftSummary }
-  | { status: 'installing' }
-  | { status: 'installed'; uuid: string; updated: boolean }
+  | { status: 'ready'; token: string; summary: InstallDraftSummary; installing: boolean }
+  | { status: 'installed'; uuid: string; updated: boolean; summary: InstallDraftSummary }
   | { status: 'error'; message: string };
 
 function isFramed(): boolean {
@@ -25,6 +44,25 @@ function isFramed(): boolean {
   }
 }
 
+/** One page-level state swap: a short settle, never a slide across the page. */
+const STATE_MOTION = {
+  initial: { opacity: 0, y: 6 },
+  animate: { opacity: 1, y: 0 },
+  exit: { opacity: 0, y: -4 },
+  transition: { duration: 0.18, ease: [0.16, 1, 0.3, 1] as const },
+};
+
+/**
+ * Install / update review.
+ *
+ * The page answers one question — "what will this script be allowed to do?" —
+ * so it reads top to bottom as identity, capabilities, source, decision. The
+ * decision bar stays pinned to the bottom edge: the code preview can be
+ * thousands of lines long, and the install button must not scroll away with it.
+ *
+ * Installing keeps the review on screen and turns the button into its own
+ * progress indicator; the page only changes shape once there is a result.
+ */
 export default function App() {
   const { t } = useTranslation();
   const [state, setState] = useState<State>({ status: 'loading' });
@@ -52,7 +90,7 @@ export default function App() {
       sendBg<InstallDraftSummary & { token: string }>('install:getDraft', { token })
         .then((draft) => {
           if (!draft) throw new Error(t('install.invalidSource'));
-          setState({ status: 'ready', token, summary: draft });
+          setState({ status: 'ready', token, summary: draft, installing: false });
         })
         .catch((error: Error) => setState({ status: 'error', message: error.message }));
       return;
@@ -60,20 +98,21 @@ export default function App() {
 
     sendBg<{ token: string; summary: InstallDraftSummary }>('install:prepare', { sourceUrl: src })
       .then(({ token: nextToken, summary }) =>
-        setState({ status: 'ready', token: nextToken, summary }),
+        setState({ status: 'ready', token: nextToken, summary, installing: false }),
       )
       .catch((error: Error) => setState({ status: 'error', message: error.message }));
   }, [params, t]);
 
   const install = async () => {
-    if (state.status !== 'ready') return;
-    setState({ status: 'installing' });
+    if (state.status !== 'ready' || state.installing) return;
+    const { token, summary } = state;
+    setState({ ...state, installing: true });
     try {
       const result = await sendBg<{ uuid: string; updated: boolean }>('install:commit', {
-        token: state.token,
+        token,
         enabled,
       });
-      setState({ status: 'installed', uuid: result.uuid, updated: result.updated });
+      setState({ status: 'installed', uuid: result.uuid, updated: result.updated, summary });
     } catch (error) {
       setState({ status: 'error', message: error instanceof Error ? error.message : String(error) });
     }
@@ -84,214 +123,406 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-background px-6 py-8 text-foreground">
+    <div className="flex min-h-dvh flex-col bg-background text-foreground">
       <ThemeInit />
       <FontSizeInit />
-      <div className="mx-auto w-full max-w-2xl space-y-6">
-        <header className="flex items-center justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-control bg-primary/10 text-primary">
-              <FileCode2 className="h-4 w-4" />
-            </div>
-            <div>
-              <h1 className="text-base font-semibold">{t('install.title')}</h1>
-              <p className="text-xs text-muted-foreground">{t('install.subtitle')}</p>
-            </div>
+
+      <header className="sticky top-0 z-20 border-b border-border bg-background/85 backdrop-blur-md">
+        <div className="mx-auto flex h-14 w-full max-w-2xl items-center justify-between gap-3 px-5">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <BrandMark />
+            {/* Product wordmark stays English in every locale. */}
+            <span className="truncate text-sm font-semibold">Lumo Userscripts</span>
+            <span aria-hidden="true" className="text-muted-foreground/60">
+              /
+            </span>
+            <h1 className="truncate text-sm text-muted-foreground">{t('install.title')}</h1>
           </div>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => window.close()}>
+          <Button
+            variant="ghost"
+            size="iconSm"
+            onClick={() => window.close()}
+            aria-label={t('common.close')}
+          >
             <X className="h-4 w-4" />
           </Button>
-        </header>
+        </div>
+      </header>
 
-        {state.status === 'loading' && (
-          <div className="rounded-card border border-border bg-card p-6">
-            <p className="flex items-center gap-2 text-sm text-muted-foreground">
-              <RefreshCw className="h-4 w-4 animate-spin" />
-              {t('install.fetching')}
-            </p>
-          </div>
-        )}
-
-        {state.status === 'error' && (
-          <div className="rounded-card border border-destructive/30 bg-destructive/5 p-6">
-            <p className="flex items-center gap-2 text-sm font-medium text-destructive">
-              <ShieldAlert className="h-4 w-4" />
-              {t('install.errorTitle')}
-            </p>
-            <p className="mt-2 whitespace-pre-wrap break-words text-xs text-destructive/90">
-              {state.message}
-            </p>
-            <div className="mt-4 flex gap-2">
-              <Button variant="outline" size="sm" onClick={retry}>
-                {t('common.retry')}
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => window.close()}>
-                {t('common.close')}
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {state.status === 'ready' && (
-          <>
-            <div className="rounded-card border border-border bg-card p-5">
-              <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-card bg-muted text-muted-foreground">
-                  <FileCode2 className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h2 className="truncate text-sm font-semibold">{state.summary.name}</h2>
-                    {state.summary.version && <Badge variant="outline">v{state.summary.version}</Badge>}
-                    {state.summary.isUpdate && <Badge variant="accent">{t('install.update')}</Badge>}
-                    {state.summary.isUpdate && state.summary.previousVersion && (
-                      <Badge variant="default">
-                        v{state.summary.previousVersion} → v{state.summary.version || '—'}
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {[state.summary.namespace, state.summary.author].filter(Boolean).join(' · ')}
-                  </p>
-                  {state.summary.description && (
-                    <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-muted-foreground">
-                      {state.summary.description}
-                    </p>
-                  )}
-                  <p className="mt-2 truncate text-2xs text-muted-foreground">
-                    {state.summary.sourceUrl || t('install.localSource')}
-                  </p>
-                </div>
-              </div>
-
-              <Separator className="my-4" />
-
-              <div className="grid gap-3 text-xs sm:grid-cols-2">
-                <InfoBlock title={t('install.permissions')}>
-                  {state.summary.grant.length && !state.summary.grant.includes('none') ? (
-                    <div className="flex flex-wrap gap-1">
-                      {state.summary.grant.map((grant) => (
-                        <Badge key={grant} variant="outline">
-                          {grant}
-                        </Badge>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-muted-foreground">{t('install.noPermissions')}</span>
-                  )}
-                </InfoBlock>
-                <InfoBlock title={t('install.network')}>
-                  {state.summary.connect.length ? (
-                    <div className="flex flex-wrap gap-1">
-                      {state.summary.connect.map((host) => (
-                        <Badge key={host} variant="accent">
-                          {host}
-                        </Badge>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-muted-foreground">{t('install.noNetwork')}</span>
-                  )}
-                </InfoBlock>
-                <InfoBlock title={t('install.requires')}>
-                  {state.summary.requireDetails?.length ? (
-                    <div className="space-y-1">
-                      {state.summary.requireDetails.map((item) => (
-                        <div key={item.url} className="break-all text-muted-foreground">
-                          <span className="text-foreground">{formatBytes(item.size)}</span> · {item.url}
-                          {item.hash && (
-                            <span className="ml-1 text-2xs opacity-70">
-                              #{item.hash.slice(0, 12)}
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <span className="text-muted-foreground">{t('install.none')}</span>
-                  )}
-                </InfoBlock>
-                <InfoBlock title={t('install.matches')}>
-                  <span className="break-all text-muted-foreground">
-                    {[...state.summary.matches, ...state.summary.includes].join(', ') ||
-                      t('install.allPages')}
-                  </span>
-                </InfoBlock>
-              </div>
-
-              {state.summary.warnings.length > 0 && (
-                <div className="mt-4 rounded-md border border-border bg-muted/40 p-3 text-2xs text-muted-foreground">
-                  {state.summary.warnings.map((warning) => (
-                    <p key={warning}>• {warning}</p>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <details className="rounded-card border border-border bg-card">
-              <summary className="cursor-pointer select-none px-4 py-3 text-xs font-medium">
-                {t('install.codePreview')}
-              </summary>
-              <pre className="max-h-72 overflow-auto border-t border-border p-4 text-2xs leading-relaxed scrollbar-lumo">
-                {state.summary.code}
-              </pre>
-            </details>
-
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                <input
-                  type="checkbox"
-                  checked={enabled}
-                  onChange={(event) => setEnabled(event.target.checked)}
-                />
-                {t('install.enableAfter')}
-              </label>
-              <div className="flex gap-2">
-                <Button variant="ghost" size="sm" onClick={() => window.close()}>
-                  {t('common.cancel')}
-                </Button>
-                <Button size="sm" onClick={() => void install()}>
-                  <Download className="mr-1.5 h-3.5 w-3.5" />
-                  {state.summary.isUpdate ? t('install.updateAction') : t('install.installAction')}
-                </Button>
-              </div>
-            </div>
-          </>
-        )}
-
-        {state.status === 'installing' && (
-          <div className="rounded-card border border-border bg-card p-6">
-            <p className="flex items-center gap-2 text-sm text-muted-foreground">
-              <RefreshCw className="h-4 w-4 animate-spin" />
-              {t('install.installing')}
-            </p>
-          </div>
-        )}
-
-        {state.status === 'installed' && (
-          <div className="rounded-card border border-border bg-card p-6">
-            <p className="text-sm font-medium text-foreground">{t('install.successTitle')}</p>
-            <p className="mt-1 text-xs text-muted-foreground">{t('install.successDesc')}</p>
-            <div className="mt-4 flex gap-2">
-              <Button size="sm" onClick={() => void chrome.runtime.openOptionsPage()}>
-                {t('install.openDashboard')}
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => window.close()}>
-                {t('common.close')}
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
+      <AnimatePresence mode="wait" initial={false}>
+        <motion.main
+          key={state.status}
+          {...STATE_MOTION}
+          className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-5 pt-6"
+        >
+          {state.status === 'loading' && <LoadingView />}
+          {state.status === 'error' && (
+            <ResultCard
+              tone="error"
+              icon={ShieldAlert}
+              title={t('install.errorTitle')}
+              description={state.message}
+              actions={
+                <>
+                  <Button variant="outline" size="sm" onClick={retry}>
+                    {t('common.retry')}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => window.close()}>
+                    {t('common.close')}
+                  </Button>
+                </>
+              }
+            />
+          )}
+          {state.status === 'installed' && (
+            <ResultCard
+              tone="success"
+              icon={CircleCheck}
+              title={t('install.successTitle')}
+              description={t('install.successDesc')}
+              identity={state.summary}
+              actions={
+                <>
+                  <Button size="sm" onClick={() => void chrome.runtime.openOptionsPage()}>
+                    {t('install.openDashboard')}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => window.close()}>
+                    {t('common.close')}
+                  </Button>
+                </>
+              }
+            />
+          )}
+          {state.status === 'ready' && (
+            <ReviewView
+              summary={state.summary}
+              installing={state.installing}
+              enabled={enabled}
+              onEnabledChange={setEnabled}
+              onInstall={() => void install()}
+            />
+          )}
+        </motion.main>
+      </AnimatePresence>
     </div>
   );
 }
 
-function InfoBlock({ title, children }: { title: string; children: ReactNode }) {
+function ReviewView({
+  summary,
+  installing,
+  enabled,
+  onEnabledChange,
+  onInstall,
+}: {
+  summary: InstallDraftSummary;
+  installing: boolean;
+  enabled: boolean;
+  onEnabledChange: (enabled: boolean) => void;
+  onInstall: () => void;
+}) {
+  const { t } = useTranslation();
+  const grants = summary.grant.filter((grant) => grant !== 'none');
+  const scope = [...summary.matches, ...summary.includes];
+  const lineCount = useMemo(() => summary.code.split('\n').length, [summary.code]);
+
   return (
-    <div className="min-w-0 space-y-1.5">
-      <p className="text-2xs font-medium uppercase tracking-wide text-muted-foreground">{title}</p>
-      <div className="break-words text-xs">{children}</div>
+    <>
+      <div className="space-y-4 pb-6">
+        <section className="rounded-card border border-border bg-card p-5 shadow-surface">
+          <div className="flex items-start gap-4">
+            <ScriptIcon src={summary.icon} size="lg" />
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                <h2 className="min-w-0 truncate text-lg font-semibold" title={summary.name}>
+                  {summary.name}
+                </h2>
+                {summary.isUpdate ? (
+                  <Badge variant="accent">
+                    {t('install.update')}
+                    {summary.previousVersion && (
+                      <span className="tabular-nums">
+                        {' '}
+                        v{summary.previousVersion} → v{summary.version || '—'}
+                      </span>
+                    )}
+                  </Badge>
+                ) : (
+                  summary.version && (
+                    <Badge variant="outline" className="tabular-nums">
+                      v{summary.version}
+                    </Badge>
+                  )
+                )}
+              </div>
+              {(summary.author || summary.namespace) && (
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  {[summary.author, summary.namespace].filter(Boolean).join(' · ')}
+                </p>
+              )}
+              {summary.description && (
+                <p className="mt-2.5 line-clamp-3 text-sm leading-relaxed text-muted-foreground text-pretty">
+                  {summary.description}
+                </p>
+              )}
+            </div>
+          </div>
+          <p className="mt-4 flex min-w-0 items-center gap-1.5 border-t border-border/70 pt-3 text-2xs text-muted-foreground">
+            <Link2 className="h-3 w-3 shrink-0" aria-hidden="true" />
+            <span className="min-w-0 truncate font-mono" title={summary.sourceUrl || undefined}>
+              {summary.sourceUrl || t('install.localSource')}
+            </span>
+          </p>
+        </section>
+
+        <section className="divide-y divide-border/70 rounded-card border border-border bg-card px-4 shadow-surface">
+          <Capability icon={KeyRound} title={t('install.permissions')}>
+            {grants.length ? (
+              <ChipList items={grants} variant="outline" />
+            ) : (
+              <Muted>{t('install.noPermissions')}</Muted>
+            )}
+          </Capability>
+          <Capability icon={Globe} title={t('install.network')}>
+            {summary.connect.length ? (
+              <ChipList items={summary.connect} variant="accent" />
+            ) : (
+              <Muted>{t('install.noNetwork')}</Muted>
+            )}
+          </Capability>
+          <Capability icon={Package} title={t('install.requires')}>
+            {summary.requireDetails?.length ? (
+              <ul className="space-y-1">
+                {summary.requireDetails.map((item) => (
+                  <li key={item.url} className="flex min-w-0 items-baseline gap-2 text-xs">
+                    <span className="shrink-0 tabular-nums text-foreground">
+                      {formatBytes(item.size)}
+                    </span>
+                    <span className="min-w-0 truncate font-mono text-muted-foreground" title={item.url}>
+                      {item.url}
+                    </span>
+                    {item.hash && (
+                      <span className="shrink-0 font-mono text-2xs text-muted-foreground/70">
+                        #{item.hash.slice(0, 12)}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <Muted>{t('install.none')}</Muted>
+            )}
+          </Capability>
+          <Capability icon={Crosshair} title={t('install.matches')}>
+            {scope.length ? (
+              <ChipList items={scope} variant="default" />
+            ) : (
+              <Muted>{t('install.allPages')}</Muted>
+            )}
+          </Capability>
+        </section>
+
+        {summary.warnings.length > 0 && (
+          <section
+            role="note"
+            className="flex gap-2.5 rounded-card border border-warning/30 bg-warning/10 px-4 py-3"
+          >
+            <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" aria-hidden="true" />
+            <ul className="min-w-0 space-y-1 text-xs leading-relaxed text-foreground">
+              {summary.warnings.map((warning) => (
+                <li key={warning} className="break-words">
+                  {warning}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        <Collapsible className="overflow-hidden rounded-card border border-border bg-card shadow-surface">
+          {/* Inset focus ring: the card clips its corners, so an outset ring
+              would be cut off. */}
+          <CollapsibleTrigger className="group gap-2 px-4 py-3 text-sm font-medium transition-colors duration-150 ease-standard hover:bg-accent/50 focus-visible:-outline-offset-2">
+            <ChevronRight
+              className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 ease-standard group-data-[state=open]:rotate-90"
+              aria-hidden="true"
+            />
+            <span className="min-w-0 flex-1 truncate">{t('install.codePreview')}</span>
+            <span className="shrink-0 text-2xs font-normal tabular-nums text-muted-foreground">
+              {t('install.lines', { count: lineCount })} · {formatBytes(summary.codeSize)}
+            </span>
+          </CollapsibleTrigger>
+          {/* Mounted on open only: highlighting a large script is the most
+              expensive thing this page can do, and most installs never look. */}
+          <CollapsibleContent>
+            <div className="scrollbar-lumo max-h-[28rem] overflow-auto border-t border-border bg-code-bg py-3 pr-4">
+              <CodeView code={summary.code} lineNumbers />
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      </div>
+
+      {/* The decision floats over the review like the list's batch bar: the
+          same surface for "act on what you are looking at" everywhere. */}
+      <div className="sticky bottom-0 z-10 mt-auto pb-4 pt-1">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-popover/95 py-2 pl-2.5 pr-2 shadow-elev2 backdrop-blur-md">
+          <label className="-ml-1.5 flex cursor-pointer items-center gap-0.5 text-sm text-foreground">
+            <Checkbox
+              checked={enabled}
+              onCheckedChange={onEnabledChange}
+              label={t('install.enableAfter')}
+              disabled={installing}
+            />
+            <span aria-hidden="true">{t('install.enableAfter')}</span>
+          </label>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" onClick={() => window.close()} disabled={installing}>
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={onInstall} disabled={installing} aria-busy={installing}>
+              {installing ? (
+                <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Download className="h-3.5 w-3.5" />
+              )}
+              {installing
+                ? t('install.installing')
+                : summary.isUpdate
+                  ? t('install.updateAction')
+                  : t('install.installAction')}
+            </Button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/** One capability: what the script may touch, in a fixed label column. */
+function Capability({
+  icon: Icon,
+  title,
+  children,
+}: {
+  icon: LucideIcon;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-start gap-x-4 gap-y-1.5 py-3">
+      <div className="flex w-32 shrink-0 items-center gap-2 text-sm text-foreground">
+        <Icon className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+        <span className="truncate">{title}</span>
+      </div>
+      <div className="min-w-0 flex-1 basis-56 pt-px">{children}</div>
     </div>
+  );
+}
+
+function ChipList({
+  items,
+  variant,
+}: {
+  items: string[];
+  variant: 'default' | 'outline' | 'accent';
+}) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {items.map((item) => (
+        <Badge key={item} variant={variant} className="max-w-full font-mono">
+          <span className="truncate">{item}</span>
+        </Badge>
+      ))}
+    </div>
+  );
+}
+
+function Muted({ children }: { children: ReactNode }) {
+  return <span className="text-xs text-muted-foreground">{children}</span>;
+}
+
+/** Shaped like the review it replaces: hero, capability rows, collapsed code. */
+function LoadingView() {
+  const { t } = useTranslation();
+  return (
+    <div className="space-y-4" role="status" aria-busy="true" aria-label={t('install.fetching')}>
+      <div className="rounded-card border border-border bg-card p-5 shadow-surface">
+        <div className="flex items-start gap-4">
+          <Skeleton className="h-12 w-12 rounded-[12px]" />
+          <div className="min-w-0 flex-1 space-y-2 pt-1">
+            <Skeleton className="h-5 w-2/5" />
+            <Skeleton className="h-3 w-1/3" />
+            <Skeleton className="mt-3 h-3.5 w-4/5" />
+          </div>
+        </div>
+        <Skeleton className="mt-5 h-3 w-1/2" />
+      </div>
+      <div className="divide-y divide-border/70 rounded-card border border-border bg-card px-4 shadow-surface">
+        {[0, 1, 2, 3].map((index) => (
+          <div key={index} className="flex items-center gap-4 py-3.5">
+            <Skeleton className="h-3.5 w-24" />
+            <Skeleton className="h-3.5 w-1/3" />
+          </div>
+        ))}
+      </div>
+      <Skeleton className="h-11 w-full rounded-card" />
+    </div>
+  );
+}
+
+function ResultCard({
+  tone,
+  icon: Icon,
+  title,
+  description,
+  identity,
+  actions,
+}: {
+  tone: 'success' | 'error';
+  icon: LucideIcon;
+  title: string;
+  description: string;
+  /** The script the result is about, when there is one. */
+  identity?: InstallDraftSummary;
+  actions: ReactNode;
+}) {
+  return (
+    <section
+      role={tone === 'error' ? 'alert' : 'status'}
+      className="rounded-card border border-border bg-card p-6 shadow-surface"
+    >
+      <div className="flex items-start gap-3.5">
+        <span
+          className={cn(
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-full',
+            tone === 'success' ? 'bg-success/12 text-success' : 'bg-destructive/12 text-destructive',
+          )}
+        >
+          <Icon className="h-4.5 w-4.5" aria-hidden="true" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-base font-semibold text-foreground">{title}</p>
+          <p
+            className={cn(
+              'mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed',
+              tone === 'error' ? 'text-destructive' : 'text-muted-foreground',
+            )}
+          >
+            {description}
+          </p>
+          {identity && (
+            <div className="mt-4 flex min-w-0 items-center gap-2.5 rounded-control border border-border/70 bg-background px-3 py-2">
+              <ScriptIcon src={identity.icon} size="md" dimmed={false} />
+              <span className="min-w-0 truncate text-sm font-medium">{identity.name}</span>
+              {identity.version && (
+                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                  v{identity.version}
+                </span>
+              )}
+            </div>
+          )}
+          <div className="mt-5 flex flex-wrap gap-2">{actions}</div>
+        </div>
+      </div>
+    </section>
   );
 }

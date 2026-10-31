@@ -340,6 +340,33 @@ export async function listLogs(limit = 500, uuid?: string): Promise<LogEntry[]> 
     .slice(0, limit);
 }
 
+/**
+ * Count entries newer than `since` (exclusive), optionally of one level.
+ *
+ * Walks the `time` index from `since` forward instead of loading the store:
+ * the answer only ever concerns the tail written after the user last looked,
+ * so the cost tracks the unread count, not the size of the log.
+ */
+export async function countLogsSince(since: number, level?: LogEntry['level']): Promise<number> {
+  const db = await openDb();
+  const tx = db.transaction('logs', 'readonly');
+  const request = tx
+    .objectStore('logs')
+    .index('time')
+    .openCursor(IDBKeyRange.lowerBound(since, true));
+  let count = 0;
+  await new Promise<void>((resolve, reject) => {
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) return resolve();
+      if (!level || (cursor.value as LogEntry).level === level) count += 1;
+      cursor.continue();
+    };
+    request.onerror = () => reject(request.error ?? new Error('IndexedDB request failed'));
+  });
+  return count;
+}
+
 export async function clearLogs(uuid?: string): Promise<void> {
   if (!uuid) {
     await clearStore('logs');

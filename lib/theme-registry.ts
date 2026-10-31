@@ -44,6 +44,8 @@ export interface ThemeDefinition {
   background: string;
   /** Colours handed to the theme picker preview. All resolve from the palette. */
   swatch: {
+    /** The options window frame the sidebar sits on (`--color-sidebar`). */
+    frame: string;
     background: string;
     surface: string;
     border: string;
@@ -63,6 +65,7 @@ export const THEMES: Record<ResolvedTheme, ThemeDefinition> = {
     descriptionKey: 'options.appearance.themeLightDesc',
     background: 'oklch(0.985 0.002 95)',
     swatch: {
+      frame: 'oklch(0.962 0.004 95)',
       background: 'oklch(0.985 0.002 95)',
       surface: 'oklch(1 0 0)',
       border: 'oklch(0.902 0.004 95)',
@@ -75,6 +78,7 @@ export const THEMES: Record<ResolvedTheme, ThemeDefinition> = {
     descriptionKey: 'options.appearance.themeDarkDesc',
     background: 'oklch(0.168 0.004 270)',
     swatch: {
+      frame: 'oklch(0.148 0.004 270)',
       background: 'oklch(0.168 0.004 270)',
       surface: 'oklch(0.205 0.004 270)',
       border: 'oklch(0.306 0.006 270)',
@@ -87,6 +91,7 @@ export const THEMES: Record<ResolvedTheme, ThemeDefinition> = {
     descriptionKey: 'options.appearance.themeMidnightDesc',
     background: 'oklch(0.196 0.026 262)',
     swatch: {
+      frame: 'oklch(0.172 0.026 262)',
       background: 'oklch(0.196 0.026 262)',
       surface: 'oklch(0.232 0.028 262)',
       border: 'oklch(0.336 0.03 262)',

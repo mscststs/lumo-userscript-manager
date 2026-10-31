@@ -85,6 +85,15 @@ export interface UserScript {
   codeSize: number;
 }
 
+/**
+ * A library record as the manager UI receives it: the stored script plus the
+ * icon to paint right now — the cached data URL, the remote `@icon` while the
+ * cache warms, or `undefined` for the fallback glyph. Never persisted.
+ */
+export interface ManagerScript extends UserScript {
+  iconUrl?: string;
+}
+
 export interface ScriptVersion {
   /** `${uuid}:${timestamp}` */
   id: string;

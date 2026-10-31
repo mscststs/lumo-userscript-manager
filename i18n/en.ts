@@ -81,6 +81,8 @@ export const en = {
       about: 'About',
       collapse: 'Collapse sidebar',
       expand: 'Expand sidebar',
+      label: 'Navigation',
+      unreadErrors: '{{label}}, {{count}} unread errors',
     },
     general: {
       title: 'General',
@@ -90,7 +92,6 @@ export const en = {
     },
     appearance: {
       title: 'Appearance',
-      description: 'Theme, language and UI scale across every extension page.',
       mode: 'Appearance',
       modeHint: 'Light, dark, or follow the operating system.',
       modeLight: 'Light',
@@ -134,7 +135,6 @@ export const en = {
     },
     about: {
       title: 'About',
-      description: 'Build information for this extension.',
       intro:
         'A native Chrome userscript manager: install, edit, enable and update scripts without leaving the browser. Everything stays on this device.',
       runtime: 'Runtime',
@@ -157,7 +157,6 @@ export const en = {
   },
   scripts: {
     title: 'Scripts',
-    description: 'Install, edit and control every userscript in one place.',
     new: 'New script',
     import: 'Import',
     importUrl: 'From URL',
@@ -190,13 +189,13 @@ export const en = {
     toggle: 'Toggle script',
     tags: 'Tags',
     matches: 'Matches',
-    lastUpdated: 'Updated',
     selected: '{{count}} selected',
     batchEnable: 'Enable',
     batchDisable: 'Disable',
     batchDelete: 'Delete',
     clearSelection: 'Clear',
     selectAll: 'Select all',
+    updatedAt: 'Updated {{time}}',
     created: 'Created',
     namespace: 'Namespace',
     noSource: 'Local script',
@@ -322,7 +321,6 @@ export const en = {
   },
   settings: {
     title: 'Settings',
-    description: 'Runtime, injection and data preferences.',
     sections: {
       general: 'General',
       updates: 'Updates',
@@ -383,7 +381,6 @@ export const en = {
   },
   logs: {
     title: 'Logs',
-    description: 'Console output and errors captured from userscripts.',
     empty: 'No log entries yet.',
     clear: 'Clear logs',
     clearConfirm: 'Clear all log entries?',
@@ -394,7 +391,6 @@ export const en = {
   },
   install: {
     title: 'Install script',
-    subtitle: 'Review what will run before it is installed.',
     fetching: 'Fetching script…',
     installing: 'Installing…',
     errorTitle: 'Installation failed',
@@ -408,6 +404,7 @@ export const en = {
     noNetwork: 'No extra network access',
     none: 'None',
     count: '{{count}} files',
+    lines: '{{count}} lines',
     allPages: 'All pages',
     codePreview: 'Code preview',
     enableAfter: 'Enable after install',

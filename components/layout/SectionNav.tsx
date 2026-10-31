@@ -1,3 +1,5 @@
+import { useId } from 'react';
+import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 
 interface SectionNavProps<T extends string> {
@@ -5,11 +7,6 @@ interface SectionNavProps<T extends string> {
   value: T;
   onChange: (value: T) => void;
   ariaLabel: string;
-  /**
-   * Extra classes for the strip. Callers that live inside a padded header pass
-   * a negative bottom margin so the active underline lands *on* the header rule
-   * instead of floating above it.
-   */
   className?: string;
 }
 
@@ -19,10 +16,17 @@ interface SectionNavProps<T extends string> {
  * Deliberately *not* the segmented control used for filters. Two different
  * things are being switched:
  *   segmented  → a view of the same data (全部 / 已启用 / 有更新)
- *   section nav → a different document (通用 / 外观 / 更新 / 数据)
+ *   section nav → a different document (通用 / 更新 / 数据)
  * Giving them different shapes means the user can tell which kind of change a
  * click will cause before reading the labels (interaction normalisation cuts
  * both ways: same-looking controls must do the same *kind* of thing).
+ *
+ * The strip sits at the bottom edge of a page header and is pulled down one
+ * pixel, so the active underline lands *on* the header rule. The underline is
+ * one shared-layout object that slides between tabs — the same physics as the
+ * segmented thumb and the sidebar selection — while the content below swaps
+ * instantly. Every tab carries the same weight, so selecting one never
+ * changes the width of its label and nudges its neighbours.
  */
 export function SectionNav<T extends string>({
   items,
@@ -31,6 +35,7 @@ export function SectionNav<T extends string>({
   ariaLabel,
   className,
 }: SectionNavProps<T>) {
+  const id = useId();
   const index = Math.max(
     0,
     items.findIndex((item) => item.value === value),
@@ -40,7 +45,7 @@ export function SectionNav<T extends string>({
     <div
       role="tablist"
       aria-label={ariaLabel}
-      className={cn('flex items-center gap-5 overflow-x-auto', className)}
+      className={cn('-mb-px flex items-center gap-5 overflow-x-auto', className)}
       onKeyDown={(event) => {
         if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
         event.preventDefault();
@@ -60,13 +65,19 @@ export function SectionNav<T extends string>({
             tabIndex={active ? 0 : -1}
             onClick={() => onChange(item.value)}
             className={cn(
-              'shrink-0 border-b-2 pb-1.5 pt-1 text-sm transition-colors duration-150 ease-standard',
-              active
-                ? 'border-primary font-medium text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground',
+              'relative shrink-0 pb-2.5 pt-0.5 text-sm font-medium transition-colors duration-150 ease-standard',
+              active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
             )}
           >
             {item.label}
+            {active && (
+              <motion.span
+                layoutId={`section-nav-${id}`}
+                aria-hidden="true"
+                className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-primary"
+                transition={{ type: 'spring', stiffness: 520, damping: 40, mass: 0.7 }}
+              />
+            )}
           </button>
         );
       })}

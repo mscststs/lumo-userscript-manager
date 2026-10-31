@@ -3,6 +3,7 @@ import {
   getDraft,
   listLogs,
   clearLogs,
+  countLogsSince,
   clearStore,
   replaceResources,
   cleanupDrafts,
@@ -27,11 +28,13 @@ import {
   handleHostRequest,
   HostError,
 } from '@/lib/background/host-service';
+import { broadcast } from '@/lib/background/events';
 import {
-  broadcast,
   commitInstall,
   destroyScript,
   getAllScripts,
+  getEditorDetail,
+  getManagerScripts,
   getPopupData,
   getScriptDetail,
   prepareInstall,
@@ -167,9 +170,9 @@ async function handleRuntimeMessage(
       };
     }
     case 'scripts:list':
-      return getAllScripts(Boolean(payload.includeRemoved));
+      return getManagerScripts(Boolean(payload.includeRemoved));
     case 'scripts:getDetail':
-      return getScriptDetail(String(payload.uuid ?? ''));
+      return getEditorDetail(String(payload.uuid ?? ''));
     case 'scripts:save':
       return saveScriptFromCode(
         payload.uuid ? String(payload.uuid) : null,
@@ -239,13 +242,17 @@ async function handleRuntimeMessage(
       return listLogs(Number(payload.limit ?? 500), payload.uuid ? String(payload.uuid) : undefined);
     case 'logs:clear':
       await clearLogs(payload.uuid ? String(payload.uuid) : undefined);
+      broadcast('logs-changed');
       return true;
+    case 'logs:unread':
+      return { errors: await countLogsSince(await storage.getLogsSeenAt(), 'error') };
     case 'backup:export':
       return exportBackup();
     case 'backup:import':
       return importBackup(payload);
     case 'storage:clear':
       await clearStore('logs');
+      broadcast('logs-changed');
       return true;
     default:
       throw new Error(`Unknown message: ${type}`);

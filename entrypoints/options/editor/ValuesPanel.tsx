@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { EmptyState } from '@/components/layout/EmptyState';
+import { CodeView } from '@/components/code/CodeView';
 import { SettingsGroup } from '@/components/settings/SettingsGroup';
 
 /**
@@ -85,9 +86,13 @@ export function ValuesPanel({
                   <TooltipContent side="left">{t('editor.deleteValue')}</TooltipContent>
                 </Tooltip>
               </div>
-              <pre className="scrollbar-lumo mt-1.5 max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-control border border-border bg-background px-2.5 py-2 font-mono text-2xs leading-relaxed text-muted-foreground">
-                {JSON.stringify(value, null, 2)}
-              </pre>
+              <div className="scrollbar-lumo mt-1.5 max-h-40 overflow-auto rounded-control border border-border bg-code-bg px-2.5 py-2">
+                <CodeView
+                  code={JSON.stringify(value, null, 2) ?? String(value)}
+                  lang="json"
+                  className="[&_pre]:whitespace-pre-wrap [&_pre]:break-all"
+                />
+              </div>
             </div>
           ))
         )}

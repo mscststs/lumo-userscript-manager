@@ -12,7 +12,11 @@ import {
 } from 'lucide-react';
 import { ThemeInit } from '@/lib/theme';
 import { FontSizeInit } from '@/lib/font-size';
+import { sendBg, onLumoEvent } from '@/lib/messages';
+import { REPOSITORY_URL } from '@/lib/project';
 import { cn } from '@/lib/utils';
+import { useStorageWatch } from '@/store/useStorageWatch';
+import { BrandMark } from '@/components/brand/BrandMark';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { ToastProvider } from '@/components/ui/toast';
@@ -96,11 +100,40 @@ const NAV: {
   { name: 'about', labelKey: 'options.nav.about', icon: <Info className="h-4 w-4" /> },
 ];
 
+/**
+ * Errors logged since the log view was last on screen.
+ *
+ * Re-counted when the log store changes and when the "seen" pointer moves — the
+ * log page advances it — so opening the log view in one window clears the
+ * badge in every other window too.
+ */
+function useUnreadErrors(): number {
+  const [errors, setErrors] = useState(0);
+
+  const refresh = useCallback(() => {
+    void sendBg<{ errors: number }>('logs:unread')
+      .then((result) => setErrors(result.errors))
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    refresh();
+    return onLumoEvent((event) => {
+      if (event === 'logs-changed') refresh();
+    });
+  }, [refresh]);
+  useStorageWatch('logsSeenAt', refresh);
+
+  return errors;
+}
+
 export default function App() {
   const { t } = useTranslation();
   const { route, navigate } = useHashRoute();
   const [collapsed, setCollapsed] = useState(false);
   const active = route.name === 'editor' ? 'scripts' : route.name;
+  const unreadErrors = useUnreadErrors();
+  const version = chrome.runtime.getManifest().version;
 
   const content = useMemo(() => {
     if (route.name === 'scripts') {
@@ -138,38 +171,45 @@ export default function App() {
     <MotionConfig reducedMotion="user">
       <TooltipProvider delayDuration={400}>
         <ToastProvider>
-          <div className="flex h-dvh w-full overflow-hidden bg-background text-foreground">
+          {/* The window is the frame: the sidebar shares its colour and the page
+              sits on it as one raised panel. Navigation reads as part of the
+              window rather than as a second pane competing with the content. */}
+          <div className="flex h-dvh w-full overflow-hidden bg-sidebar text-foreground">
             <ThemeInit />
             <FontSizeInit />
 
             <nav
+              aria-label={t('options.nav.label')}
               className={cn(
-                'flex h-full shrink-0 flex-col border-r border-border bg-sidebar transition-[width] duration-200 ease-standard',
+                'flex h-full shrink-0 flex-col py-2 transition-[width] duration-200 ease-standard',
                 collapsed ? 'w-14' : 'w-14 md:w-56',
               )}
             >
               <div
                 className={cn(
-                  'flex h-14 shrink-0 items-center gap-2.5 px-3',
+                  'flex h-14 shrink-0 items-center gap-2.5 px-3.5',
                   !collapsed && 'md:px-4',
                 )}
               >
-                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-control bg-primary/10 text-primary">
-                  <FileCode2 className="h-3.5 w-3.5" aria-hidden="true" />
-                </div>
-                <div className={cn('min-w-0', collapsed ? 'hidden' : 'hidden md:block')}>
+                <BrandMark className="h-7 w-7" />
+                <p
+                  className={cn(
+                    'min-w-0 truncate text-sm font-semibold text-foreground',
+                    collapsed ? 'hidden' : 'hidden md:block',
+                  )}
+                >
                   {/* Product wordmark stays English in every locale, like the
                       extension name in the Chrome UI. */}
-                  <p className="truncate text-sm font-semibold leading-tight text-foreground">
-                    Lumo Userscripts
-                  </p>
-                </div>
+                  Lumo Userscripts
+                </p>
               </div>
 
               <div className="min-h-0 flex-1 overflow-y-auto scrollbar-lumo px-2 py-1">
                 <div className="space-y-0.5">
                   {NAV.map((item) => {
                     const isActive = active === item.name;
+                    const badge = item.name === 'logs' && !isActive ? unreadErrors : 0;
+                    const label = t(item.labelKey);
                     return (
                       <Tooltip key={item.name}>
                         <TooltipTrigger asChild>
@@ -177,8 +217,15 @@ export default function App() {
                             type="button"
                             onClick={() => navigate({ name: item.name })}
                             aria-current={isActive ? 'page' : undefined}
+                            // Named explicitly: on the rail the visible label is
+                            // display:none, which would leave the button nameless.
+                            aria-label={
+                              badge > 0
+                                ? t('options.nav.unreadErrors', { label, count: badge })
+                                : label
+                            }
                             className={cn(
-                              'relative flex h-9 w-full items-center gap-2.5 rounded-control px-2.5 text-sm',
+                              'relative flex h-8 w-full items-center gap-2.5 rounded-control px-2.5 text-sm',
                               'transition-colors duration-150 ease-standard',
                               isActive
                                 ? 'font-medium text-foreground'
@@ -186,11 +233,14 @@ export default function App() {
                               collapsed ? 'md:justify-center md:px-0' : 'md:justify-start',
                             )}
                           >
+                            {/* The selection is a raised chip — the same object
+                                as the segmented thumb — and slides between rows
+                                rather than blinking from one to the next. */}
                             {isActive && (
                               <motion.span
                                 layoutId="options-nav-active"
                                 aria-hidden="true"
-                                className="absolute inset-0 rounded-control bg-accent"
+                                className="absolute inset-0 rounded-control border border-border/60 bg-card shadow-elev1"
                                 transition={{ type: 'spring', stiffness: 560, damping: 44, mass: 0.6 }}
                               />
                             )}
@@ -201,19 +251,39 @@ export default function App() {
                               )}
                             >
                               {item.icon}
+                              {badge > 0 && (
+                                <span
+                                  aria-hidden="true"
+                                  className={cn(
+                                    'absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-destructive',
+                                    collapsed ? '' : 'md:hidden',
+                                  )}
+                                />
+                              )}
                             </span>
                             <span
                               className={cn(
-                                'text-optical relative z-10 min-w-0 truncate',
+                                'text-optical relative z-10 min-w-0 flex-1 truncate text-left',
                                 collapsed ? 'hidden' : 'hidden md:inline',
                               )}
                             >
-                              {t(item.labelKey)}
+                              {label}
                             </span>
+                            {badge > 0 && (
+                              <span
+                                aria-hidden="true"
+                                className={cn(
+                                  'relative z-10 h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-2xs font-semibold tabular-nums leading-none text-destructive-foreground',
+                                  collapsed ? 'hidden' : 'hidden md:inline-flex',
+                                )}
+                              >
+                                {badge > 99 ? '99+' : badge}
+                              </span>
+                            )}
                           </button>
                         </TooltipTrigger>
                         <TooltipContent side="right" className={collapsed ? '' : 'md:hidden'}>
-                          {t(item.labelKey)}
+                          {label}
                         </TooltipContent>
                       </Tooltip>
                     );
@@ -223,10 +293,20 @@ export default function App() {
 
               <div
                 className={cn(
-                  'flex h-12 shrink-0 items-center border-t border-border px-2',
-                  collapsed ? 'md:justify-center' : 'md:justify-end',
+                  'hidden h-10 shrink-0 items-center gap-2 px-2 md:flex',
+                  collapsed ? 'md:justify-center' : 'md:justify-between md:pl-4',
                 )}
               >
+                {!collapsed && (
+                  <a
+                    href={REPOSITORY_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="min-w-0 truncate rounded-sm font-mono text-2xs text-muted-foreground transition-colors duration-150 ease-standard hover:text-foreground"
+                  >
+                    v{version}
+                  </a>
+                )}
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -234,7 +314,7 @@ export default function App() {
                       size="iconSm"
                       onClick={() => setCollapsed((value) => !value)}
                       aria-label={t(collapsed ? 'options.nav.expand' : 'options.nav.collapse')}
-                      className="hidden md:inline-flex"
+                      className="text-muted-foreground"
                     >
                       {collapsed ? (
                         <PanelLeftOpen className="h-3.5 w-3.5" />
@@ -250,11 +330,11 @@ export default function App() {
               </div>
             </nav>
 
-            <main className="min-h-0 min-w-0 flex-1 overflow-y-auto scrollbar-lumo scroll-container">
-              <div
-                key={route.name}
-                className={route.name === 'editor' ? 'h-full' : 'min-h-full'}
-              >
+            {/* Each page owns its scrolling (see PageLayout): the panel itself
+                never scrolls, so its rounded corners and the page heading stay
+                put while the content moves underneath. */}
+            <main className="my-2 mr-2 min-h-0 min-w-0 flex-1 overflow-hidden rounded-card border border-border/70 bg-background shadow-panel">
+              <div key={route.name} className="h-full">
                 {content}
               </div>
             </main>

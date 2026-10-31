@@ -4,7 +4,8 @@ import { parseMetadata, resolveMetadataUrls } from '@/lib/script/metadata';
 import { isNewerVersion } from '@/lib/script/semver';
 import { sha256Hex } from '@/lib/script/hash';
 import { storage } from '@/store/storage';
-import { broadcast, commitInstall, getAllScripts, prepareInstall } from './scripts';
+import { commitInstall, getAllScripts, prepareInstall } from './scripts';
+import { broadcast } from './events';
 import { requestRegistration } from './registry';
 
 const UPDATE_ALARM = 'lumo:update-check';
