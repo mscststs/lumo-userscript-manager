@@ -85,6 +85,7 @@ export const zh: TranslationSchema = {
       expand: '展开侧栏',
       label: '导航',
       unreadErrors: '{{label}}，{{count}} 条未读错误',
+      pendingRequests: '{{label}}，{{count}} 个待处理的访问请求',
     },
     general: {
       title: '通用',
@@ -413,6 +414,15 @@ export const zh: TranslationSchema = {
       requests: '访问请求',
       requestsHint: '请求使用此端点的扩展。允许后会启用智能体访问并将该扩展加入允许列表。',
       unknownClient: '未知扩展',
+      requestDialog: {
+        title: '扩展请求访问',
+        description: '{{client}} 请求{{scope}}。',
+        scopeRead: '读取本扩展的脚本库',
+        scopeWrite: '读取并修改本扩展的脚本',
+        grants: '允许后将启用智能体访问，并将该扩展加入允许列表。',
+        later: '稍后',
+        queued: '还有 {{count}} 个',
+      },
       approve: '允许并启用',
       dismiss: '忽略',
       approved: '已允许该扩展。',

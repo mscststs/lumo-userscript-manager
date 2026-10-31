@@ -83,6 +83,7 @@ export const en = {
       expand: 'Expand sidebar',
       label: 'Navigation',
       unreadErrors: '{{label}}, {{count}} unread errors',
+      pendingRequests: '{{label}}, {{count}} pending access requests',
     },
     general: {
       title: 'General',
@@ -422,6 +423,15 @@ export const en = {
       requestsHint:
         'Extensions that asked to use this endpoint. Allowing one enables agent access and adds it to the allowlist.',
       unknownClient: 'Unknown extension',
+      requestDialog: {
+        title: 'Extension requests access',
+        description: '{{client}} wants to {{scope}}.',
+        scopeRead: 'read this extension’s script library',
+        scopeWrite: 'read and modify this extension’s scripts',
+        grants: 'Allowing enables agent access and adds this extension to the allowlist.',
+        later: 'Later',
+        queued: '{{count}} more',
+      },
       approve: 'Allow and enable',
       dismiss: 'Dismiss',
       approved: 'Extension allowed.',

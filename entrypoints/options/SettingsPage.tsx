@@ -13,9 +13,10 @@ import {
   X,
 } from 'lucide-react';
 import type { AgentAuditEntry } from '@/lib/db';
-import type { AgentPendingRequest, AgentSettings, RuntimeStatus, UISettings } from '@/types';
+import type { AgentSettings, RuntimeStatus, UISettings } from '@/types';
 import { storage } from '@/store/storage';
 import { useStorageWatch } from '@/store/useStorageWatch';
+import { useAgentAccess } from '@/store/useAgentAccess';
 import { sendBg, onLumoEvent } from '@/lib/messages';
 import { createBackupZip, readBackupZip, type BackupData } from '@/lib/backup';
 import { BackupError, parseBackupJson, summarizeBackup } from '@/lib/backup-format';
@@ -97,7 +98,10 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
   const [agentId, setAgentId] = useState('');
   const [copied, setCopied] = useState(false);
   const [audit, setAudit] = useState<AgentAuditEntry[]>([]);
-  const [pendingRequests, setPendingRequests] = useState<AgentPendingRequest[]>([]);
+  // Same queue the approval dialog renders; the inline list is the durable
+  // entry point for users who turned automatic prompting off.
+  const agentAccess = useAgentAccess();
+  const pendingRequests = agentAccess.actionable;
   const [runtime, setRuntime] = useState<RuntimeStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [backupStats, setBackupStats] = useState<BackupStats | null>(null);
@@ -165,10 +169,6 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
     if (next) setAgent(next);
   });
 
-  useStorageWatch<AgentPendingRequest[]>('agentPendingRequests', (next) => {
-    setPendingRequests(next ?? []);
-  });
-
   const update = async (patch: Partial<UISettings>) => {
     if (!settings) return;
     const next = { ...settings, ...patch };
@@ -232,16 +232,11 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
   useEffect(() => {
     if (section !== 'agent') return;
     void loadAudit();
-    void sendBg<AgentPendingRequest[]>('agent:pendingRequests')
-      .then(setPendingRequests)
-      .catch(() => undefined);
   }, [section, loadAudit]);
 
   const approveRequest = async (id: string) => {
     try {
-      const next = await sendBg<AgentSettings | undefined>('agent:approveRequest', { id });
-      if (next) setAgent(next);
-      setPendingRequests((prev) => prev.filter((request) => request.id !== id));
+      await agentAccess.approve(id);
       toast({ title: t('settings.agent.approved'), variant: 'success' });
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -250,12 +245,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
 
   const dismissRequest = async (id: string) => {
     try {
-      await sendBg('agent:dismissRequest', { id });
-      setPendingRequests((prev) =>
-        prev.map((request) =>
-          request.id === id ? { ...request, dismissedAt: Date.now() } : request,
-        ),
-      );
+      await agentAccess.dismiss(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -612,40 +602,43 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
 
       {section === 'agent' && agent && (
         <>
-          {pendingRequests.some((request) => !request.dismissedAt) && (
+          {pendingRequests.length > 0 && (
             <SettingsGroup
               title={t('settings.agent.requests')}
               description={t('settings.agent.requestsHint')}
             >
-              {pendingRequests
-                .filter((request) => !request.dismissedAt)
-                .map((request) => (
-                  <div
-                    key={request.id}
-                    className="flex flex-wrap items-center justify-between gap-3 py-2.5"
-                  >
-                    <div className="min-w-0 flex-1 basis-52">
-                      <p className="text-sm font-medium">
+              {pendingRequests.map((request) => (
+                <div
+                  key={request.id}
+                  className="flex flex-wrap items-center justify-between gap-3 py-2.5"
+                >
+                  <div className="min-w-0 flex-1 basis-52">
+                    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                      <p className="min-w-0 truncate text-sm font-medium">
                         {request.name || t('settings.agent.unknownClient')}
                       </p>
-                      <code className="mt-0.5 block truncate font-mono text-2xs text-muted-foreground">
-                        {request.id}
-                      </code>
+                      {request.version && (
+                        <Badge variant="outline">{request.version}</Badge>
+                      )}
                     </div>
-                    <div className="flex shrink-0 gap-2">
-                      <Button size="sm" onClick={() => void approveRequest(request.id)}>
-                        {t('settings.agent.approve')}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => void dismissRequest(request.id)}
-                      >
-                        {t('settings.agent.dismiss')}
-                      </Button>
-                    </div>
+                    <code className="mt-0.5 block select-all truncate font-mono text-2xs text-muted-foreground">
+                      {request.id}
+                    </code>
                   </div>
-                ))}
+                  <div className="flex shrink-0 gap-2">
+                    <Button size="sm" onClick={() => void approveRequest(request.id)}>
+                      {t('settings.agent.approve')}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => void dismissRequest(request.id)}
+                    >
+                      {t('settings.agent.dismiss')}
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </SettingsGroup>
           )}
 

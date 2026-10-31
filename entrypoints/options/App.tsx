@@ -15,7 +15,9 @@ import { FontSizeInit } from '@/lib/font-size';
 import { sendBg, onLumoEvent } from '@/lib/messages';
 import { cn } from '@/lib/utils';
 import { useStorageWatch } from '@/store/useStorageWatch';
+import { useAgentAccess } from '@/store/useAgentAccess';
 import { BrandMark } from '@/components/brand/BrandMark';
+import { AgentAccessDialog } from '@/components/agent/AgentAccessDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { ToastProvider } from '@/components/ui/toast';
@@ -132,6 +134,8 @@ export default function App() {
   const [collapsed, setCollapsed] = useState(false);
   const active = route.name === 'editor' ? 'scripts' : route.name;
   const unreadErrors = useUnreadErrors();
+  // Shared with the approval dialog: the same queue drives the nav badge.
+  const agentAccess = useAgentAccess();
 
   const content = useMemo(() => {
     if (route.name === 'scripts') {
@@ -206,7 +210,21 @@ export default function App() {
                 <div className="space-y-0.5">
                   {NAV.map((item) => {
                     const isActive = active === item.name;
-                    const badge = item.name === 'logs' && !isActive ? unreadErrors : 0;
+                    const pendingAccess = item.name === 'settings' ? agentAccess.actionable.length : 0;
+                    const badge = isActive
+                      ? 0
+                      : item.name === 'logs'
+                        ? unreadErrors
+                        : pendingAccess;
+                    // Amber for a decision waiting on the user, red for faults:
+                    // a pending request is not an error.
+                    const tone =
+                      item.name === 'settings'
+                        ? { dot: 'bg-warning', pill: 'bg-warning text-warning-foreground' }
+                        : {
+                            dot: 'bg-destructive',
+                            pill: 'bg-destructive text-destructive-foreground',
+                          };
                     const label = t(item.labelKey);
                     return (
                       <Tooltip key={item.name}>
@@ -219,7 +237,12 @@ export default function App() {
                             // zero width, which would leave the button nameless.
                             aria-label={
                               badge > 0
-                                ? t('options.nav.unreadErrors', { label, count: badge })
+                                ? t(
+                                    item.name === 'settings'
+                                      ? 'options.nav.pendingRequests'
+                                      : 'options.nav.unreadErrors',
+                                    { label, count: badge },
+                                  )
                                 : label
                             }
                             className={cn(
@@ -252,7 +275,8 @@ export default function App() {
                                 <span
                                   aria-hidden="true"
                                   className={cn(
-                                    'absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full bg-destructive',
+                                    'absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full',
+                                    tone.dot,
                                     collapsed ? '' : 'md:hidden',
                                   )}
                                 />
@@ -271,7 +295,8 @@ export default function App() {
                               <span
                                 aria-hidden="true"
                                 className={cn(
-                                  'relative z-10 h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-2xs font-semibold tabular-nums leading-none text-destructive-foreground',
+                                  'relative z-10 h-4 min-w-4 items-center justify-center rounded-full px-1 text-2xs font-semibold tabular-nums leading-none',
+                                  tone.pill,
                                   collapsed ? 'hidden' : 'hidden md:inline-flex',
                                 )}
                               >
@@ -326,6 +351,11 @@ export default function App() {
               </div>
             </main>
           </div>
+
+          {/* A pending access request is an interrupt, not a page section: the
+              dialog is mounted above the routed page so the queue stays
+              actionable from any route. */}
+          <AgentAccessDialog access={agentAccess} />
         </ToastProvider>
       </TooltipProvider>
     </MotionConfig>
