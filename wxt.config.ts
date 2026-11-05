@@ -15,21 +15,35 @@ export default defineConfig({
     description: '__MSG_extDescription__',
     minimum_chrome_version: '138',
     permissions: [
+      // Settings, pointers and counters only (`store/storage.ts`).
       'storage',
+      // Userscript bodies, revisions and logs live in IndexedDB (`lib/db`).
       'unlimitedStorage',
+      // Badge counts, popup tab context and `GM_openInTab` (`lib/background`).
       'tabs',
-      'activeTab',
-      'scripting',
+      // Dynamic registration table for every installed userscript (`lib/script`).
       'userScripts',
+      // Repaint/clear the badge on navigation commits (`entrypoints/background.ts`).
       'webNavigation',
+      // Redirect `.user.js` navigations to the installer page (`entrypoints/background.ts`).
       'declarativeNetRequest',
+      // `GM_cookie` (`lib/background/gm.ts`).
       'cookies',
+      // `GM_download` (`lib/background/gm.ts`).
       'downloads',
+      // `GM_notification` (`lib/background/gm.ts`).
       'notifications',
-      'contextMenus',
+      // Background update checks (`lib/background/updates.ts`).
       'alarms',
+      // `GM_setClipboard` and copying the extension id from settings.
       'clipboardWrite',
     ],
+    // Deliberately absent, each removed after a Chrome Web Store review:
+    //  - `scripting`: userscripts run through `userScripts` plus the static
+    //    bridge content script, never through `chrome.scripting`.
+    //  - `activeTab`: `<all_urls>` already grants the tab access the popup needs.
+    //  - `contextMenus`: `GM_registerMenuCommand` surfaces in the popup menu,
+    //    not in the browser context menu.
     host_permissions: ['<all_urls>'],
     // Agent hosts open an MCP session over a runtime Port (see lib/agent).
     // "*" is required because the host's unpacked ID differs per install;

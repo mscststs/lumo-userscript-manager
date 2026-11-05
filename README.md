@@ -104,12 +104,14 @@ IIFEs at `public/user-scripts/`; they must stay dependency-free classic scripts.
 | Permission | Why |
 | --- | --- |
 | `userScripts` | Dynamic script registration |
-| `storage`, `unlimitedStorage` | Settings and bounded metadata |
-| `tabs`, `activeTab`, `webNavigation`, `scripting` | Tab context and diagnostics |
+| `storage`, `unlimitedStorage` | Settings plus the IndexedDB quota that holds script bodies, revisions and logs |
+| `tabs`, `webNavigation` | Badge counts, popup tab context, `GM_openInTab` and navigation commits |
 | `declarativeNetRequest` | Redirect `.user.js` navigations to the install page |
 | `cookies`, `downloads` | `GM_cookie`, `GM_download` |
-| `notifications`, `contextMenus`, `alarms`, `clipboardWrite` | GM APIs and background jobs |
+| `notifications`, `alarms`, `clipboardWrite` | GM APIs and background jobs |
 | `<all_urls>` | Userscripts run where the user configures them |
+
+`scripting`, `activeTab` and `contextMenus` are intentionally not requested: userscripts are injected through `userScripts` plus the static bridge content script, `<all_urls>` already covers tab access, and `GM_registerMenuCommand` is surfaced in the popup rather than the browser context menu. `tests/manifest-permissions.test.ts` fails if a declared permission loses its last caller or one of these three comes back.
 
 ## Known limitations
 

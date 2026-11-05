@@ -35,7 +35,7 @@ This data is stored entirely on the user's local device, is never transmitted to
 
 ## Permissions
 
-Lumo Userscripts requests browser permissions (such as `storage`, `scripting`, `activeTab` and side panel access) solely to provide its core functionality — installing, editing and running userscripts on pages the user chooses. These permissions are never used to collect or transmit user data.
+Lumo Userscripts requests only the browser permissions its current features need: `userScripts` to register the userscripts you install; `storage` and `unlimitedStorage` to keep settings and script data on your device; `tabs` and `webNavigation` for page-aware badge counts and menu commands; `declarativeNetRequest` to route `.user.js` links to the installer page; and `cookies`, `downloads`, `notifications`, `alarms` and `clipboardWrite` for the corresponding userscript APIs (`GM_cookie`, `GM_download`, `GM_notification`, update checks and `GM_setClipboard`). The `<all_urls>` host permission lets userscripts run on the sites you configure. These permissions are never used to collect or transmit user data.
 
 ## Third-Party Content
 

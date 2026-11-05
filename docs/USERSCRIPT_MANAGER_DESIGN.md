@@ -138,12 +138,14 @@ Service Worker（唯一数据/权限中心）
 | 权限 | 用途 |
 | --- | --- |
 | `userScripts` | 动态注册用户脚本 |
-| `storage` / `unlimitedStorage` | 设置与有界元数据 |
-| `tabs` / `activeTab` / `webNavigation` / `scripting` | 标签页上下文与诊断 |
+| `storage` / `unlimitedStorage` | 设置、有界元数据，以及存放脚本正文/历史/日志的 IndexedDB 配额 |
+| `tabs` / `webNavigation` | 角标计数、Popup 标签页上下文、`GM_openInTab` 与导航提交 |
 | `declarativeNetRequest` | 把 `.user.js` 导航重定向到安装页 |
 | `cookies` / `downloads` | `GM_cookie` / `GM_download` |
-| `notifications` / `contextMenus` / `alarms` / `clipboardWrite` | GM API 与后台任务 |
+| `notifications` / `alarms` / `clipboardWrite` | GM API 与后台任务 |
 | `<all_urls>` | 用户配置的用户脚本作用域 |
+
+`scripting` / `activeTab` / `contextMenus` 为刻意不申请：用户脚本经 `userScripts` 与静态 bridge content script 注入，`<all_urls>` 已覆盖标签页访问，`GM_registerMenuCommand` 在 Popup 中呈现而非浏览器右键菜单。`tests/manifest-permissions.test.ts` 会在任一已声明权限失去最后一个调用点、或这三个权限被重新加入时失败。
 
 ## 10. 验证
 
