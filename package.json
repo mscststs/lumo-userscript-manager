@@ -2,7 +2,7 @@
   "name": "lumo-userscript-manager",
   "description": "A powerful, well-crafted userscript manager for your browser",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.0.3",
   "license": "MIT",
   "author": "mscststs",
   "repository": {
@@ -25,6 +25,7 @@
     "prebuild": "npm run build:runtime",
     "build": "wxt build",
     "build:firefox": "wxt build -b firefox",
+    "prezip": "npm run build:runtime",
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
     "compile": "tsc --noEmit",

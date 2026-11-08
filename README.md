@@ -62,6 +62,44 @@ LUMO_E2E=1 npm test -- tests/integration
 Set `CHROME_PATH` to override the Chrome/Chromium/Edge binary (default
 `google-chrome`).
 
+### Releasing to the Chrome Web Store
+
+Publishing is tag-driven and does not run on ordinary pushes to `main`:
+
+1. Bump `version` in `package.json`.
+2. Commit the change.
+3. Push a matching tag, e.g. `git tag v1.0.3 && git push origin v1.0.3`.
+
+The [Publish to Chrome Web Store](../../actions/workflows/publish.yml) workflow
+then builds the package, type-checks it, verifies that the tag, `package.json`
+and the zip's `manifest.json` all agree, uploads it, and submits it for review.
+The version must also be greater than the one already published on the store.
+
+The workflow reads five repository secrets:
+
+| Secret | Where it comes from |
+| --- | --- |
+| `CHROME_CLIENT_ID` | Google Cloud OAuth client (Chrome Web Store API enabled) |
+| `CHROME_CLIENT_SECRET` | Same OAuth client |
+| `CHROME_REFRESH_TOKEN` | OAuth consent flow for scope `https://www.googleapis.com/auth/chromewebstore` |
+| `CHROME_PUBLISHER_ID` | Developer dashboard URL: `publishers/<publisher id>/items/...` |
+| `CHROME_ITEM_ID` | The 32-character extension id in the dashboard URL |
+
+Manual runs from the Actions tab support `publish`, `upload` (no review
+submission), and `status` (read-only); `skip_upload` is a recovery switch for
+retrying only the publish step after an upload succeeded. The same checks are
+available locally without consuming a submission:
+
+```bash
+npm run zip
+node scripts/release/cws-publish.mjs --mode check
+node scripts/release/cws-publish.mjs --mode status   # needs the CHROME_* env vars
+node scripts/release/cws-publish.mjs --mode publish --skip-upload  # recovery only
+```
+
+The Microsoft Edge Add-ons listing ships the same package but is uploaded
+manually from the Edge Partner Center; see [`docs/STORE_LISTING.md`](docs/STORE_LISTING.md).
+
 ## Architecture
 
 ```
