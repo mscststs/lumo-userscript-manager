@@ -57,7 +57,7 @@ const RUNNING = `Running scripts:
 - delete moves a script to the trash; permanent deletion is not available.`;
 
 const DIAGNOSING = `Diagnosing:
-- Call diagnostics when a script "does not work": it reports whether chrome.userScripts is available, registration counts, and runtime errors.`;
+- Call diagnostics when a script "does not work": it reports whether the userScripts API is available, registration counts, and runtime errors.`;
 
 const REVIEW_POLICY =
   'The user has enabled review: new scripts are created disabled and marked pendingReview. Tell the user to review and enable them in Lumo Userscripts, and do not claim a new script is running.';
@@ -301,7 +301,7 @@ export function registerAgentTools(
       title: 'Userscript runtime diagnostics',
       annotations: { readOnlyHint: true, idempotentHint: true },
       description:
-        'Report whether chrome.userScripts is available, registration counts, and scripts that recorded a runtime error. Use when a script is installed but does not run.',
+        'Report whether the userScripts API is available, registration counts, and scripts that recorded a runtime error. Use when a script is installed but does not run.',
       inputSchema: {
         id: z.string().optional().describe('Include update/runtime state for one script.'),
       },
@@ -506,7 +506,8 @@ export function registerAgentTools(
           .optional()
           .describe('Complete userscript source, including the metadata block.'),
         selfMetadata: z
-          .record(z.string(), z.array(z.string()))
+          .object({})
+          .catchall(z.array(z.string()))
           .optional()
           .describe('User overrides for individual @tags, merged over the code metadata.'),
         expectedCodeHash: z
