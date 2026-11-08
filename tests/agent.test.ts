@@ -4,9 +4,12 @@ import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
 import type { JSONRPCMessage } from '@modelcontextprotocol/sdk/types.js';
 import { createAgentMcpServer } from '@/lib/agent/mcp-server';
 import { handleProbe } from '@/lib/agent/probe';
+import { handleAuthorize } from '@/lib/agent/authorize';
 import {
+  AUTHORIZE_CHANNEL,
   PROBE_CHANNEL,
   PROBE_VERSION,
+  isAuthorizeRequest,
   isExtensionId,
   isProbeRequest,
 } from '@/lib/agent/protocol';
@@ -167,6 +170,10 @@ describe('agent probe contract', () => {
     expect(isProbeRequest({ channel: PROBE_CHANNEL, version: PROBE_VERSION })).toBe(true);
     expect(isProbeRequest({ channel: 'other', version: 1 })).toBe(false);
     expect(isProbeRequest(null)).toBe(false);
+    // Two L0 channels, structurally identical so one listener can dispatch them.
+    expect(isAuthorizeRequest({ channel: AUTHORIZE_CHANNEL, version: PROBE_VERSION })).toBe(true);
+    expect(isAuthorizeRequest({ channel: PROBE_CHANNEL, version: PROBE_VERSION })).toBe(false);
+    expect(isProbeRequest({ channel: AUTHORIZE_CHANNEL, version: PROBE_VERSION })).toBe(false);
     expect(isExtensionId('a'.repeat(32))).toBe(true);
     expect(isExtensionId('z'.repeat(32))).toBe(false);
   });
@@ -182,11 +189,24 @@ describe('agent probe contract', () => {
     );
   });
 
-  it('records an unknown caller as a pending request', async () => {
+  it('records nothing on a probe, and everything on an authorize', async () => {
     await handleProbe(
       { channel: PROBE_CHANNEL, version: PROBE_VERSION, client: { id: HOST_ID, name: 'Lumo', version: '1.0.0' } },
       { id: HOST_ID } as chrome.runtime.MessageSender,
     );
+    expect(await storage.getAgentPendingRequests()).toEqual([]);
+
+    await handleAuthorize(
+      {
+        channel: AUTHORIZE_CHANNEL,
+        version: PROBE_VERSION,
+        client: { id: HOST_ID, name: 'Lumo', version: '1.0.0' },
+      },
+      { id: HOST_ID } as chrome.runtime.MessageSender,
+    );
+    // The reply never waits on the write (a slow prompt must not look like an
+    // unanswered call), so give the queued record a turn before reading it.
+    await new Promise((resolve) => setTimeout(resolve, 0));
     const pending = await storage.getAgentPendingRequests();
     expect(pending).toHaveLength(1);
     expect(pending[0]).toEqual(
@@ -195,8 +215,8 @@ describe('agent probe contract', () => {
   });
 
   it('approves a pending request by enabling access and allowlisting it', async () => {
-    await handleProbe(
-      { channel: PROBE_CHANNEL, version: PROBE_VERSION },
+    await handleAuthorize(
+      { channel: AUTHORIZE_CHANNEL, version: PROBE_VERSION },
       { id: HOST_ID } as chrome.runtime.MessageSender,
     );
     const next = await approvePendingRequest(HOST_ID);

@@ -17,6 +17,7 @@ import type { AgentSettings, RuntimeStatus, UISettings } from '@/types';
 import { storage } from '@/store/storage';
 import { useStorageWatch } from '@/store/useStorageWatch';
 import { useAgentAccess } from '@/store/useAgentAccess';
+import { AgentIntro } from '@/components/agent/AgentIntro';
 import { sendBg, onLumoEvent } from '@/lib/messages';
 import { createBackupZip, readBackupZip, type BackupData } from '@/lib/backup';
 import { BackupError, parseBackupJson, summarizeBackup } from '@/lib/backup-format';
@@ -604,6 +605,11 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
 
       {section === 'agent' && agent && (
         <>
+          {/* Stays only while nothing is connected: once a client is on the
+              allowlist the explanation is spent, and a permanent banner above
+              the switches would be pure chrome. */}
+          {agent.allowedExtensionIds.length === 0 && <AgentIntro />}
+
           {pendingRequests.length > 0 && (
             <SettingsGroup
               title={t('settings.agent.requests')}

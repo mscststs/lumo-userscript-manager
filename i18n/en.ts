@@ -414,6 +414,33 @@ export const en = {
     agent: {
       enabled: 'Allow agent access',
       enabledHint: 'Exposes this extension\u2019s script library over MCP to the extensions listed below.',
+      intro: {
+        title: 'About agent access',
+        hint: 'Connect Lumo Agent and let it create and edit scripts for you.',
+        dialogTitle: 'About agent access',
+        lead: 'Drive Lumo Agent with your own LLM API endpoint, and the agent can create and edit userscripts directly.',
+        steps: {
+          install: {
+            title: 'Install Lumo Agent',
+          },
+          service: {
+            title: 'Add an extension service in Lumo',
+            description: 'Settings › MCP › Extensions',
+          },
+          id: {
+            title: 'Paste this extension\u2019s ID',
+            description: 'The agent uses this ID to find this extension.',
+          },
+        },
+        stores: {
+          chrome: 'Chrome Web Store',
+          edge: 'Edge Add-ons',
+          github: 'GitHub',
+        },
+        copy: 'Copy',
+        copied: 'Extension ID copied',
+        done: 'Got it',
+      },
       identity: 'Identity',
       extensionId: 'Extension ID',
       extensionIdHint: 'Paste this ID into the agent\u2019s settings so it can discover this service.',
@@ -443,7 +470,7 @@ export const en = {
       approved: 'Extension allowed.',
       promptOnRequest: 'Open settings when an extension asks',
       promptOnRequestHint:
-        'Shows the approval card automatically. Pending requests always appear here even when this is off.',
+        'Also decides whether other extensions can find this one: when off, Lumo cannot discover it and no request is ever shown.',
       writes: 'Agent writes',
       allowWrites: 'Allow the agent to modify scripts',
       allowWritesHint: 'Adds create, edit, enable/disable, install and trash tools.',

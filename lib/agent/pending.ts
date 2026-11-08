@@ -3,14 +3,10 @@ import { storage } from '@/store/storage';
 import { openOptionsTab } from '@/lib/options-tab';
 import { isExtensionId } from './protocol';
 
-/** Re-prompt at most once a day per extension. */
-const PROMPT_COOLDOWN_MS = 24 * 60 * 60 * 1000;
-/** A dismissed request can re-prompt after this long. */
-const DISMISS_COOLDOWN_MS = 24 * 60 * 60 * 1000;
-/** Do not steal focus more than once per 10s (multiple hosts may probe). */
-const OPEN_COOLDOWN_MS = 10_000;
-
-let lastOpenAt = 0;
+/**
+ * Serialized so two hosts answering at once cannot lose a record: every write
+ * below is a read-modify-write over the whole queue.
+ */
 let chain: Promise<unknown> = Promise.resolve();
 
 /** Serialize read-modify-write cycles on the two storage keys. */
@@ -36,10 +32,12 @@ function sanitizeClient(client: { name?: string; version?: string } | undefined)
 }
 
 /**
- * Record an unknown caller as a pending approval request.
+ * Record a caller that asked for access as a pending approval request.
  *
- * Called from the probe handler, so it must never throw into the response.
- * Authorized callers and disabled endpoints are not recorded.
+ * Called from the `lumo:authorize` handler — never from the probe, which must
+ * stay read-only. A repeat request from the same extension reuses its row (and
+ * revives it if the user had dismissed it), so asking again always produces a
+ * card to approve.
  */
 export function recordPendingRequest(
   senderId: string | undefined,
@@ -64,10 +62,9 @@ export function recordPendingRequest(
           ...details,
           lastSeen: now,
         };
-        // Expire a dismissal so a new prompt is possible after the cooldown.
-        if (request.dismissedAt && now - request.dismissedAt >= DISMISS_COOLDOWN_MS) {
-          delete request.dismissedAt;
-        }
+        // An explicit request outranks an earlier dismissal: the user (or their
+        // host) asked again, so the card must be actionable again.
+        delete request.dismissedAt;
       } else {
         request = {
           id: senderId,
@@ -88,23 +85,26 @@ export function recordPendingRequest(
 }
 
 /**
- * Open this extension's settings so the user can approve the request.
+ * Show the approval card, every single time it is asked for.
  *
- * Prompting is a convenience, not part of authorization: the probe still
- * answers `authorized:false` while this runs, and every failure is swallowed.
+ * `lumo:authorize` is only sent from a host's explicit "Authorize" button, so
+ * there is no rate limit to apply: a click that produced no visible result would
+ * just look broken. Cooldowns used to live here (per-request 24h, global 10s) and
+ * were exactly why a second attempt appeared to do nothing. The only remaining
+ * gate is the user's own "open settings when an extension asks" switch, which is
+ * also what hides this extension from host discovery.
+ *
+ * `promptedAt` is still stamped: the in-page dialog (`shouldOpenAgentPrompt`)
+ * uses it to know the queue entry was announced just now, rather than being an
+ * old row the user has already seen.
  */
 export async function promptForRequest(request: AgentPendingRequest | undefined): Promise<void> {
   if (!request) return;
   try {
     const settings = await storage.getAgentSettings();
-    if (!settings.promptOnRequest || request.dismissedAt) return;
+    if (!settings.promptOnRequest) return;
 
     const now = Date.now();
-    if (request.promptedAt && now - request.promptedAt < PROMPT_COOLDOWN_MS) return;
-    if (now - lastOpenAt < OPEN_COOLDOWN_MS) return;
-
-    // Mark before opening: if the tab call fails, we must not retry on every
-    // probe from the same extension.
     await serialize(async () => {
       const requests = await storage.getAgentPendingRequests();
       await storage.setAgentPendingRequests(
@@ -114,7 +114,6 @@ export async function promptForRequest(request: AgentPendingRequest | undefined)
       );
     });
 
-    lastOpenAt = now;
     await openOptionsTab('#/settings/agent');
   } catch (error) {
     console.warn('[Lumo Userscripts] Failed to prompt for agent access:', error);
@@ -143,7 +142,7 @@ export function approvePendingRequest(senderId: string): Promise<AgentSettings |
   });
 }
 
-/** Dismiss a request; it can re-prompt after the cooldown. */
+/** Dismiss a request; a new `lumo:authorize` from that caller revives it. */
 export function dismissPendingRequest(senderId: string): Promise<void> {
   if (!isExtensionId(senderId)) return Promise.resolve();
 

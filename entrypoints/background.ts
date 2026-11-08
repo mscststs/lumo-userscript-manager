@@ -84,7 +84,8 @@ import {
   dismissPendingRequest,
 } from '@/lib/agent/pending';
 import { handleProbe } from '@/lib/agent/probe';
-import { isProbeRequest, MCP_PORT_NAME } from '@/lib/agent/protocol';
+import { handleAuthorize } from '@/lib/agent/authorize';
+import { isAuthorizeRequest, isProbeRequest, MCP_PORT_NAME } from '@/lib/agent/protocol';
 import { ChromePortTransport } from '@/lib/agent/transport';
 import { openOptionsTab } from '@/lib/options-tab';
 
@@ -504,13 +505,20 @@ export default defineBackground(() => {
     return true;
   });
 
-  // ─── Agent endpoint (L0 probe + L1 MCP) ───────────────────────────────────
-  // Only extensions listed in `agentSettings.allowedExtensionIds` may open an
-  // MCP session. `externally_connectable` in the manifest decides who can even
-  // reach these listeners; this is the second, authoritative check.
+  // ─── Agent endpoint (L0 probe/authorize + L1 MCP) ─────────────────────────
+  // Two L0 messages, one listener: `lumo:probe` reads, `lumo:authorize` asks.
+  // Only extensions listed in `agentSettings.allowedExtensionIds` may open an MCP
+  // session. `externally_connectable` in the manifest decides who can even reach
+  // these listeners; this is the second, authoritative check.
   chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {
-    if (!isProbeRequest(message)) return false;
-    void handleProbe(message, sender).then(sendResponse, (error) =>
+    const handler = isProbeRequest(message)
+      ? handleProbe(message, sender)
+      : isAuthorizeRequest(message)
+        ? handleAuthorize(message, sender)
+        : null;
+    if (!handler) return false;
+
+    void handler.then(sendResponse, (error) =>
       sendResponse({
         ok: false,
         error: {

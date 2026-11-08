@@ -405,6 +405,33 @@ export const zh: TranslationSchema = {
     agent: {
       enabled: '允许智能体访问',
       enabledHint: '通过 MCP 向下列扩展开放本扩展的脚本库。',
+      intro: {
+        title: '了解智能体访问',
+        hint: '接上 Lumo Agent，让智能体直接创建和编辑脚本。',
+        dialogTitle: '了解智能体访问',
+        lead: '用你自己的 LLM API 端点驱动 Lumo Agent，智能体就能直接创建、修改用户脚本。',
+        steps: {
+          install: {
+            title: '安装 Lumo Agent',
+          },
+          service: {
+            title: '在 Lumo 里添加扩展服务',
+            description: '设置 › MCP › 扩展服务',
+          },
+          id: {
+            title: '粘贴本扩展的 ID',
+            description: '智能体通过这个 ID 找到本扩展。',
+          },
+        },
+        stores: {
+          chrome: 'Chrome 商店',
+          edge: 'Edge 商店',
+          github: 'GitHub',
+        },
+        copy: '复制 ID',
+        copied: '已复制扩展 ID',
+        done: '我知道了',
+      },
       identity: '身份',
       extensionId: '扩展 ID',
       extensionIdHint: '将此 ID 填入智能体的设置，使其能够发现本服务。',
@@ -432,7 +459,8 @@ export const zh: TranslationSchema = {
       dismiss: '忽略',
       approved: '已允许该扩展。',
       promptOnRequest: '扩展请求访问时打开设置',
-      promptOnRequestHint: '自动打开设置页展示授权卡片。关闭后待授权请求仍会列在此处。',
+      promptOnRequestHint:
+        '同时决定其他扩展能否发现本扩展：关闭后 Lumo 探测不到它，也不会再弹授权卡片。',
       writes: '智能体写入',
       allowWrites: '允许智能体修改脚本',
       allowWritesHint: '启用创建、编辑、启停、安装与回收站工具。',
