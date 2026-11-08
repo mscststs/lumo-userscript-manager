@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
  * Checkbox.
  *
  * A native `<input type="checkbox">` cannot be themed reliably across the three
- * palettes (Chrome paints it from `color-scheme`, ignoring the accent), and in a
+ * palettes (Chromium paints it from `color-scheme`, ignoring the accent), and in a
  * 44px list row it renders at an unusable 13px. This is the ARIA checkbox
  * pattern instead: `role="checkbox"` + `aria-checked`, real focus, real space
  * bar handling.

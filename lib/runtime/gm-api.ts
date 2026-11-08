@@ -194,6 +194,12 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
     lastModified: Date.now(),
   };
 
+  const userAgent = pageWindow.navigator.userAgent;
+  // Edge's UA carries both `Chrome/` (engine) and `Edg/` (product). Many
+  // userscripts test `browserName === 'Chrome'` to detect a Chromium engine,
+  // so keep that name and report the Edge product version instead.
+  const edgeVersion = userAgent.match(/\bEdg\/([\d.]+)/)?.[1];
+
   const GM_info: Record<string, any> = {
     scriptHandler: 'Lumo Userscripts',
     version: handlerVersion,
@@ -201,11 +207,11 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
     sandboxMode: options.sandboxMode,
     script: scriptInfo,
     scriptMetaStr: metaStr,
-    userAgent: pageWindow.navigator.userAgent,
+    userAgent,
     userAgentData: (pageWindow.navigator as any).userAgentData,
     platform: {
       browserName: 'Chrome',
-      browserVersion: pageWindow.navigator.userAgent.match(/Chrome\/([\d.]+)/)?.[1] ?? '',
+      browserVersion: edgeVersion ?? userAgent.match(/\bChrome\/([\d.]+)/)?.[1] ?? '',
       os: pageWindow.navigator.platform,
     },
   };

@@ -201,6 +201,7 @@ async function handleRuntimeMessage(
           ...data.runtime,
           userScriptsAvailable: availability.ok,
           lastError: availability.ok ? data.runtime.lastError : availability.error,
+          lastErrorCode: availability.ok ? data.runtime.lastErrorCode : availability.code,
         },
       };
     }
@@ -248,6 +249,7 @@ async function handleRuntimeMessage(
         ...current,
         userScriptsAvailable: availability.ok,
         lastError: availability.ok ? current.lastError : availability.error,
+        lastErrorCode: availability.ok ? current.lastErrorCode : availability.code,
       };
     }
     case 'runtime:refresh':

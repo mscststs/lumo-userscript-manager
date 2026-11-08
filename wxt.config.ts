@@ -13,6 +13,8 @@ export default defineConfig({
     default_locale: 'en',
     name: '__MSG_extName__',
     description: '__MSG_extDescription__',
+    // Chrome and Edge share Chromium's version numbering, so this floor
+    // applies to both store builds; the userScripts API needs it either way.
     minimum_chrome_version: '138',
     permissions: [
       // Settings, pointers and counters only (`store/storage.ts`).

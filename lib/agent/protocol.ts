@@ -65,7 +65,7 @@ export interface ProbeResponse {
   error?: { code: ProbeErrorCode; message: string };
 }
 
-/** Chrome extension IDs are 32 characters drawn from `a`–`p`. */
+/** Browser extension IDs are 32 characters drawn from `a`–`p`. */
 export function isExtensionId(value: unknown): value is string {
   return typeof value === 'string' && /^[a-p]{32}$/.test(value);
 }

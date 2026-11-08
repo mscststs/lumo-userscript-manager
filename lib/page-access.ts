@@ -2,8 +2,8 @@
  * Which pages can actually receive an injected user script.
  *
  * `chrome.userScripts` match patterns only understand http(s) and file URLs
- * (plus `*`), and Chrome refuses to run extension code inside its own
- * privileged surfaces. The popup used to infer matches purely from
+ * (plus `*`), and Chromium browsers refuse to run extension code inside their
+ * own privileged surfaces. The popup used to infer matches purely from
  * `urlMatches()`, so a script with no `@match`/`@include` (which defaults to
  * "every page") appeared active on `chrome://` tabs where nothing could ever
  * be injected.
@@ -26,8 +26,9 @@ export interface PageAccess {
 }
 
 /**
- * Schemes Chrome never injects extension scripts into. Firefox spellings are
- * included so the same module also describes the `-b firefox` build.
+ * Schemes Chromium browsers never inject extension scripts into. Firefox
+ * spellings are included so the same module also describes the `-b firefox`
+ * build.
  */
 const RESTRICTED_SCHEME_LABELS: Record<string, string> = {
   'chrome:': 'chrome://',
@@ -45,14 +46,19 @@ const RESTRICTED_SCHEME_LABELS: Record<string, string> = {
   'resource:': 'resource://',
 };
 
-/** Sites Chrome explicitly protects from extension script injection. */
+/** Sites the browser explicitly protects from extension script injection. */
 const PROTECTED_HOSTS = new Set(['chromewebstore.google.com']);
 
 function isProtectedSite(url: URL): boolean {
   const host = url.hostname.toLowerCase();
   if (PROTECTED_HOSTS.has(host)) return true;
   // Legacy Web Store URL: chrome.google.com/webstore/...
-  return host === 'chrome.google.com' && /^\/webstore(\/|$)/i.test(url.pathname);
+  if (host === 'chrome.google.com' && /^\/webstore(\/|$)/i.test(url.pathname)) return true;
+  // Edge Add-ons: microsoftedge.microsoft.com/addons/...
+  if (host === 'microsoftedge.microsoft.com' && /^\/addons(\/|$)/i.test(url.pathname)) {
+    return true;
+  }
+  return false;
 }
 
 function schemeLabel(scheme: string): string {
@@ -62,7 +68,7 @@ function schemeLabel(scheme: string): string {
 /**
  * Classify a tab URL. `file://` is reported as injectable here; the extension
  * only reaches those pages after the user grants "Allow access to file URLs",
- * which is a Chrome setting checked by the caller.
+ * which is a browser setting checked by the caller.
  */
 export function getPageAccess(url: string | undefined): PageAccess {
   const raw = url?.trim();
@@ -101,7 +107,7 @@ export function isInjectableUrl(url: string | undefined): boolean {
   return getPageAccess(url).injectable;
 }
 
-/** `file:///…` URLs need an explicit Chrome permission before injection. */
+/** `file:///…` URLs need an explicit browser permission before injection. */
 export function isFileUrl(url: string | undefined): boolean {
   if (!url) return false;
   try {

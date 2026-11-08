@@ -4,8 +4,8 @@
     "description": "扩展的显示名称。"
   },
   "extDescription": {
-    "message": "一个强大、好用的 Chrome 用户脚本管理器",
-    "description": "在 Chrome 应用商店和扩展管理页面展示的描述。"
+    "message": "一个强大、好用的浏览器用户脚本管理器",
+    "description": "在扩展商店和扩展管理页面展示的描述。"
   },
   "actionTitle": {
     "message": "打开 Lumo 用户脚本管理器",

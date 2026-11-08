@@ -45,7 +45,8 @@ export function optionsUrl(hash = ''): string {
  *    do nothing else, so an editor with in-progress work is never reloaded just
  *    to show the page the user is already on.
  * 2. Otherwise reuse the most recently used options tab and let it navigate.
- *    When only the fragment differs Chrome performs a same-document navigation,
+ *    When only the fragment differs Chromium performs a same-document
+ *    navigation,
  *    which the app's `hashchange` router turns into an instant route switch
  *    instead of a full reload.
  * 3. No options tab at all → create one.

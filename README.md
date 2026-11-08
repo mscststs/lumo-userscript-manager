@@ -1,10 +1,11 @@
 # Lumo Userscripts
 
-A Chrome MV3 userscript manager built with WXT, React 19 and Tailwind CSS 4.
+A Chromium MV3 userscript manager for Chrome and Edge, built with WXT, React 19 and Tailwind CSS 4.
 
-- Chrome 138+ — requires **Allow User Scripts** for the extension
+- Chrome 138+ or Edge 138+ — requires **Allow User Scripts** for the extension
 - Repository: <https://github.com/mscststs/lumo-userscript-manager>
 - Issues: <https://github.com/mscststs/lumo-userscript-manager/issues>
+- Privacy: [PRIVACY.md](PRIVACY.md)
 - License: [MIT](LICENSE)
 
 ## Features
@@ -33,23 +34,33 @@ npm install
 npm run dev     # predev builds the runtime bundles first
 ```
 
-Load `.output/chrome-mv3` via `chrome://extensions` → Developer mode → Load unpacked,
-then enable **Allow User Scripts** for the extension.
+Load the unpacked build in either browser — the same Chrome package runs in
+Edge, which maps `chrome://` routes to `edge://`:
+
+| Browser | Build | Load via |
+| --- | --- | --- |
+| Chrome | `.output/chrome-mv3` | `chrome://extensions` → Developer mode → Load unpacked |
+| Edge | `.output/chrome-mv3` | `edge://extensions` → Developer mode → Load unpacked |
+
+Then enable **Allow User Scripts** for the extension.
 
 ```bash
 npm run build   # production build → .output/chrome-mv3
-npm run zip     # distributable archive
+npm run zip     # distributable archive for both stores
 npm run compile # TypeScript check
 npm test        # hermetic test suite
 ```
 
-The MV3 transport also has a real-Chrome regression suite:
+The MV3 transport also has a real-browser regression suite. It loads the
+Chrome build; `CHROME_PATH` may point at any Chromium binary that can load it
+(Chrome, Edge, Chromium):
 
 ```bash
 LUMO_E2E=1 npm test -- tests/integration
 ```
 
-Set `CHROME_PATH` to override the Chrome/Chromium binary.
+Set `CHROME_PATH` to override the Chrome/Chromium/Edge binary (default
+`google-chrome`).
 
 ## Architecture
 
@@ -112,6 +123,10 @@ IIFEs at `public/user-scripts/`; they must stay dependency-free classic scripts.
 | `<all_urls>` | Userscripts run where the user configures them |
 
 `scripting`, `activeTab` and `contextMenus` are intentionally not requested: userscripts are injected through `userScripts` plus the static bridge content script, `<all_urls>` already covers tab access, and `GM_registerMenuCommand` is surfaced in the popup rather than the browser context menu. `tests/manifest-permissions.test.ts` fails if a declared permission loses its last caller or one of these three comes back.
+
+`externally_connectable` lets the Agent/MCP endpoint receive runtime ports from
+other extensions. It is deny-by-default: `lib/agent/policy.ts` only authorizes
+extension IDs the user explicitly allows in Settings → Agent.
 
 ## Known limitations
 

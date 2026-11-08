@@ -74,7 +74,7 @@
 
 ### 2.1 为什么是 OKLCH
 
-所有颜色使用 **OKLCH**（CSS Color 4；Chrome 111+，本项目最低 Chrome 138）。理由：
+所有颜色使用 **OKLCH**（CSS Color 4；Chromium 111+，本项目最低 Chrome / Edge 138）。理由：
 
 - OKLCH 的 L 是感知亮度，`L=0.5` 在红/绿/蓝上看起来一样亮。HSL 的 `L=50%` 在黄色上刺眼、在蓝色上发闷，无法建立统一的明暗阶梯。
 - 暗色主题可以按**亮度**分层（页面 → 卡片 → 浮层 → hover），而不是给一个灰底不断叠半透明黑，后者会糊成一片。
@@ -463,7 +463,7 @@ outline 带更安静的 `shadow-control`；ghost 无阴影。
 | 帧 | 同一脚本在 top 与 4 个 iframe 里都跑，只算 1 | 角标数的是脚本，不是注入次数（`runCount` 同样每次文档只记一次） |
 | 全局开关 | `scriptsEnabled` 关闭时一律为空 | 主开关暂停所有脚本，没有注册就没有上报，数字必然归零 |
 | 0 | 不画（`text: ''`） | 一个常驻的 `0` 会吃掉工具栏宽度，且没有信息量 |
-| 上限 | `>99` → `99+` | Chrome 角标超过 4 个字符会被截断 |
+| 上限 | `>99` → `99+` | Chromium 角标超过 4 个字符会被截断 |
 | 颜色 | 跟随主题色：亮色主题 `L≈0.55` + 白字，暗色主题 `L≈0.78` + 近黑字（`lib/color.ts` 做 OKLCH→hex） | 角标是唯一不能用 CSS 的表面；转换函数比手维护色表更不容易和 `globals.css` 分叉 |
 | `system` 主题 | 按亮色处理 | service worker 没有 `matchMedia`；亮色 accent 对白字仍有 ≥4.5:1，在暗色工具栏上也可读 |
 | 刷新时机 | 注入上报 / 主文档 commit（清零）/ 子帧 commit / 激活 tab / 换窗口 / `uiSettings` 变化 / 注册变化 | 数字只在「谁在跑」变化时变；URL 变化本身不改变已注入的脚本 |
@@ -477,7 +477,7 @@ Chrome 在每次新文档 commit 时清空该 tab 的角标，因此 commit 时�
 与 popup 的关系：popup 列出的是 top 文档 URL 命中的脚本（`lib/background/matching.ts`），
 角标可能多出一个「只在 iframe 里命中」的脚本 —— 它确实在跑，只是不在那张列表里。
 
-特权页面（`chrome://`、扩展页、Web Store）一律无角标，与 `lib/page-access.ts` 同一判定。
+特权页面（`chrome://`、`edge://`、扩展页、Chrome Web Store、Edge Add-ons）一律无角标，与 `lib/page-access.ts` 同一判定。
 
 ---
 
@@ -594,9 +594,9 @@ Popup 与浏览器自带的扩展面板同构：**一张 40px 行高的平铺列
    不单独作为按钮，避免"点行"和"点图标"产生两种结果。
 3. **hover 是唯一的装饰。** 行背景 `accent`，无边框、无分隔线、无卡片阴影。
 4. **不需要的控件直接不存在**：列表 ≤5 条时没有筛选框；没有命令时不渲染命令层。
-5. **不可注入的页面不伪造列表**：`chrome://`、`chrome-extension://`、Web Store 等
+5. **不可注入的页面不伪造列表**：`chrome://`、`edge://`、`chrome-extension://`、Chrome Web Store、Edge Add-ons 等
    特权页面没有可注入的脚本，popup 的列表区显示权限空态（`ShieldOff` + 一句
-   「没有访问此页的权限」），作用域标签显示协议（`chrome://`）而不是伪域名，
+   「没有访问此页的权限」），作用域标签显示协议（`chrome://` / `edge://`）而不是伪域名，
    本页脚本计数一并隐藏。判定统一来自 `lib/page-access.ts`。
 
 ### 10.2 Options

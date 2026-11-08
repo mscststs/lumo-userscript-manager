@@ -524,7 +524,9 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
             </dl>
             {runtime?.lastError && (
               <p className="whitespace-pre-wrap break-words py-2.5 text-2xs leading-relaxed text-destructive">
-                {runtime.lastError}
+                {runtime.lastErrorCode
+                  ? t(`settings.runtimeErrors.${runtime.lastErrorCode}`)
+                  : runtime.lastError}
               </p>
             )}
             <div className="flex flex-wrap items-center justify-end gap-2 py-2.5">

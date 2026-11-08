@@ -10,6 +10,8 @@ describe('page access', () => {
     for (const [url, label] of [
       ['chrome://extensions/', 'chrome://'],
       ['chrome://settings', 'chrome://'],
+      ['edge://extensions/', 'edge://'],
+      ['edge://settings', 'edge://'],
       ['chrome-search://local-ntp/local-ntp.html', 'chrome-search://'],
       ['chrome-untrusted://terminal/', 'chrome-untrusted://'],
       ['chrome-extension://abcdefghijklmnop/popup.html', 'chrome-extension://'],
@@ -32,18 +34,20 @@ describe('page access', () => {
     expect(access.label).toBe('chrome://');
   });
 
-  it('marks the Chrome Web Store as protected', () => {
+  it('marks extension store pages as protected', () => {
     for (const url of [
       'https://chromewebstore.google.com/detail/foo',
       'https://chrome.google.com/webstore/detail/foo',
+      'https://microsoftedge.microsoft.com/addons/detail/foo',
     ]) {
       const access = getPageAccess(url);
       expect(access.injectable, url).toBe(false);
       expect(access.reason, url).toBe('protected-site');
     }
 
-    // Only the /webstore subtree is protected on chrome.google.com.
+    // Only the /webstore and /addons subtrees are protected on those hosts.
     expect(isInjectableUrl('https://chrome.google.com/other')).toBe(true);
+    expect(isInjectableUrl('https://microsoftedge.microsoft.com/other')).toBe(true);
   });
 
   it('allows ordinary documents', () => {

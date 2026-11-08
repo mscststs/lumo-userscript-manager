@@ -68,7 +68,7 @@ export async function handleProbe(
         : {
             reason: {
               code: 'USER_SCRIPTS_UNAVAILABLE',
-              message: availability.error ?? 'chrome.userScripts is not available.',
+              message: availability.error ?? 'The userScripts API is not available.',
             },
           }),
     },

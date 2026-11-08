@@ -57,7 +57,7 @@ export const en = {
     noScripts: 'No scripts for this page',
     noPageAccess: 'No access to this page',
     userScriptsUnavailable: 'User scripts are disabled',
-    userScriptsUnavailableDescription: 'Enable “Allow User Scripts” for this extension in chrome://extensions.',
+    userScriptsUnavailableDescription: 'Enable “Allow User Scripts” for this extension on the browser’s extensions page.',
     openExtensions: 'Open extensions',
     commandUnavailable: 'Command unavailable. Reload the page and try again.',
     scriptError: 'Script error',
@@ -352,7 +352,13 @@ export const en = {
     defaultInjectIntoHint: 'Used when a script does not declare @inject-into.',
     updateIntervalHint: 'How often to look for script updates in the background.',
     hoursSuffix: 'hours',
-    runtimeHint: 'Live state of the chrome.userScripts registration table.',
+    runtimeHint: 'Live state of the userScripts registration table.',
+    runtimeErrors: {
+      'api-unavailable': 'The userScripts API is not available in this browser.',
+      'unexpected-result': 'The userScripts API returned an unexpected result.',
+      disabled:
+        'User scripts are disabled. Enable “Allow User Scripts” on the browser’s extensions page.',
+    },
     export: 'Export',
     exportZip: 'ZIP backup',
     exportJson: 'JSON backup',
@@ -418,7 +424,7 @@ export const en = {
       idPlaceholder: '32-character extension ID',
       add: 'Add',
       remove: 'Remove',
-      invalidId: 'Enter a 32-character Chromium extension ID.',
+      invalidId: 'Enter a 32-character browser extension ID.',
       requests: 'Access requests',
       requestsHint:
         'Extensions that asked to use this endpoint. Allowing one enables agent access and adds it to the allowlist.',

@@ -4,8 +4,8 @@
     "description": "The display name of the extension."
   },
   "extDescription": {
-    "message": "A powerful, well-crafted userscript manager for Chrome",
-    "description": "The description of the extension shown in the Chrome Web Store and extension management page."
+    "message": "A powerful, well-crafted userscript manager for your browser",
+    "description": "The description of the extension shown in extension stores and the extension management page."
   },
   "actionTitle": {
     "message": "Open Lumo Userscripts",

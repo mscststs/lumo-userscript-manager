@@ -44,7 +44,7 @@ export type UserLogLevel = 'error' | 'warn' | 'info' | 'debug';
  * Trust configuration for the agent-facing MCP endpoint.
  *
  * The endpoint is deny-by-default: the user turns it on *and* lists the
- * extension IDs allowed to call it. Chrome extension IDs are the only stable
+ * extension IDs allowed to call it. Browser extension IDs are the only stable
  * identity a receiver gets (`sender.id`), so they are the allowlist.
  */
 export interface AgentSettings {

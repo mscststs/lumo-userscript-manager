@@ -1,6 +1,6 @@
 # Lumo Userscripts — 架构说明
 
-> 目标：Chrome MV3 原生、可长期维护的用户脚本管理器。
+> 目标：Chromium MV3 原生（Chrome / Edge）、可长期维护的用户脚本管理器。
 > UI 规范见 [`DESIGN.md`](DESIGN.md)；本文只描述运行时、数据与安全边界。
 
 ---
@@ -72,7 +72,7 @@ Service Worker（唯一数据/权限中心）
 
 启动器只负责把 payload 交给引擎；引擎未就绪时进入队列，引擎加载后统一 drain。注册表按签名对比，内容未变化时跳过重建，避免页面加载期间无谓的拆装。
 
-`lib/page-access.ts` 是「页面能否注入」的唯一判定：`chrome://`、`chrome-extension://`、`devtools://`、`view-source:`、Web Store 等特权页面一律不可注入。`urlMatches()` 在匹配规则前先做该判定，因此 popup 列表、host RPC 守卫与运行时启动器不会出现「列表说有、实际不执行」的分歧。`file://` 还需扩展具备「允许访问文件网址」，由 `getPopupData()` 异步确认。
+`lib/page-access.ts` 是「页面能否注入」的唯一判定：`chrome://`、`edge://`、`chrome-extension://`、`devtools://`、`view-source:`、Chrome Web Store、Edge Add-ons 等特权页面一律不可注入。`urlMatches()` 在匹配规则前先做该判定，因此 popup 列表、host RPC 守卫与运行时启动器不会出现「列表说有、实际不执行」的分歧。`file://` 还需扩展具备「允许访问文件网址」，由 `getPopupData()` 异步确认。
 
 ## 3. 世界选择与运行时机
 
@@ -128,7 +128,7 @@ Service Worker（唯一数据/权限中心）
 ## 8. 界面结构
 
 - **Popup**：全局注入开关 → 当前页面只读条（域名 / 本页脚本数）→ 脚本行。作用域分离是硬规则。不可注入页面显示权限空态，不给虚假的脚本列表。脚本行首是脚本自己的 `@icon`（后台缓存，缺失时用矢量兜底）。
-- **工具栏角标**：扩展图标上显示当前页面实际运行的脚本数 —— 引擎在脚本体执行前上报 `host:run`，background 按 tab 跨帧去重后计数，再与「已启用 / 未回收」求交集（`lib/background/injected-state.ts`）。主文档 commit 时清零并丢弃角标缓存（Chrome 会在新文档提交时清空 per-tab 角标）。0 时不画，>99 为 `99+`，跟随主题色；可在 外观 → 界面 关闭（`showBadge`）。
+- **工具栏角标**：扩展图标上显示当前页面实际运行的脚本数 —— 引擎在脚本体执行前上报 `host:run`，background 按 tab 跨帧去重后计数，再与「已启用 / 未回收」求交集（`lib/background/injected-state.ts`）。主文档 commit 时清零并丢弃角标缓存（Chromium 会在新文档提交时清空 per-tab 角标）。0 时不画，>99 为 `99+`，跟随主题色；可在 外观 → 界面 关闭（`showBadge`）。
 - **Options**：导航顺序为 `#/scripts`、`#/settings/:section`、`#/appearance`、`#/logs`、`#/about`（日志紧靠关于：两者都是诊断/构建信息面），编辑器为 `#/script/:uuid`。
 - 脚本编辑器用标签页切换代码 / 元数据 / 值 / 资源 / 信息，不左右分栏。
 - 组件与令牌规范见 [`DESIGN.md`](DESIGN.md)。
@@ -151,4 +151,4 @@ Service Worker（唯一数据/权限中心）
 
 - `npm run compile`：TypeScript 全量检查。
 - `npm test`：默认套件无浏览器依赖（元数据、URL 规则、桥接、存储、主题与对比度）。
-- `LUMO_E2E=1 npm test -- tests/integration`：真实 Chrome 回归，覆盖两个执行世界、GM 值、菜单、`@require` 与 SW 回收。
+- `LUMO_E2E=1 npm test -- tests/integration`：真实 Chrome（或 Edge，见 `CHROME_PATH`）回归，覆盖两个执行世界、GM 值、菜单、`@require` 与 SW 回收。

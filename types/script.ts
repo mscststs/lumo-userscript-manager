@@ -206,12 +206,19 @@ export interface RuntimeMenuCommand {
   frameId: number;
 }
 
+export type UserScriptsAvailabilityCode =
+  | 'api-unavailable'
+  | 'unexpected-result'
+  | 'disabled';
+
 export interface RuntimeStatus {
   userScriptsAvailable: boolean;
   scriptsEnabled: boolean;
   registeredCount: number;
   engineCount: number;
   lastError?: string;
+  /** Machine-readable counterpart of `lastError`, translated by the UI. */
+  lastErrorCode?: UserScriptsAvailabilityCode;
   lastCheckedAt: number;
 }
 

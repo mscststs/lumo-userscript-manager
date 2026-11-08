@@ -5,6 +5,7 @@ import type {
   ScriptRunAt,
   ScriptWorld,
   UserScript,
+  UserScriptsAvailabilityCode,
 } from '@/types';
 import { getScriptCode, listScripts } from '@/lib/db';
 import { storage } from '@/store/storage';
@@ -41,23 +42,37 @@ export function getRuntimeStatus(): RuntimeStatus {
   return { ...status };
 }
 
-export async function checkUserScriptsAvailable(): Promise<{ ok: boolean; error?: string }> {
+export interface UserScriptsAvailability {
+  ok: boolean;
+  error?: string;
+  code?: UserScriptsAvailabilityCode;
+}
+
+export async function checkUserScriptsAvailable(): Promise<UserScriptsAvailability> {
   try {
     if (!chrome.userScripts || typeof chrome.userScripts.getScripts !== 'function') {
-      return { ok: false, error: 'chrome.userScripts API is not available.' };
+      return {
+        ok: false,
+        code: 'api-unavailable',
+        error: 'The userScripts API is not available.',
+      };
     }
     const scripts = await chrome.userScripts.getScripts();
     if (!Array.isArray(scripts)) {
-      return { ok: false, error: 'chrome.userScripts returned an unexpected result.' };
+      return {
+        ok: false,
+        code: 'unexpected-result',
+        error: 'The userScripts API returned an unexpected result.',
+      };
     }
     return { ok: true };
   } catch (error) {
+    // The browser's own message stays as the diagnostic detail; the UI
+    // translates `code` so a disabled API never reads as a raw English string.
     return {
       ok: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : 'User scripts are disabled. Enable "Allow User Scripts" in chrome://extensions.',
+      code: 'disabled',
+      error: error instanceof Error ? error.message : 'User scripts are disabled.',
     };
   }
 }
@@ -269,6 +284,7 @@ async function performRegistration(): Promise<RuntimeStatus> {
       registeredCount: 0,
       engineCount: 0,
       lastError: availability.error,
+      lastErrorCode: availability.code,
       lastCheckedAt: Date.now(),
     };
     return status;
@@ -388,6 +404,7 @@ function safelyRegister(): Promise<RuntimeStatus> {
     status = {
       ...status,
       lastError: error instanceof Error ? error.message : String(error),
+      lastErrorCode: undefined,
       lastCheckedAt: Date.now(),
     };
     return status;

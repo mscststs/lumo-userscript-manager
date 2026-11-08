@@ -201,7 +201,7 @@ export default function App() {
                   )}
                 >
                   {/* Product wordmark stays English in every locale, like the
-                      extension name in the Chrome UI. */}
+                      extension name in the browser UI. */}
                   Lumo Userscripts
                 </p>
               </div>
