@@ -46,6 +46,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { isExtensionId } from '@/lib/agent/protocol';
+import { removeAllowedClient, upsertAllowedClient } from '@/lib/agent/allowlist';
 import {
   Select,
   SelectContent,
@@ -96,7 +97,9 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
   const toast = useToast();
   const [settings, setSettings] = useState<UISettings | null>(null);
   const [agent, setAgent] = useState<AgentSettings | null>(null);
+  const [agentName, setAgentName] = useState('');
   const [agentId, setAgentId] = useState('');
+  const agentIdInput = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState(false);
   const [audit, setAudit] = useState<AgentAuditEntry[]>([]);
   // Same queue the approval dialog renders; the inline list is the durable
@@ -214,11 +217,17 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
       setError(t('settings.agent.invalidId'));
       return;
     }
-    if (agent?.allowedExtensionIds.includes(id)) {
-      setAgentId('');
-      return;
-    }
-    void updateAgent({ allowedExtensionIds: [...(agent?.allowedExtensionIds ?? []), id] });
+    // The ID is the identity; the name is an optional label the user can supply
+    // when the host has never identified itself. Re-adding an existing ID with a
+    // name edits that entry instead of silently doing nothing.
+    const name = agentName.trim().slice(0, 80);
+    void updateAgent({
+      allowedClients: upsertAllowedClient(agent?.allowedClients ?? [], {
+        id,
+        ...(name ? { name } : {}),
+      }),
+    });
+    setAgentName('');
     setAgentId('');
   };
 
@@ -608,7 +617,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
           {/* Stays only while nothing is connected: once a client is on the
               allowlist the explanation is spent, and a permanent banner above
               the switches would be pure chrome. */}
-          {agent.allowedExtensionIds.length === 0 && <AgentIntro />}
+          {agent.allowedClients.length === 0 && <AgentIntro />}
 
           {pendingRequests.length > 0 && (
             <SettingsGroup
@@ -730,28 +739,40 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
                 title={t('settings.agent.allowed')}
                 description={t('settings.agent.allowedHint')}
               >
-                {agent.allowedExtensionIds.length === 0 ? (
+                {agent.allowedClients.length === 0 ? (
                   <p className="py-2.5 text-xs text-muted-foreground">
                     {t('settings.agent.noAllowed')}
                   </p>
                 ) : (
-                  agent.allowedExtensionIds.map((id) => (
-                    <div
-                      key={id}
-                      className="flex items-center justify-between gap-3 py-2"
-                    >
-                      <code className="min-w-0 flex-1 truncate font-mono text-xs text-muted-foreground">
-                        {id}
-                      </code>
+                  agent.allowedClients.map((client) => (
+                    <div key={client.id} className="flex items-center justify-between gap-3 py-2">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                          <p
+                            className={cn(
+                              'min-w-0 truncate',
+                              client.name
+                                ? 'text-sm font-medium text-foreground'
+                                : 'font-mono text-xs text-muted-foreground',
+                            )}
+                          >
+                            {client.name ?? client.id}
+                          </p>
+                          {client.version && <Badge variant="outline">{client.version}</Badge>}
+                        </div>
+                        {client.name && (
+                          <code className="mt-0.5 block select-all truncate font-mono text-2xs text-muted-foreground">
+                            {client.id}
+                          </code>
+                        )}
+                      </div>
                       <Button
                         variant="ghost"
                         size="icon"
                         className="h-7 w-7 shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
                         onClick={() =>
                           void updateAgent({
-                            allowedExtensionIds: agent.allowedExtensionIds.filter(
-                              (entry) => entry !== id,
-                            ),
+                            allowedClients: removeAllowedClient(agent.allowedClients, client.id),
                           })
                         }
                         aria-label={t('settings.agent.remove')}
@@ -763,6 +784,24 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
                 )}
                 <div className="flex flex-wrap items-center gap-2 py-2.5">
                   <Input
+                    value={agentName}
+                    onChange={(event) => setAgentName(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Enter') return;
+                      event.preventDefault();
+                      // The name is optional, the ID is not: Enter here submits
+                      // when an ID is already there, otherwise it moves on to the
+                      // field that is actually required.
+                      if (isExtensionId(agentId.trim())) addAllowedId();
+                      else agentIdInput.current?.focus();
+                    }}
+                    placeholder={t('settings.agent.namePlaceholder')}
+                    aria-label={t('settings.agent.namePlaceholder')}
+                    className="min-w-0 flex-1 basis-32 text-xs"
+                    maxLength={80}
+                  />
+                  <Input
+                    ref={agentIdInput}
                     value={agentId}
                     onChange={(event) => setAgentId(event.target.value)}
                     onKeyDown={(event) => {
@@ -773,7 +812,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
                     }}
                     placeholder={t('settings.agent.idPlaceholder')}
                     aria-label={t('settings.agent.idPlaceholder')}
-                    className="min-w-0 flex-1 basis-48 font-mono text-xs"
+                    className="min-w-0 flex-1 basis-52 font-mono text-xs"
                     spellCheck={false}
                   />
                   <Button

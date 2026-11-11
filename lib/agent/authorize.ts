@@ -1,5 +1,6 @@
 import { checkUserScriptsAvailable } from '@/lib/background/registry';
-import { promptForRequest, recordPendingRequest } from './pending';
+import { isAllowedClient } from './allowlist';
+import { promptForRequest, recordPendingRequest, rememberAllowedClient } from './pending';
 import { storage } from '@/store/storage';
 import {
   AGENT_NAMESPACE,
@@ -63,15 +64,19 @@ export async function handleAuthorize(
   }
 
   const senderId = sender.id ?? '';
-  const authorized = Boolean(senderId && settings.allowedExtensionIds.includes(senderId));
+  const authorized = isAllowedClient(settings, senderId);
 
   // Already allowed: nothing to ask. Answering the same shape as the probe keeps
   // the host's handling identical for both messages.
   //
   // The record-and-prompt pipeline is deliberately not awaited: it writes
   // storage and opens a tab, and the host is waiting on this reply with a
-  // timeout. A slow prompt must never make the call look unanswered.
-  if (!authorized) {
+  // timeout. A slow prompt must never make the call look unanswered. An
+  // already-allowed caller is only refreshed — never re-queued — so it keeps
+  // its name and version in the allowlist without producing a card.
+  if (authorized) {
+    void rememberAllowedClient(senderId, request.client);
+  } else {
     void recordPendingRequest(senderId, request.client).then((pending) =>
       promptForRequest(pending),
     );

@@ -1,6 +1,7 @@
 import type { AgentPendingRequest, AgentSettings } from '@/types';
 import { storage } from '@/store/storage';
 import { openOptionsTab } from '@/lib/options-tab';
+import { findAllowedClient, upsertAllowedClient } from './allowlist';
 import { isExtensionId } from './protocol';
 
 /**
@@ -48,7 +49,7 @@ export function recordPendingRequest(
   return serialize(async () => {
     try {
       const settings = await storage.getAgentSettings();
-      if (settings.allowedExtensionIds.includes(senderId)) return undefined;
+      if (findAllowedClient(settings, senderId)) return undefined;
 
       const requests = await storage.getAgentPendingRequests();
       const now = Date.now();
@@ -125,21 +126,72 @@ export function approvePendingRequest(senderId: string): Promise<AgentSettings |
   if (!isExtensionId(senderId)) return Promise.resolve(undefined);
 
   return serialize(async () => {
-    const settings = await storage.getAgentSettings();
+    const [settings, requests] = await Promise.all([
+      storage.getAgentSettings(),
+      storage.getAgentPendingRequests(),
+    ]);
+    // Read the queue *before* deleting the row: the self-reported name and
+    // version the host sent with `lumo:authorize` are the only chance to keep
+    // them, and a bare ID is what left the allowlist anonymous.
+    const pending = requests.find((request) => request.id === senderId);
     const next: AgentSettings = {
       ...settings,
       enabled: true,
-      allowedExtensionIds: Array.from(
-        new Set([...settings.allowedExtensionIds, senderId]),
-      ).slice(0, 16),
+      allowedClients: upsertAllowedClient(settings.allowedClients, {
+        id: senderId,
+        ...(pending?.name ? { name: pending.name } : {}),
+        ...(pending?.version ? { version: pending.version } : {}),
+      }),
     };
     await storage.setAgentSettings(next);
-    const requests = await storage.getAgentPendingRequests();
     await storage.setAgentPendingRequests(
       requests.filter((request) => request.id !== senderId),
     );
     return next;
   });
+}
+
+/**
+ * Refresh the display details of an already-allowed caller.
+ *
+ * `lumo:authorize` carries the host's self-reported name and version every time
+ * the user asks to connect, so an ID that was allowlisted by hand — or migrated
+ * from a build that only stored IDs — gains a face the next time that host
+ * identifies itself. Called from authorize only: the probe must stay read-only.
+ *
+ * A no-op (no write, no storage event) when nothing changed, because the host
+ * may retry the authorize on every focus.
+ */
+export async function rememberAllowedClient(
+  senderId: string | undefined,
+  client: { name?: string; version?: string } | undefined,
+): Promise<void> {
+  if (!senderId || !isExtensionId(senderId)) return;
+  const details = sanitizeClient(client);
+  if (!details.name && !details.version) return;
+
+  try {
+    await serialize(async () => {
+      const settings = await storage.getAgentSettings();
+      const existing = findAllowedClient(settings, senderId);
+      if (!existing) return;
+      if (
+        (details.name ?? existing.name) === existing.name &&
+        (details.version ?? existing.version) === existing.version
+      ) {
+        return;
+      }
+      await storage.setAgentSettings({
+        ...settings,
+        allowedClients: upsertAllowedClient(settings.allowedClients, {
+          id: senderId,
+          ...details,
+        }),
+      });
+    });
+  } catch (error) {
+    console.warn('[Lumo Userscripts] Failed to refresh an allowlisted client:', error);
+  }
 }
 
 /** Dismiss a request; a new `lumo:authorize` from that caller revives it. */

@@ -33,7 +33,7 @@ const { resetWriteLimit, consumeWrite, WRITE_LIMIT, WRITE_WINDOW_MS } = await im
 
 const WRITE_REVIEW: AgentSettings = {
   enabled: true,
-  allowedExtensionIds: [HOST_ID],
+  allowedClients: [{ id: HOST_ID }],
   allowWrites: true,
   reviewWrites: true,
   promptOnRequest: false,

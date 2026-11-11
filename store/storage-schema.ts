@@ -23,7 +23,8 @@
  * revision counter in this area as the change-broadcast channel.
  */
 
-import type { AgentPendingRequest, AgentSettings, UISettings } from '@/types';
+import type { AgentAllowedClient, AgentPendingRequest, AgentSettings, UISettings } from '@/types';
+import { MAX_ALLOWED_CLIENTS } from '@/lib/agent/allowlist';
 import {
   DEFAULT_ACCENT,
   DEFAULT_DARK_THEME,
@@ -104,13 +105,45 @@ export const DEFAULT_UI_SETTINGS: UISettings = {
 
 export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
   enabled: false,
-  allowedExtensionIds: [],
+  allowedClients: [],
   allowWrites: true,
   reviewWrites: false,
   promptOnRequest: true,
 };
 
 const EXTENSION_ID_RE = /^[a-p]{32}$/;
+
+/**
+ * Repair the allowlist and migrate the pre-1.1 shape.
+ *
+ * Older builds stored a bare `allowedExtensionIds: string[]`, which is why the
+ * allowlist could only ever show IDs. A legacy array is folded in as entries
+ * with no name; the next `lumo:authorize` from that host fills in the details.
+ */
+export function normalizeAllowedClients(raw: unknown, legacyIds?: unknown): AgentAllowedClient[] {
+  const rows: AgentAllowedClient[] = [];
+  const seen = new Set<string>();
+
+  const push = (entry: unknown) => {
+    if (!entry || typeof entry !== 'object') return;
+    const record = entry as Record<string, unknown>;
+    const id = record.id;
+    if (typeof id !== 'string' || !EXTENSION_ID_RE.test(id) || seen.has(id)) return;
+    seen.add(id);
+    const name = typeof record.name === 'string' ? record.name.trim().slice(0, 80) : '';
+    const version =
+      typeof record.version === 'string' ? record.version.trim().slice(0, 32) : '';
+    rows.push({
+      id,
+      ...(name ? { name } : {}),
+      ...(version ? { version } : {}),
+    });
+  };
+
+  if (Array.isArray(raw)) raw.forEach(push);
+  if (Array.isArray(legacyIds)) legacyIds.forEach((id) => push({ id }));
+  return rows.slice(0, MAX_ALLOWED_CLIENTS);
+}
 
 /** Repair the bounded pending-request queue. */
 export function normalizeAgentPendingRequests(raw: unknown): AgentPendingRequest[] {
@@ -171,13 +204,10 @@ export const STORAGE_FIELDS: { [K in StorageKey]: StorageFieldDef<K> } = {
       // Chrome extension IDs are 32 characters from a-p. Filtering here keeps a
       // hand-edited or imported value from becoming an allowlist entry that can
       // never match, and caps the list so the record stays bounded.
-      allowedExtensionIds: Array.from(
-        new Set(
-          (Array.isArray(raw?.allowedExtensionIds) ? raw.allowedExtensionIds : []).filter(
-            (id): id is string => typeof id === 'string' && /^[a-p]{32}$/.test(id),
-          ),
-        ),
-      ).slice(0, 16),
+      allowedClients: normalizeAllowedClients(
+        raw?.allowedClients,
+        (raw as unknown as { allowedExtensionIds?: unknown } | undefined)?.allowedExtensionIds,
+      ),
       // Defaults are "writes on, review off"; an explicit stored value wins so
       // a user who turned either switch the other way keeps that choice.
       allowWrites: raw?.allowWrites !== false,

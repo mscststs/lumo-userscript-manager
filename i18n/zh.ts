@@ -440,6 +440,7 @@ export const zh: TranslationSchema = {
       allowedHint: '只有这些扩展可以建立 MCP 会话；其他调用会在读取任何数据前被拒绝。',
       noAllowed: '尚未允许任何扩展。',
       idPlaceholder: '32 位扩展 ID',
+      namePlaceholder: '显示名称（可选）',
       add: '添加',
       remove: '移除',
       invalidId: '请输入 32 位浏览器扩展 ID。',

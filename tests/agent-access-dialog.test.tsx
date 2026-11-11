@@ -14,7 +14,7 @@ const HOST_ID = 'c'.repeat(32);
 
 const SETTINGS: AgentSettings = {
   enabled: false,
-  allowedExtensionIds: [],
+  allowedClients: [],
   allowWrites: false,
   reviewWrites: true,
   promptOnRequest: true,

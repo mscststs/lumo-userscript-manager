@@ -44,12 +44,15 @@ export type UserLogLevel = 'error' | 'warn' | 'info' | 'debug';
  * Trust configuration for the agent-facing MCP endpoint.
  *
  * The endpoint is deny-by-default: the user turns it on *and* lists the
- * extension IDs allowed to call it. Browser extension IDs are the only stable
- * identity a receiver gets (`sender.id`), so they are the allowlist.
+ * extensions allowed to call it. Browser extension IDs are the only stable
+ * identity a receiver gets (`sender.id`), so they remain the identity of an
+ * allowlist entry; `name`/`version` are self-reported display hints that exist
+ * only so the user can recognise who was allowed later.
  */
 export interface AgentSettings {
   enabled: boolean;
-  allowedExtensionIds: string[];
+  /** Bounded allowlist, newest first. */
+  allowedClients: AgentAllowedClient[];
   /** Allow the agent to create/edit/enable/disable/trash scripts. Defaults to on. */
   allowWrites: boolean;
   /** New agent-authored scripts stay disabled until the user reviews them. Defaults to off. */
@@ -59,11 +62,26 @@ export interface AgentSettings {
 }
 
 /**
- * An extension that probed the agent endpoint but is not on the allowlist.
+ * One allowlisted extension: the authoritative ID plus what it calls itself.
+ *
+ * A record rather than a bare ID so Settings → Agent can show “Lumo 1.2.3”
+ * instead of a 32-character string the user cannot recognise. `name` is
+ * editable (manual adds), `version` is refreshed whenever the host identifies
+ * itself, and neither is ever used for the trust decision.
+ */
+export interface AgentAllowedClient {
+  id: string;
+  name?: string;
+  version?: string;
+}
+
+/**
+ * An extension that asked for access but is not on the allowlist.
  *
  * Bounded and non-exportable: it is runtime consent state, not configuration.
  * `name`/`version` are self-reported by the caller and are only a display hint;
- * the extension ID is the authoritative identity.
+ * the extension ID is the authoritative identity. Approving a request copies
+ * these details into the allowlist before the row is removed.
  */
 export interface AgentPendingRequest {
   id: string;

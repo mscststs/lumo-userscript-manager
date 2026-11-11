@@ -449,6 +449,7 @@ export const en = {
       allowedHint: 'Only these extensions may open an MCP session. Anything else is refused before data is read.',
       noAllowed: 'No extension is allowed yet.',
       idPlaceholder: '32-character extension ID',
+      namePlaceholder: 'Display name (optional)',
       add: 'Add',
       remove: 'Remove',
       invalidId: 'Enter a 32-character browser extension ID.',

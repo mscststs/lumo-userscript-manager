@@ -1,5 +1,6 @@
 import type { AgentSettings } from '@/types';
 import { storage } from '@/store/storage';
+import { isAllowedClient } from './allowlist';
 
 export interface AgentAccess {
   settings: AgentSettings;
@@ -19,7 +20,7 @@ export async function resolveAgentAccess(senderId: string | undefined): Promise<
   return {
     settings,
     enabled: settings.enabled,
-    authorized: Boolean(senderId && settings.allowedExtensionIds.includes(senderId)),
+    authorized: isAllowedClient(settings, senderId),
   };
 }
 

@@ -1,5 +1,6 @@
 import { checkUserScriptsAvailable } from '@/lib/background/registry';
 import { storage } from '@/store/storage';
+import { isAllowedClient } from './allowlist';
 import {
   AGENT_NAMESPACE,
   AGENT_SERVICE_NAME,
@@ -61,7 +62,7 @@ export async function handleProbe(
   }
 
   const senderId = sender.id ?? '';
-  const authorized = Boolean(senderId && settings.allowedExtensionIds.includes(senderId));
+  const authorized = isAllowedClient(settings, senderId);
   const availability = await checkUserScriptsAvailable();
 
   return {

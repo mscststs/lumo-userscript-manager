@@ -507,7 +507,7 @@ export default defineBackground(() => {
 
   // ─── Agent endpoint (L0 probe/authorize + L1 MCP) ─────────────────────────
   // Two L0 messages, one listener: `lumo:probe` reads, `lumo:authorize` asks.
-  // Only extensions listed in `agentSettings.allowedExtensionIds` may open an MCP
+  // Only extensions on `agentSettings.allowedClients` may open an MCP
   // session. `externally_connectable` in the manifest decides who can even reach
   // these listeners; this is the second, authoritative check.
   chrome.runtime.onMessageExternal.addListener((message, sender, sendResponse) => {

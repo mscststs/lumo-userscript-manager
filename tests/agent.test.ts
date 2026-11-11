@@ -22,7 +22,7 @@ import { STORAGE_FIELDS, normalizeAgentPendingRequests } from '@/store/storage-s
 const HOST_ID = 'c'.repeat(32);
 const READ_SETTINGS = {
   enabled: true,
-  allowedExtensionIds: [HOST_ID],
+  allowedClients: [{ id: HOST_ID }],
   allowWrites: false,
   reviewWrites: true,
   promptOnRequest: false,
@@ -214,21 +214,30 @@ describe('agent probe contract', () => {
     );
   });
 
-  it('approves a pending request by enabling access and allowlisting it', async () => {
+  it('approves a pending request by enabling access and keeping who it was', async () => {
     await handleAuthorize(
-      { channel: AUTHORIZE_CHANNEL, version: PROBE_VERSION },
+      {
+        channel: AUTHORIZE_CHANNEL,
+        version: PROBE_VERSION,
+        client: { id: HOST_ID, name: 'Lumo', version: '1.0.0' },
+      },
       { id: HOST_ID } as chrome.runtime.MessageSender,
     );
+    // The record is written off the reply path; let it land before approving.
+    await new Promise((resolve) => setTimeout(resolve, 0));
     const next = await approvePendingRequest(HOST_ID);
     expect(next).toEqual(
-      expect.objectContaining({ enabled: true, allowedExtensionIds: [HOST_ID] }),
+      expect.objectContaining({
+        enabled: true,
+        allowedClients: [{ id: HOST_ID, name: 'Lumo', version: '1.0.0' }],
+      }),
     );
     expect(await storage.getAgentPendingRequests()).toEqual([]);
   });
 
   it('reports enabled + authorized after the user opts in', async () => {
     await chrome.storage.local.set({
-      agentSettings: { enabled: true, allowedExtensionIds: [HOST_ID] },
+      agentSettings: { enabled: true, allowedClients: [{ id: HOST_ID }] },
     });
     const response = await handleProbe(
       { channel: PROBE_CHANNEL, version: PROBE_VERSION },
@@ -259,19 +268,36 @@ describe('agent probe contract', () => {
     expect(rows[0]).toEqual(expect.objectContaining({ id: HOST_ID }));
   });
 
-  it('normalizes the allowlist', () => {
+  it('normalizes the allowlist and remembers display details', () => {
     const normalize = STORAGE_FIELDS.agentSettings.normalize!;
     const result = normalize({
       enabled: true,
-      allowedExtensionIds: [HOST_ID, 'not-an-id', HOST_ID, 7],
+      allowedClients: [
+        { id: HOST_ID, name: '  Lumo  ', version: '1.0.0' },
+        { id: 'not-an-id', name: 'Bad' },
+        { id: HOST_ID, name: 'Duplicate' },
+        { id: 'd'.repeat(32), name: '' },
+      ],
     } as never);
     expect(result).toEqual({
       enabled: true,
-      allowedExtensionIds: [HOST_ID],
+      allowedClients: [
+        { id: HOST_ID, name: 'Lumo', version: '1.0.0' },
+        { id: 'd'.repeat(32) },
+      ],
       allowWrites: true,
       reviewWrites: false,
       promptOnRequest: true,
     });
+  });
+
+  it('migrates a legacy allowlist of bare IDs', () => {
+    const normalize = STORAGE_FIELDS.agentSettings.normalize!;
+    const result = normalize({
+      enabled: true,
+      allowedExtensionIds: [HOST_ID, HOST_ID, 'not-an-id'],
+    } as never);
+    expect(result.allowedClients).toEqual([{ id: HOST_ID }]);
   });
 });
 
@@ -320,7 +346,7 @@ describe('agent MCP server', () => {
 
   it('runs a tool over the runtime Port transport', async () => {
     await chrome.storage.local.set({
-      agentSettings: { enabled: true, allowedExtensionIds: [HOST_ID] },
+      agentSettings: { enabled: true, allowedClients: [{ id: HOST_ID }] },
     });
 
     const [serverPort, clientPort] = fakePortPair();

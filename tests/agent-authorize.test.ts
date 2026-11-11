@@ -98,11 +98,10 @@ describe('lumo:probe', () => {
 
   it('reports authorization once the user has allowed the host', async () => {
     await chrome.storage.local.set({
-      agentSettings: { enabled: true, allowedExtensionIds: [HOST_ID] },
+      agentSettings: { enabled: true, allowedClients: [{ id: HOST_ID, name: 'Lumo' }] },
     });
 
     const response = await probe();
-
     expect(response.status).toEqual(
       expect.objectContaining({ enabled: true, authorized: true, ready: true }),
     );
@@ -132,13 +131,31 @@ describe('lumo:authorize', () => {
 
   it('does nothing when the host is already allowed', async () => {
     await chrome.storage.local.set({
-      agentSettings: { enabled: true, allowedExtensionIds: [HOST_ID] },
+      agentSettings: { enabled: true, allowedClients: [{ id: HOST_ID, name: 'Lumo' }] },
     });
 
     const response = await authorize();
     await settle();
 
     expect(response.status?.authorized).toBe(true);
+    expect(await storage.getAgentPendingRequests()).toEqual([]);
+    expect(tabsCreate).not.toHaveBeenCalled();
+  });
+
+  it('refreshes the name of an already-allowed host that identifies itself', async () => {
+    // Hand-added and migrated entries start as bare IDs; the next authorize is
+    // what gives them a face without producing another approval card.
+    await chrome.storage.local.set({
+      agentSettings: { enabled: true, allowedClients: [{ id: HOST_ID }] },
+    });
+
+    await authorize({ id: HOST_ID, name: 'Lumo', version: '2.0.0' });
+    await settle();
+
+    const settings = await storage.getAgentSettings();
+    expect(settings.allowedClients).toEqual([
+      { id: HOST_ID, name: 'Lumo', version: '2.0.0' },
+    ]);
     expect(await storage.getAgentPendingRequests()).toEqual([]);
     expect(tabsCreate).not.toHaveBeenCalled();
   });
