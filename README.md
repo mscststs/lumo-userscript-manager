@@ -68,7 +68,7 @@ Publishing is tag-driven and does not run on ordinary pushes to `main`:
 
 1. Bump `version` in `package.json`.
 2. Commit the change.
-3. Push a matching tag, e.g. `git tag v1.0.3 && git push origin v1.0.3`.
+3. Push a matching tag, e.g. `git tag v1.0.4 && git push origin v1.0.4`.
 
 The [Publish to Chrome Web Store](../../actions/workflows/publish.yml) workflow
 then builds the package, type-checks it, verifies that the tag, `package.json`
