@@ -101,12 +101,7 @@ function normalizeInclude(value: string): UrlRule | null {
     const schemeIndex = candidate.indexOf('://');
     const rest = candidate.slice(schemeIndex + 3);
     if (!rest.includes('/')) candidate += '/*';
-    let matchCandidate = candidate;
-    if (matchCandidate.startsWith('*://*.')) {
-      // `*://*.example.com/*` is a valid match pattern.
-    } else if (matchCandidate.startsWith('*://*')) {
-      // keep it
-    }
+    const matchCandidate = candidate;
 
     if (
       isValidMatchPattern(matchCandidate) &&

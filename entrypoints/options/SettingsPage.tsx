@@ -27,10 +27,11 @@ import { useStorageWatch } from '@/store/useStorageWatch';
 import { useAgentAccess } from '@/store/useAgentAccess';
 import { AgentIntro } from '@/components/agent/AgentIntro';
 import { sendBg, onLumoEvent } from '@/lib/messages';
-import { createBackupZip, readBackupZip, type BackupData } from '@/lib/backup';
+import type { BackupData } from '@/lib/backup';
 import { BackupError, parseBackupJson, summarizeBackup } from '@/lib/backup-format';
 import { formatBytes, cn } from '@/lib/utils';
 import { formatDateTime } from '@/lib/format';
+import { isImeComposing } from '@/lib/keyboard';
 import { DEFAULT_RUN_AT_VALUES, INJECT_INTO_OPTIONS, RUN_AT_OPTIONS } from '@/lib/script/metadata-options';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageLayout } from '@/components/layout/PageLayout';
@@ -55,13 +56,7 @@ import {
 } from '@/components/ui/dialog';
 import { isExtensionId } from '@/lib/agent/protocol';
 import { removeAllowedClient, upsertAllowedClient } from '@/lib/agent/allowlist';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export type SettingsSection = 'general' | 'updates' | 'data' | 'agent';
 
@@ -122,6 +117,12 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
   const toast = useToast();
   const [settings, setSettings] = useState<UISettings | null>(null);
   const [agent, setAgent] = useState<AgentSettings | null>(null);
+  // Refs mirror the last optimistic state so a burst of writes never starts
+  // from a stale render closure. Writes are serialized below.
+  const settingsRef = useRef<UISettings | null>(null);
+  const agentRef = useRef<AgentSettings | null>(null);
+  const settingsWriteChain = useRef<Promise<void>>(Promise.resolve());
+  const agentWriteChain = useRef<Promise<void>>(Promise.resolve());
   const [agentName, setAgentName] = useState('');
   const [agentId, setAgentId] = useState('');
   const agentIdInput = useRef<HTMLInputElement>(null);
@@ -147,25 +148,35 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
+  const applySettings = useCallback((next: UISettings) => {
+    settingsRef.current = next;
+    setSettings(next);
+  }, []);
+
+  const applyAgent = useCallback((next: AgentSettings) => {
+    agentRef.current = next;
+    setAgent(next);
+  }, []);
+
   const loadRuntime = useCallback(async () => {
     try {
       setRuntime(await sendBg<RuntimeStatus>('runtime:status'));
     } catch (e) {
       setError(errorText(e));
     }
-  }, []);
+  }, [errorText]);
 
   useEffect(() => {
     storage
       .getUISettings()
-      .then(setSettings)
+      .then(applySettings)
       .catch((e: Error) => setError(errorText(e)));
     storage
       .getAgentSettings()
-      .then(setAgent)
+      .then(applyAgent)
       .catch((e: Error) => setError(errorText(e)));
     void loadRuntime();
-  }, [loadRuntime]);
+  }, [applyAgent, applySettings, errorText, loadRuntime]);
 
   const loadBackupStats = useCallback(async () => {
     try {
@@ -173,7 +184,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
     } catch (e) {
       setError(errorText(e));
     }
-  }, []);
+  }, [errorText]);
 
   useEffect(() => {
     if (section !== 'data') return;
@@ -191,49 +202,77 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
   );
 
   useStorageWatch<UISettings>('uiSettings', (next) => {
-    if (next) setSettings(next);
+    if (next) applySettings(next);
   });
 
   useStorageWatch<AgentSettings>('agentSettings', (next) => {
-    if (next) setAgent(next);
+    if (next) applyAgent(next);
   });
 
-  const update = async (patch: Partial<UISettings>) => {
-    if (!settings) return;
-    const next = { ...settings, ...patch };
-    setSettings(next);
+  /**
+   * Optimistic write with a serialized commit queue.
+   *
+   * `chrome.storage.local` has no compare-and-swap: two handlers that both read
+   * the same `settings` object can finish out of order and silently drop the
+   * earlier change. The ref gives every handler the newest optimistic value,
+   * and the chain guarantees the writes themselves land in the same order.
+   */
+  const update = (patch: Partial<UISettings>): Promise<void> => {
+    const current = settingsRef.current ?? settings;
+    if (!current) return Promise.resolve();
+    const next = { ...current, ...patch };
+    applySettings(next);
     setError(null);
-    try {
-      await storage.setUISettings(next);
-      if (
-        patch.scriptsEnabled !== undefined ||
-        patch.defaultRunAt !== undefined ||
-        patch.defaultInjectInto !== undefined ||
-        patch.forceSandbox !== undefined
-      ) {
-        await sendBg('runtime:refresh');
-        await loadRuntime();
+
+    const task = async () => {
+      try {
+        await storage.setUISettings(next);
+        if (
+          patch.scriptsEnabled !== undefined ||
+          patch.defaultRunAt !== undefined ||
+          patch.defaultInjectInto !== undefined ||
+          patch.forceSandbox !== undefined
+        ) {
+          await sendBg('runtime:refresh');
+          await loadRuntime();
+        }
+        if (patch.autoUpdate !== undefined || patch.updateIntervalHours !== undefined) {
+          await sendBg('updates:setup');
+        }
+        toast({ title: t('settings.saved'), variant: 'success' });
+      } catch (e) {
+        setError(errorText(e));
+        // Reconcile with what actually persisted; do not leave the UI
+        // advertising a value the write rejected.
+        const persisted = await storage.getUISettings().catch(() => null);
+        if (persisted) applySettings(persisted);
       }
-      if (patch.autoUpdate !== undefined || patch.updateIntervalHours !== undefined) {
-        await sendBg('updates:setup');
-      }
-      toast({ title: t('settings.saved'), variant: 'success' });
-    } catch (e) {
-      setError(errorText(e));
-    }
+    };
+
+    settingsWriteChain.current = settingsWriteChain.current.then(task, task);
+    return settingsWriteChain.current;
   };
 
-  const updateAgent = async (patch: Partial<AgentSettings>) => {
-    if (!agent) return;
-    const next = { ...agent, ...patch };
-    setAgent(next);
+  const updateAgent = (patch: Partial<AgentSettings>): Promise<void> => {
+    const current = agentRef.current ?? agent;
+    if (!current) return Promise.resolve();
+    const next = { ...current, ...patch };
+    applyAgent(next);
     setError(null);
-    try {
-      await storage.setAgentSettings(next);
-      toast({ title: t('settings.saved'), variant: 'success' });
-    } catch (e) {
-      setError(errorText(e));
-    }
+
+    const task = async () => {
+      try {
+        await storage.setAgentSettings(next);
+        toast({ title: t('settings.saved'), variant: 'success' });
+      } catch (e) {
+        setError(errorText(e));
+        const persisted = await storage.getAgentSettings().catch(() => null);
+        if (persisted) applyAgent(persisted);
+      }
+    };
+
+    agentWriteChain.current = agentWriteChain.current.then(task, task);
+    return agentWriteChain.current;
   };
 
   const addAllowedId = () => {
@@ -324,6 +363,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
     setBackupBusy(format === 'zip' ? 'export-zip' : 'export-json');
     try {
       const data = await sendBg<BackupData>('backup:export');
+      const { createBackupZip } = await import('@/lib/backup');
       const date = new Date().toISOString().slice(0, 10);
       const blob =
         format === 'zip'
@@ -358,6 +398,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
       const buffer = await file.arrayBuffer();
       const head = new Uint8Array(buffer, 0, Math.min(2, buffer.byteLength));
       const isZip = head[0] === 0x50 && head[1] === 0x4b;
+      const { readBackupZip } = await import('@/lib/backup');
       const data = isZip
         ? readBackupZip(buffer)
         : parseBackupJson(new TextDecoder().decode(buffer));
@@ -481,7 +522,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
                     void update({ defaultRunAt: value as UISettings['defaultRunAt'] })
                   }
                 >
-                  <SelectTrigger className="w-64" aria-label={t('settings.defaultRunAt')}>
+                  <SelectTrigger className="w-64 max-w-full" aria-label={t('settings.defaultRunAt')}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -504,7 +545,10 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
                     void update({ defaultInjectInto: value as UISettings['defaultInjectInto'] })
                   }
                 >
-                  <SelectTrigger className="w-64" aria-label={t('settings.defaultInjectInto')}>
+                  <SelectTrigger
+                    className="w-64 max-w-full"
+                    aria-label={t('settings.defaultInjectInto')}
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -590,7 +634,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
                     void update({ logLevel: value as UISettings['logLevel'] })
                   }
                 >
-                  <SelectTrigger className="w-64" aria-label={t('settings.logLevel')}>
+                  <SelectTrigger className="w-64 max-w-full" aria-label={t('settings.logLevel')}>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -813,7 +857,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
                     value={agentName}
                     onChange={(event) => setAgentName(event.target.value)}
                     onKeyDown={(event) => {
-                      if (event.key !== 'Enter') return;
+                      if (event.key !== 'Enter' || isImeComposing(event)) return;
                       event.preventDefault();
                       // The name is optional, the ID is not: Enter here submits
                       // when an ID is already there, otherwise it moves on to the
@@ -832,10 +876,9 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
                     value={agentId}
                     onChange={(event) => setAgentId(event.target.value)}
                     onKeyDown={(event) => {
-                      if (event.key === 'Enter') {
-                        event.preventDefault();
-                        addAllowedId();
-                      }
+                      if (event.key !== 'Enter' || isImeComposing(event)) return;
+                      event.preventDefault();
+                      addAllowedId();
                     }}
                     placeholder={t('settings.agent.idPlaceholder')}
                     aria-label={t('settings.agent.idPlaceholder')}
@@ -937,7 +980,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
                   onClick={() => void exportBackup('zip')}
                 >
                   {backupBusy === 'export-zip' ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />
                   ) : (
                     <FileArchive className="h-3.5 w-3.5" />
                   )}
@@ -956,7 +999,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
                   onClick={() => void exportBackup('json')}
                 >
                   {backupBusy === 'export-json' ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />
                   ) : (
                     <FileJson className="h-3.5 w-3.5" />
                   )}
@@ -971,6 +1014,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
             description={t('settings.importHint')}
           >
             <div className="py-3">
+              {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- drag/drop is pointer-only; the Choose button inside is the keyboard path. */}
               <div
                 className={cn(
                   'rounded-card border border-dashed px-4 py-5 text-center transition-colors duration-150 ease-standard',
@@ -994,7 +1038,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
                 }}
               >
                 {backupBusy === 'read' ? (
-                  <Loader2 className="mx-auto h-5 w-5 animate-spin text-muted-foreground" />
+                  <Loader2 className="mx-auto h-5 w-5 animate-spin motion-reduce:animate-none text-muted-foreground" />
                 ) : (
                   <FileArchive className="mx-auto h-5 w-5 text-muted-foreground" />
                 )}
@@ -1198,7 +1242,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
                         backupBusy !== null || !previewSummary || previewSummary.scripts === 0
                       }
                     >
-                      {backupBusy === 'import' && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                      {backupBusy === 'import' && <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />}
                       {t('settings.importAction', { count: previewSummary?.scripts ?? 0 })}
                     </Button>
                   </>
@@ -1288,10 +1332,9 @@ function NumberField({
         onChange={(event) => setDraft(event.target.value)}
         onBlur={commit}
         onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            commit();
-          }
+          if (event.key !== 'Enter' || isImeComposing(event)) return;
+          event.preventDefault();
+          commit();
         }}
         className="w-20 text-end tabular-nums"
       />

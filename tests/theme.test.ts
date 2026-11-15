@@ -203,9 +203,11 @@ describe('theme tokens in globals.css', () => {
   it('does not derive the scrim from a foreground or background tint', () => {
     const dialog = readFileSync(resolve(__dirname, '../components/ui/dialog.tsx'), 'utf8');
     const code = dialog.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
-    expect(code).toContain('bg-overlay');
+    expect(code).toContain('lumo-dialog');
     expect(code).not.toContain('bg-foreground/');
     expect(code).not.toContain('bg-black/');
+    const css = readFileSync(resolve(__dirname, '../assets/globals.css'), 'utf8');
+    expect(css).toMatch(/\.lumo-dialog::backdrop\s*\{[^}]*--color-overlay/);
   });
 });
 
@@ -242,7 +244,7 @@ describe('first-paint theming', () => {
     });
 
     it('pins its first-launch defaults to the registered palettes', () => {
-      const table = PRELOAD.match(/var FALLBACK = \{([\s\S]*?)\n  \};/);
+      const table = PRELOAD.match(/var FALLBACK = \{([\s\S]*?)\n {2}\};/);
       expect(table, 'no FALLBACK table found').not.toBeNull();
       const source = table![1]!;
       for (const name of ['light', 'dark'] as const) {

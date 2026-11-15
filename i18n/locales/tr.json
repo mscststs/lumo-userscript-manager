@@ -17,7 +17,8 @@
     "install": "Yükle",
     "level": "Seviye",
     "discard": "Vazgeç",
-    "noResults": "Sonuç yok."
+    "noResults": "Sonuç yok.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}, {{count}} okunmamış hata",
       "unreadErrors_other": "{{label}}, {{count}} okunmamış hatalar",
       "pendingRequests_one": "{{label}}, {{count}} erişim isteği bekleniyor",
-      "pendingRequests_other": "{{label}}, {{count}} bekleyen erişim istekleri"
+      "pendingRequests_other": "{{label}}, {{count}} bekleyen erişim istekleri",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "Dış görünüş",

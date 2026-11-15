@@ -52,7 +52,7 @@ describe.skipIf(!enabled)('options navigation rail', () => {
     const measure = () =>
       evaluate(`(() => {
         const nav = document.querySelector('nav');
-        const button = nav.querySelector('button[aria-current="page"]');
+        const button = nav.querySelector('a[aria-current="page"]');
         const icon = button.querySelector(':scope > span.relative.z-10');
         const label = button.querySelector(':scope > span.text-optical');
         const iconRect = icon.getBoundingClientRect();

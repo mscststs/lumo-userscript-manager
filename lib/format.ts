@@ -1,7 +1,29 @@
+/**
+ * Formatter caches.
+ *
+ * `Intl` constructors are surprisingly expensive and the log/list views format
+ * every visible row on each render. One formatter per locale/options pair keeps
+ * a 500-row repaint from allocating hundreds of objects.
+ */
+const dateTimeFormatters = new Map<string, Intl.DateTimeFormat>();
+const dayFormatters = new Map<string, Intl.DateTimeFormat>();
+const clockFormatters = new Map<string, Intl.DateTimeFormat>();
+const relativeFormatters = new Map<string, Intl.RelativeTimeFormat>();
+
+function cached<T>(cache: Map<string, T>, key: string, create: () => T): T {
+  const existing = cache.get(key);
+  if (existing) return existing;
+  const value = create();
+  cache.set(key, value);
+  return value;
+}
+
 export function formatDateTime(timestamp: number | undefined, locale: string): string {
   if (!timestamp) return '—';
   try {
-    return new Date(timestamp).toLocaleString(locale);
+    return cached(dateTimeFormatters, locale, () => new Intl.DateTimeFormat(locale)).format(
+      timestamp,
+    );
   } catch {
     return new Date(timestamp).toISOString();
   }
@@ -36,7 +58,11 @@ export function formatRelativeTime(
 ): string {
   if (!timestamp) return '—';
   const diff = timestamp - now;
-  const format = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+  const format = cached(
+    relativeFormatters,
+    locale,
+    () => new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }),
+  );
   if (Math.abs(diff) < 45_000) return format.format(0, 'second');
   for (const [unit, size] of RELATIVE_STEPS) {
     if (Math.abs(diff) >= size || unit === 'minute') {
@@ -62,17 +88,23 @@ export function formatDayLabel(timestamp: number, locale: string, now = Date.now
   // `round`, not `floor`: a DST day is 23 or 25 hours long.
   const days = Math.round((startOfDay(timestamp) - startOfDay(now)) / DAY);
   if (days === 0 || days === -1) {
-    const label = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(days, 'day');
+    const label = cached(
+      relativeFormatters,
+      locale,
+      () => new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }),
+    ).format(days, 'day');
     return label.charAt(0).toLocaleUpperCase(locale) + label.slice(1);
   }
   const sameYear = new Date(timestamp).getFullYear() === new Date(now).getFullYear();
   try {
-    return new Intl.DateTimeFormat(locale, {
-      year: sameYear ? undefined : 'numeric',
-      month: 'short',
-      day: 'numeric',
-      weekday: 'short',
-    }).format(timestamp);
+    return cached(dayFormatters, `${locale}:${sameYear}`, () =>
+      new Intl.DateTimeFormat(locale, {
+        year: sameYear ? undefined : 'numeric',
+        month: 'short',
+        day: 'numeric',
+        weekday: 'short',
+      }),
+    ).format(timestamp);
   } catch {
     return new Date(timestamp).toDateString();
   }
@@ -81,11 +113,13 @@ export function formatDayLabel(timestamp: number, locale: string, now = Date.now
 /** Wall-clock time with seconds, for entries already grouped under a day. */
 export function formatClockTime(timestamp: number, locale: string): string {
   try {
-    return new Intl.DateTimeFormat(locale, {
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    }).format(timestamp);
+    return cached(clockFormatters, locale, () =>
+      new Intl.DateTimeFormat(locale, {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+      }),
+    ).format(timestamp);
   } catch {
     return new Date(timestamp).toLocaleTimeString();
   }

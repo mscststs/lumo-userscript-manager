@@ -2,7 +2,6 @@ import {
   BRIDGE_HELLO,
   BRIDGE_READY,
   BRIDGE_RESUME,
-  BRIDGE_RESULT,
   BRIDGE_RPC,
   isBridgeEvent,
   isBridgeResult,

@@ -17,7 +17,8 @@
     "install": "安裝",
     "level": "等級",
     "discard": "捨棄",
-    "noResults": "沒有結果。"
+    "noResults": "沒有結果。",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo 使用者腳本管理器",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}，{{count}} 個未讀錯誤",
       "unreadErrors_other": "{{label}}，{{count}} 個未讀錯誤",
       "pendingRequests_one": "{{label}}，{{count}} 個待處理的存取請求",
-      "pendingRequests_other": "{{label}}，{{count}} 個待處理的存取請求"
+      "pendingRequests_other": "{{label}}，{{count}} 個待處理的存取請求",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "外觀",

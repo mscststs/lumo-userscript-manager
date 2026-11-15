@@ -20,7 +20,7 @@
 | 法则 | 本项目的落地 | 依据 |
 | --- | --- | --- |
 | 渐进式隐藏 | 批量栏无选中时不存在；popup 搜索框在脚本 ≤5 时不渲染；空态不出现伪 CTA | 认知负荷理论（Sweller, 1988）：与任务无关的元素产生 extraneous load；Hick–Hyman 定律（1952）：选项数与决策时间成正比 |
-| 交互归一 | Select / Dropdown / Tooltip 共用同一 popover 表面与进出场；所有危险操作统一走 `ConfirmDialog` | Jakob 定律（Nielsen, 2000）：用户把对其它产品的预期带进来；一致性降低学习成本 |
+| 交互归一 | Select / Dropdown / Tooltip 共用同一 popover 表面、同一 `ChevronDown` 图标与进出场；所有危险操作统一走 `ConfirmDialog` | Jakob 定律（Nielsen, 2000）：用户把对其它产品的预期带进来；一致性降低学习成本 |
 | 渐进式披露 | 脚本行默认只有状态 + 名称；命令、元数据、版本历史按需展开 | Progressive Disclosure（Nielsen, 2006）；Miller 7±2 与 Cowan 4±1：分组后单屏决策数控制在 4–6 |
 | 物理级动效 | 批量栏从底部推入并推动内容；导航指示器用共享 layout 滑动；退场快于入场 | 迪士尼动画原则的 slow-in/slow-out；iOS `UIView` 弹簧阻尼；Material motion 的「容器变换」原则 |
 
@@ -35,7 +35,7 @@
 7. 任何加载态必须有与最终内容**同高**的骨架，禁止布局跳动。
 8. 页头固定在内容面板顶部，滚动只发生在页头下方的页体里；标题永远不随内容滚走。
 9. 颜色只从语义令牌取；组件内不出现十六进制、`rgb()`、`hsl()` 字面量。
-10. 动画时长 90–240ms；`prefers-reduced-motion` 下全部降为 1ms。
+10. 动画时长 90–240ms；`prefers-reduced-motion` 下关闭空间位移/缩放，保留颜色与透明度反馈。
 
 ---
 
@@ -307,13 +307,13 @@ DARK_THEME_OPTIONS  = dark | midnight
 | 列表增删 | 行高度 + 透明度 200ms（`ease-emphasis`），`AnimatePresence initial={false}` | 消失的行收起高度，下方行被平滑推上来；>80 行时降为 0ms，避免一次几百个高度动画 |
 | 行内显隐 | 透明度 100ms | 勾选框替换图标、行菜单浮现：高频微交互只用最短最轻的过渡 |
 | 安装页状态 | 透明度 + 6px 位移 180ms，`mode="wait"` | 加载 → 审阅 → 结果是整页级切换，只做一次短暂的落定 |
-| 页面切换 | 无动效（同步提交路由） | 切换必须是即时硬切：旧页不得以快照形式盖在新页上 |
+| 页面切换 | 无动效。路由作为 transition 提交：新页模块就绪前旧页保持可见，绝不用骨架或快照顶替 | 切换必须是即时硬切：旧页不得以快照形式盖在新页上 |
 | 批量条 | 从底部 16px 推入 | 与「从底部出现」的方向一致 |
 
 ### 5.3 降级
 
-- `prefers-reduced-motion: reduce`：CSS 动画全部 1ms；`MotionConfig reducedMotion="user"` 关闭布局动画。
-- 路由切换一律即时生效，不启用 View Transitions，也永不阻塞导航。
+- `prefers-reduced-motion: reduce`：关闭空间位移动画；`MotionConfig reducedMotion="user"` 同步处理 Motion 组件；颜色/透明度过渡保留。
+- 路由切换不启用 View Transitions，也永不阻塞导航：地址栏即时应答，页面作为 transition 在模块就绪后一次性替换。页面模块在 hover/focus 与空闲时预热（`entrypoints/options/routes.ts`），因此冷切换停留在旧页一帧，而不是闪 300ms 骨架。
 
 ---
 
@@ -340,7 +340,7 @@ outline 带更安静的 `shadow-control`；ghost 无阴影。
 - 高度统一 32px（`h-8`），字号 14px（`text-sm`），内边距 10px。
 - `Input` / `Textarea` / `Select` 表面用 `background`（在 `card` 上是「挖洞」），hover 边框加深，focus 由全局 ring 表达。
 - `Switch`：默认 36×20，`sm` 28×16；拇指恒为近白（物理反光件），轨道 off 用 `input`（暗色下必须可见）。
-- `Checkbox`：16px 视觉框 + 28px 命中区，ARIA checkbox，支持 `mixed`。
+- `Checkbox`：原生 `<input type="checkbox">` + `appearance: none`，16px 视觉框 + 28px 命中区，保留原生 label/键盘/`mixed` 语义。
 - 标签关联：`SettingRow` 的 `htmlFor` 指向控件；无 `htmlFor` 时用 `aria-label`。
 - **枚举值必须成对呈现**：`EnumValue` 把翻译标签与 `rawValue` 并排（标签常规字重，raw
   等宽 `text-2xs muted-foreground`），Select 触发器、选项列表与只读信息行共用同一个
@@ -518,7 +518,7 @@ Chrome 在每次新文档 commit 时清空该 tab 的角标，因此 commit 时�
 | 焦点可见（2.4.7 / 2.4.13） | 全局 `:focus-visible` 2px ring + 2px offset；仅 `role=listbox/menu` 豁免 |
 | 目标尺寸（2.5.8） | 最小 24px；默认控件 32px；图标按钮 28px |
 | 对比度（1.4.3 / 1.4.11） | 见 §2.5；测试强制 |
-| 键盘 | Dialog 焦点陷阱（Radix）；Segmented 支持 ←/→；Switch/Checkbox 空格；`Mod+S`（⌘S / Ctrl+S）在编辑器保存 |
+| 键盘 | 原生 `<dialog>` 焦点陷阱/Esc/返回手势；Segmented 支持方向键 + Home/End；Switch/Checkbox 空格；`Mod+S`（⌘S / Ctrl+S）在编辑器保存 |
 | 语义 | `role="list/listitem"`、`aria-current="page"`、`aria-checked`、`aria-live` |
 | 动效 | 尊重 `prefers-reduced-motion` |
 | 强制颜色 | `forced-colors: active` 下改用系统 `Highlight` |

@@ -80,7 +80,7 @@ export default defineConfig({
       // The options bundle carries CodeMirror + Shiki; it is intentionally a
       // single local chunk (no network). The default 500 kB warning is noise
       // here, so keep a limit that still catches accidental growth.
-      chunkSizeWarningLimit: 1000,
+      chunkSizeWarningLimit: 600,
       rollupOptions: {
         onwarn(warning, warn) {
           // Zod v4 ships `@__PURE__` comments that Rollup 4 cannot interpret in

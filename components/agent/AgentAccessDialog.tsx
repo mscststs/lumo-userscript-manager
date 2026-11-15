@@ -163,7 +163,7 @@ export function AgentAccessDialog({ access }: AgentAccessDialogProps) {
           </Button>
           <Button onClick={() => void runApprove()} disabled={busy}>
             {busy ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />
             ) : (
               <ShieldCheck className="h-3.5 w-3.5" />
             )}

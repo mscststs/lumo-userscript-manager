@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, ChevronDown, Globe, Search } from 'lucide-react';
@@ -23,6 +23,8 @@ interface LanguagePickerProps {
   value: LanguagePreference;
   onChange: (value: LanguagePreference) => void;
   className?: string;
+  /** Lets the surrounding SettingRow label target this control. */
+  id?: string;
 }
 
 /**
@@ -37,12 +39,13 @@ interface LanguagePickerProps {
  * the current language and English pinned: users looking for their own language
  * should not have to scroll past 50 others.
  */
-export function LanguagePicker({ value, onChange, className }: LanguagePickerProps) {
+export function LanguagePicker({ value, onChange, className, id }: LanguagePickerProps) {
   const { t, i18n } = useTranslation();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
+  const listId = useId();
 
   const detected = findLocale(detectLanguage());
   const selected = value === 'auto' ? undefined : findLocale(value);
@@ -100,6 +103,12 @@ export function LanguagePicker({ value, onChange, className }: LanguagePickerPro
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
       move(-1);
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      setActiveIndex(0);
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      setActiveIndex(Math.max(0, rows.length - 1));
     } else if (event.key === 'Enter') {
       event.preventDefault();
       const row = rows[activeIndex];
@@ -113,22 +122,28 @@ export function LanguagePicker({ value, onChange, className }: LanguagePickerPro
   return (
     <>
       <Button
+        id={id}
         type="button"
         variant="outline"
         onClick={() => setOpen(true)}
         aria-label={t('options.appearance.language')}
         className={cn(
-          'h-10 w-56 justify-between gap-2 px-3 font-normal',
+          // Reads as a form control, not an action: same height, padding, icon
+          // sizes and surface as `Select` and `Input`, and the same quiet
+          // hover. It is a `Button` only because it opens a searchable dialog
+          // instead of a listbox (55 locales).
+          'h-8 w-56 justify-between gap-2 px-2.5 font-normal',
+          'border-input bg-background shadow-none hover:border-muted-foreground/50 hover:bg-background hover:text-foreground',
           className
         )}
       >
         <span className="flex min-w-0 items-center gap-2">
-          <Globe className="h-4 w-4 shrink-0 opacity-60" />
+          <Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <span className="truncate text-sm" dir="auto">
             {triggerLabel}
           </span>
         </span>
-        <ChevronDown className="h-4 w-4 shrink-0 opacity-50" />
+        <ChevronDown className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -149,12 +164,22 @@ export function LanguagePicker({ value, onChange, className }: LanguagePickerPro
               onKeyDown={handleKeyDown}
               placeholder={t('options.appearance.languageSearch')}
               aria-label={t('options.appearance.languageSearch')}
+              role="combobox"
+              aria-expanded={open}
+              aria-controls={listId}
+              aria-autocomplete="list"
+              aria-activedescendant={
+                rows[activeIndex]
+                  ? `locale-option-${rows[activeIndex]!.tag}`
+                  : 'locale-option-auto'
+              }
               className="h-9 ps-9"
             />
           </div>
 
           <div
             ref={listRef}
+            id={listId}
             role="listbox"
             aria-label={t('options.appearance.language')}
             className="max-h-[min(50vh,420px)] overflow-y-auto scrollbar-lumo -mx-1 px-1"
@@ -170,8 +195,10 @@ export function LanguagePicker({ value, onChange, className }: LanguagePickerPro
                   <button
                     key={row?.tag ?? 'auto'}
                     type="button"
+                    id={row ? `locale-option-${row.tag}` : 'locale-option-auto'}
                     role="option"
                     aria-selected={selectedRow}
+                    tabIndex={-1}
                     data-index={index}
                     data-active={index === activeIndex || undefined}
                     onMouseEnter={() => setActiveIndex(index)}

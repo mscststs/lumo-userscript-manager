@@ -17,7 +17,8 @@
     "install": "نصب",
     "level": "سطح",
     "discard": "دور انداختن",
-    "noResults": "هیچ نتیجه ای وجود ندارد."
+    "noResults": "هیچ نتیجه ای وجود ندارد.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}، {{count}} خطای خوانده نشده",
       "unreadErrors_other": "{{label}}، {{count}} خطاهای خوانده نشده",
       "pendingRequests_one": "{{label}}، {{count}} درخواست دسترسی در انتظار",
-      "pendingRequests_other": "{{label}}، {{count}} درخواست های دسترسی در انتظار"
+      "pendingRequests_other": "{{label}}، {{count}} درخواست های دسترسی در انتظار",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "ظاهر",

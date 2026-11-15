@@ -17,7 +17,8 @@
     "install": "Cài đặt",
     "level": "Mức độ",
     "discard": "Bỏ",
-    "noResults": "Không có kết quả."
+    "noResults": "Không có kết quả.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}, {{count}} lỗi chưa đọc",
       "unreadErrors_other": "{{label}}, {{count}} lỗi chưa đọc",
       "pendingRequests_one": "{{label}}, {{count}} yêu cầu truy cập đang chờ xử lý",
-      "pendingRequests_other": "{{label}}, {{count}} đang chờ yêu cầu truy cập"
+      "pendingRequests_other": "{{label}}, {{count}} đang chờ yêu cầu truy cập",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "Vẻ bề ngoài",

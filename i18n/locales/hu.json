@@ -17,7 +17,8 @@
     "install": "Telepítés",
     "level": "Szint",
     "discard": "Elvetés",
-    "noResults": "Nincs eredmény."
+    "noResults": "Nincs eredmény.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}, {{count}} olvasatlan hiba",
       "unreadErrors_other": "{{label}}, {{count}} olvasatlan hiba",
       "pendingRequests_one": "{{label}}, {{count}} függőben lévő hozzáférési kérelem",
-      "pendingRequests_other": "{{label}}, {{count}} függőben lévő hozzáférési kérelmek"
+      "pendingRequests_other": "{{label}}, {{count}} függőben lévő hozzáférési kérelmek",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "Megjelenés",

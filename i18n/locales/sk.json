@@ -17,7 +17,8 @@
     "install": "Inštalovať",
     "level": "Úroveň",
     "discard": "Zahodiť",
-    "noResults": "Žiadne výsledky."
+    "noResults": "Žiadne výsledky.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -59,7 +60,8 @@
       "unreadErrors_few": "{{label}}, {{count}} neprečítané chyby",
       "unreadErrors_many": "{{label}}, {{count}} neprečítané chyby",
       "pendingRequests_few": "{{label}}, {{count}} čakajúce žiadosti o prístup",
-      "pendingRequests_many": "{{label}}, {{count}} čakajúce žiadosti o prístup"
+      "pendingRequests_many": "{{label}}, {{count}} čakajúce žiadosti o prístup",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "Vzhľad",

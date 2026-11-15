@@ -17,7 +17,8 @@
     "install": "Инсталирай",
     "level": "Ниво",
     "discard": "Изхвърли",
-    "noResults": "Няма резултати."
+    "noResults": "Няма резултати.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}, {{count}} непрочетена грешка",
       "unreadErrors_other": "{{label}}, {{count}} непрочетени грешки",
       "pendingRequests_one": "{{label}}, {{count}} чакаща заявка за достъп",
-      "pendingRequests_other": "{{label}}, {{count}} чакащи заявки за достъп"
+      "pendingRequests_other": "{{label}}, {{count}} чакащи заявки за достъп",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "Външен вид",

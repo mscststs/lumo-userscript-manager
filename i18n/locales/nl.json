@@ -17,7 +17,8 @@
     "install": "Installeren",
     "level": "Niveau",
     "discard": "Weggooien",
-    "noResults": "Geen resultaten."
+    "noResults": "Geen resultaten.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}, {{count}} ongelezen fout",
       "unreadErrors_other": "{{label}}, {{count}} ongelezen fouten",
       "pendingRequests_one": "{{label}}, {{count}} in afwachting van toegangsverzoek",
-      "pendingRequests_other": "{{label}}, {{count}} openstaande toegangsverzoeken"
+      "pendingRequests_other": "{{label}}, {{count}} openstaande toegangsverzoeken",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "Verschijning",

@@ -17,7 +17,8 @@
     "install": "Instaliraj",
     "level": "Razina",
     "discard": "Odbaci",
-    "noResults": "Nema rezultata."
+    "noResults": "Nema rezultata.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -56,7 +57,8 @@
       "pendingRequests_one": "{{label}}, {{count}} zahtjev za pristup na čekanju",
       "pendingRequests_other": "{{label}}, {{count}} zahtjevi za pristup na čekanju",
       "unreadErrors_few": "{{label}}, {{count}} nepročitane pogreške",
-      "pendingRequests_few": "{{label}}, {{count}} zahtjevi za pristup na čekanju"
+      "pendingRequests_few": "{{label}}, {{count}} zahtjevi za pristup na čekanju",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "Izgled",

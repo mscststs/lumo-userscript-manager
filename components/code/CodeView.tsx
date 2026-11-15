@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { HighlighterCore } from 'shiki/core';
 import { cn } from '@/lib/utils';
 
@@ -55,6 +56,7 @@ export function CodeView({
   lineNumbers?: boolean;
   className?: string;
 }) {
+  const { t } = useTranslation();
   const [html, setHtml] = useState<string | null>(null);
 
   useEffect(() => {
@@ -83,6 +85,9 @@ export function CodeView({
 
   return (
     <div
+      role="region"
+      tabIndex={0}
+      aria-label={t('install.codePreview')}
       className={cn('code-view font-mono text-2xs leading-5 text-foreground', className)}
       data-line-numbers={lineNumbers ? '' : undefined}
     >

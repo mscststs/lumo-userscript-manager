@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef } from 'react';
 import type { StorageKey } from './storage-schema';
 
 export type { StorageKey };
@@ -15,7 +15,10 @@ export function useStorageWatch<T = unknown>(
   callback: StorageChangeCallback<T>,
 ) {
   const callbackRef = useRef(callback);
-  callbackRef.current = callback;
+
+  useEffect(() => {
+    callbackRef.current = callback;
+  }, [callback]);
 
   useEffect(() => {
     const listener = (
@@ -45,10 +48,15 @@ export function useStorageWatchMultiple(
   callback: (key: StorageKey, newValue: unknown, oldValue: unknown) => void,
 ) {
   const callbackRef = useRef(callback);
-  callbackRef.current = callback;
-
   const keysRef = useRef(keys);
-  keysRef.current = keys;
+
+  useEffect(() => {
+    callbackRef.current = callback;
+  }, [callback]);
+
+  useEffect(() => {
+    keysRef.current = keys;
+  }, [keys]);
 
   useEffect(() => {
     const listener = (

@@ -17,7 +17,8 @@
     "install": "Εγκατάσταση",
     "level": "Επίπεδο",
     "discard": "Απόρριψη",
-    "noResults": "Κανένα αποτέλεσμα."
+    "noResults": "Κανένα αποτέλεσμα.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}, {{count}} μη αναγνωσμένο σφάλμα",
       "unreadErrors_other": "{{label}}, {{count}} μη αναγνωσμένα σφάλματα",
       "pendingRequests_one": "{{label}}, {{count}} εκκρεμεί αίτημα πρόσβασης",
-      "pendingRequests_other": "{{label}}, {{count}} αιτήματα πρόσβασης σε εκκρεμότητα"
+      "pendingRequests_other": "{{label}}, {{count}} αιτήματα πρόσβασης σε εκκρεμότητα",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "Εμφάνιση",

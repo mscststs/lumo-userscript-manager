@@ -17,7 +17,8 @@
     "install": "ఇన్‌స్టాల్ చేయండి",
     "level": "స్థాయి",
     "discard": "విస్మరించండి",
-    "noResults": "ఫలితాలు లేవు."
+    "noResults": "ఫలితాలు లేవు.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}, {{count}} చదవని లోపం",
       "unreadErrors_other": "{{label}}, {{count}} చదవని లోపాలు",
       "pendingRequests_one": "{{label}}, {{count}} పెండింగ్ యాక్సెస్ అభ్యర్థన",
-      "pendingRequests_other": "{{label}}, {{count}} పెండింగ్ యాక్సెస్ అభ్యర్థనలు"
+      "pendingRequests_other": "{{label}}, {{count}} పెండింగ్ యాక్సెస్ అభ్యర్థనలు",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "స్వరూపం",

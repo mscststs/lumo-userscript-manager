@@ -17,7 +17,8 @@
     "install": "Sakinisha",
     "level": "Kiwango",
     "discard": "Tupa",
-    "noResults": "Hakuna matokeo."
+    "noResults": "Hakuna matokeo.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}, {{count}} hitilafu ambayo haijasomwa",
       "unreadErrors_other": "{{label}}, {{count}} hitilafu ambazo hazijasomwa",
       "pendingRequests_one": "{{label}}, {{count}} ombi la ufikiaji linasubiri",
-      "pendingRequests_other": "{{label}}, {{count}} maombi ya ufikiaji yanayosubiri"
+      "pendingRequests_other": "{{label}}, {{count}} maombi ya ufikiaji yanayosubiri",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "Muonekano",

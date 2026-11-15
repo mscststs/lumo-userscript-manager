@@ -127,5 +127,5 @@
   var rawSize = read(FONT_SIZE_KEY);
   var fontSize = rawSize !== null ? Number(rawSize) : DEFAULT_SIZE;
   if (VALID_SIZES.indexOf(fontSize) === -1) fontSize = DEFAULT_SIZE;
-  root.style.fontSize = fontSize + 'px';
+  root.style.fontSize = (fontSize / DEFAULT_SIZE) * 100 + '%';
 })();

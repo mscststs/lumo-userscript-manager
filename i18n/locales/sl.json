@@ -17,7 +17,8 @@
     "install": "Namesti",
     "level": "Raven",
     "discard": "Zavrzi",
-    "noResults": "Brez rezultatov."
+    "noResults": "Brez rezultatov.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -59,7 +60,8 @@
       "unreadErrors_few": "{{label}}, {{count}} neprebranih napak",
       "unreadErrors_two": "{{label}}, {{count}} neprebranih napak",
       "pendingRequests_few": "{{label}}, {{count}} čakajoče zahteve za dostop",
-      "pendingRequests_two": "{{label}}, {{count}} čakajoče zahteve za dostop"
+      "pendingRequests_two": "{{label}}, {{count}} čakajoče zahteve za dostop",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "Videz",

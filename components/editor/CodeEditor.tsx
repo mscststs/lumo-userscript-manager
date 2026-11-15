@@ -10,13 +10,21 @@ interface CodeEditorProps {
   onChange: (value: string) => void;
   className?: string;
   readOnly?: boolean;
+  /** Accessible name for the contenteditable editor surface. */
+  ariaLabel?: string;
 }
 
 function isDark(): boolean {
   return document.documentElement.classList.contains('dark');
 }
 
-export function CodeEditor({ value, onChange, className, readOnly = false }: CodeEditorProps) {
+export function CodeEditor({
+  value,
+  onChange,
+  className,
+  readOnly = false,
+  ariaLabel,
+}: CodeEditorProps) {
   const container = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const themeCompartment = useRef(new Compartment());
@@ -33,6 +41,11 @@ export function CodeEditor({ value, onChange, className, readOnly = false }: Cod
         javascript({ jsx: false, typescript: false }),
         themeCompartment.current.of(isDark() ? githubDark : githubLight),
         EditorView.lineWrapping,
+        EditorView.contentAttributes.of(
+          ariaLabel
+            ? { 'aria-label': ariaLabel, 'aria-multiline': 'true' }
+            : { 'aria-multiline': 'true' },
+        ),
         EditorView.editable.of(!readOnly),
         EditorState.readOnly.of(readOnly),
         EditorView.updateListener.of((update) => {

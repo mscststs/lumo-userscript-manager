@@ -344,7 +344,7 @@
     background-color: var(--color-background);
     color-scheme: light;
     /* Scale the whole UI from one place. Everything above is rem-based. */
-    font-size: 16px;
+    font-size: 100%;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
   }
@@ -438,7 +438,11 @@
       --color-border: oklch(0.75 0.01 285);
       --color-muted-foreground: oklch(0.42 0.012 285);
     }
-    .dark {
+    /* Include the attribute-qualified palettes (midnight) too: their selector
+       is more specific than `.dark`, so a bare `.dark` override would leave
+       the blue palette without the requested contrast boost. */
+    .dark,
+    .dark[data-theme] {
       --color-border: oklch(0.45 0.01 270);
       --color-muted-foreground: oklch(0.82 0.008 270);
     }
@@ -462,11 +466,105 @@
   .text-optical {
     display: inline-block;
   }
+
+  /* Native checkbox, custom pixels. Keeping the real input means label clicks,
+     form semantics, `:indeterminate`, forced colours and assistive-technology
+     state all stay native. */
+  .lumo-checkbox {
+    position: relative;
+    display: inline-grid;
+    place-content: center;
+    inline-size: 1.75rem;
+    block-size: 1.75rem;
+    flex: none;
+    appearance: none;
+    border: 0;
+    border-radius: 0.375rem;
+    background: transparent;
+    color: var(--color-primary-foreground);
+    cursor: pointer;
+  }
+
+  .lumo-checkbox::before {
+    content: "";
+    inline-size: 1rem;
+    block-size: 1rem;
+    border: 1px solid var(--color-input);
+    border-radius: 0.25rem;
+    background-color: var(--color-background);
+    transition:
+      background-color 150ms var(--ease-standard),
+      border-color 150ms var(--ease-standard);
+  }
+
+  .lumo-checkbox:hover::before {
+    border-color: var(--color-muted-foreground);
+  }
+
+  .lumo-checkbox:checked::before,
+  .lumo-checkbox:indeterminate::before {
+    background-color: var(--color-primary);
+    border-color: var(--color-primary);
+  }
+
+  .lumo-checkbox::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .lumo-checkbox:checked::after {
+    inline-size: 0.3rem;
+    block-size: 0.55rem;
+    border: solid var(--color-primary-foreground);
+    border-width: 0 2px 2px 0;
+    transform: translateY(-0.05rem) rotate(45deg);
+    opacity: 1;
+  }
+
+  .lumo-checkbox:indeterminate::after {
+    inline-size: 0.5rem;
+    block-size: 2px;
+    border-radius: 9999px;
+    background-color: var(--color-primary-foreground);
+    opacity: 1;
+  }
+
+  .lumo-checkbox:focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+
+  .lumo-checkbox:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
+
+  @media (forced-colors: active) {
+    .lumo-checkbox::before {
+      border-color: ButtonText;
+      background-color: Canvas;
+    }
+    .lumo-checkbox:checked::before,
+    .lumo-checkbox:indeterminate::before {
+      background-color: Highlight;
+      border-color: Highlight;
+    }
+    .lumo-checkbox:checked::after {
+      border-color: HighlightText;
+    }
+    .lumo-checkbox:indeterminate::after {
+      background-color: HighlightText;
+    }
+  }
 }
 
 /* ─── Scrollbar ──────────────────────────────────────────────────────────── */
 @utility scrollbar-lumo {
-  scrollbar-width: thin;
+  scrollbar-width: auto;
   scrollbar-color: var(--color-scrollbar-thumb) transparent;
 
   &::-webkit-scrollbar {
@@ -569,6 +667,30 @@
     }
   }
 
+  /* Native <dialog> top layer. The UA already supplies focus containment and
+     inertness; only the surface, backdrop and scroll containment are ours. */
+  .lumo-dialog:modal {
+    overscroll-behavior: contain;
+  }
+
+  .lumo-dialog::backdrop {
+    background-color: var(--color-overlay);
+    backdrop-filter: blur(2px);
+    overscroll-behavior: contain;
+    animation: lumo-fade-in 160ms var(--ease-standard);
+  }
+
+  /* A closed <dialog> must not be laid out by an author display rule. The
+     open state is the only state that gets flex layout. */
+  .lumo-dialog:not([open]) {
+    display: none;
+  }
+
+  .lumo-dialog[open] {
+    display: flex;
+    animation: lumo-dialog-in 180ms var(--ease-emphasis);
+  }
+
   .dialog-overlay[data-state="open"] {
     animation: lumo-fade-in 160ms var(--ease-standard);
   }
@@ -599,6 +721,8 @@
   @media (prefers-reduced-motion: reduce) {
     .dialog-overlay,
     .dialog-content,
+    .lumo-dialog,
+    .lumo-dialog::backdrop,
     .popover-panel {
       animation-duration: 1ms !important;
     }

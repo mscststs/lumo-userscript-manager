@@ -28,8 +28,8 @@ import { opticalLabels } from '@/components/ui/optical';
 const buttonVariants = cva(
   [
     'inline-flex select-none items-center justify-center whitespace-nowrap font-medium',
-    'transition-[color,background-color,border-color,box-shadow,transform] duration-150 ease-standard',
-    'active:scale-[0.98] disabled:pointer-events-none disabled:opacity-45',
+    'transition-[color,background-color,border-color,box-shadow,transform] duration-150 ease-standard motion-reduce:transition-none',
+    'active:scale-[0.98] motion-reduce:active:scale-100 disabled:pointer-events-none disabled:opacity-45',
     '[&_svg]:shrink-0',
   ].join(' '),
   {

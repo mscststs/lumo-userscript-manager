@@ -17,7 +17,8 @@
     "install": "Install",
     "level": "Level",
     "discard": "Discard",
-    "noResults": "No results."
+    "noResults": "No results.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}, {{count}} unread error",
       "unreadErrors_other": "{{label}}, {{count}} unread errors",
       "pendingRequests_one": "{{label}}, {{count}} pending access request",
-      "pendingRequests_other": "{{label}}, {{count}} pending access requests"
+      "pendingRequests_other": "{{label}}, {{count}} pending access requests",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "Appearance",

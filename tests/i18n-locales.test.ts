@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DEFAULT_LOCALE,
   LOCALES,
   SHIPPED_LOCALES,
   detectLanguage,

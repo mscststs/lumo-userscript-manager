@@ -1,4 +1,10 @@
-import type { LogEntry, RuntimeMenuCommand, ScriptMetadata, UserScript } from '@/types';
+import type {
+  LogEntry,
+  RuntimeMenuCommand,
+  ScriptMetadata,
+  ScriptWorld,
+  UserScript,
+} from '@/types';
 import { getResources, getScript } from '@/lib/db';
 import { mergeMetadata } from '@/lib/script/metadata';
 import { compileUrlRules, urlMatches } from '@/lib/script/url-rules';
@@ -17,8 +23,17 @@ import type { HostErrorCode } from '@/lib/runtime/protocol';
 export interface HostContext {
   tabId: number;
   frameId: number;
+  /** Current page URL (may change after a same-document SPA navigation). */
   url: string;
+  /**
+   * URL of the document that received the injection. Unlike `url`, this stays
+   * put across same-document navigations, so a script that was authorized for
+   * the document keeps its GM APIs after the route changes.
+   */
+  documentUrl: string;
   uuid: string;
+  /** Execution world that opened this bridge channel, when known. */
+  world?: ScriptWorld;
   /** Chrome document id of the sending frame, when the browser provides one. */
   documentId?: string;
 }
@@ -38,11 +53,14 @@ export function createHostContext(
   payload: Record<string, unknown>,
 ): HostContext {
   const bridgeUrl = String(payload.__pageUrl ?? '');
+  const rawWorld = String(payload.__world ?? '');
   return {
     tabId: sender?.tab?.id ?? -1,
     frameId: sender?.frameId ?? 0,
     url: bridgeUrl || sender?.url || sender?.tab?.url || '',
+    documentUrl: sender?.url || sender?.tab?.url || bridgeUrl || '',
     uuid: String(payload.uuid ?? ''),
+    world: rawWorld === 'MAIN' || rawWorld === 'USER_SCRIPT' ? rawWorld : undefined,
     documentId: sender?.documentId,
   };
 }
@@ -61,11 +79,31 @@ async function requireActiveScript(uuid: string): Promise<UserScript> {
  * script UUID and execution world, and combined with `sender.tab/frameId` it
  * prevents a page from invoking another script's GM APIs.
  */
-async function requireToken(payload: Record<string, unknown>, uuid: string): Promise<void> {
+async function requireToken(
+  payload: Record<string, unknown>,
+  uuid: string,
+  ctx: HostContext,
+): Promise<void> {
   const token = String(payload.token ?? '');
-  if (!(await verifyRuntimeToken(token, uuid))) {
+  if (!(await verifyRuntimeToken(token, uuid, ctx.world))) {
     throw new HostError('Invalid runtime token.', 'INVALID_TOKEN');
   }
+}
+
+/**
+ * Every capability request must still be backed by an active script whose
+ * rules match the document that is asking. `host:bootstrap` used to be the only
+ * place doing this; a replayed token could then call `host:gm` on a page the
+ * script was never meant to touch.
+ */
+async function requireMatchingScript(ctx: HostContext): Promise<UserScript> {
+  const script = await requireActiveScript(ctx.uuid);
+  const effective = mergeMetadata(script.metadata, script.selfMetadata) as ScriptMetadata;
+  const matchUrl = ctx.documentUrl || ctx.url;
+  if (matchUrl && !urlMatches(matchUrl, compileUrlRules(effective))) {
+    throw new HostError('Script does not match this page.', 'NOT_MATCHED');
+  }
+  return script;
 }
 
 export async function handleHostRequest(
@@ -79,41 +117,39 @@ export async function handleHostRequest(
     case 'host:ping':
       return { time: Date.now() };
     case 'host:bootstrap': {
-      const script = await requireActiveScript(ctx.uuid);
-      await requireToken(payload, ctx.uuid);
-
+      await requireToken(payload, ctx.uuid, ctx);
+      const script = await requireMatchingScript(ctx);
       const effective = mergeMetadata(script.metadata, script.selfMetadata) as ScriptMetadata;
-      const url = ctx.url || String(payload.href ?? '');
-      if (url && !urlMatches(url, compileUrlRules(effective))) {
-        throw new HostError('Script does not match this page.', 'NOT_MATCHED');
-      }
-
       const { values, storageName } = await getValuesForScript(ctx.uuid);
       const resources = resourcesForRuntime(await getResources(ctx.uuid), effective);
       return { storageName, values, resources };
     }
     case 'host:gm': {
-      await requireToken(payload, ctx.uuid);
+      await requireToken(payload, ctx.uuid, ctx);
+      await requireMatchingScript(ctx);
       const api = String(payload.api ?? '');
       if (!api) throw new HostError('Missing GM API name.', 'BAD_REQUEST');
       return handleGmApi(api, (payload.args as unknown[]) ?? [], ctx);
     }
     case 'host:value:set': {
-      await requireToken(payload, ctx.uuid);
+      await requireToken(payload, ctx.uuid, ctx);
+      await requireMatchingScript(ctx);
       await setValueForScript(ctx.uuid, String(payload.key ?? ''), payload.value, {
         originUuid: ctx.uuid,
       });
       return undefined;
     }
     case 'host:value:delete': {
-      await requireToken(payload, ctx.uuid);
+      await requireToken(payload, ctx.uuid, ctx);
+      await requireMatchingScript(ctx);
       await deleteValueForScript(ctx.uuid, String(payload.key ?? ''), {
         originUuid: ctx.uuid,
       });
       return undefined;
     }
     case 'host:run': {
-      await requireToken(payload, ctx.uuid);
+      await requireToken(payload, ctx.uuid, ctx);
+      await requireMatchingScript(ctx);
       const error = payload.error ? String(payload.error) : undefined;
       if (error) {
         // The script did start; only the outcome is bad. Recording the error
@@ -132,7 +168,8 @@ export async function handleHostRequest(
       return undefined;
     }
     case 'host:log': {
-      await requireToken(payload, ctx.uuid);
+      await requireToken(payload, ctx.uuid, ctx);
+      await requireMatchingScript(ctx);
       await recordLog(
         (String(payload.level ?? 'info') as LogEntry['level']) ?? 'info',
         (payload.args as unknown[]) ?? [],
@@ -142,8 +179,8 @@ export async function handleHostRequest(
       return undefined;
     }
     case 'host:menu:register': {
-      await requireToken(payload, ctx.uuid);
-      await requireActiveScript(ctx.uuid);
+      await requireToken(payload, ctx.uuid, ctx);
+      await requireMatchingScript(ctx);
       const options = (payload.options ?? {}) as Record<string, unknown>;
       const id =
         String(payload.id ?? '') ||
@@ -164,7 +201,8 @@ export async function handleHostRequest(
       return id;
     }
     case 'host:menu:unregister': {
-      await requireToken(payload, ctx.uuid);
+      await requireToken(payload, ctx.uuid, ctx);
+      await requireMatchingScript(ctx);
       if (unregisterMenuCommand(ctx.tabId, ctx.frameId, ctx.uuid, String(payload.id ?? ''))) {
         broadcast('menus-changed', { tabId: ctx.tabId });
       }

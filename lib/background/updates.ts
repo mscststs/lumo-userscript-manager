@@ -1,10 +1,12 @@
 import type { UserScript } from '@/types';
-import { AppError, serializeError, type ErrorCode } from '@/lib/errors';
+import { serializeError, type ErrorCode } from '@/lib/errors';
 import { getScript, listScripts, updateScriptPartial } from '@/lib/db';
 import { parseMetadata, resolveMetadataUrls } from '@/lib/script/metadata';
 import { isNewerVersion } from '@/lib/script/semver';
 import { sha256Hex } from '@/lib/script/hash';
 import { storage } from '@/store/storage';
+import { fetchLimited } from '@/lib/net';
+import { MAX_SCRIPT_BYTES } from '@/lib/limits';
 import { commitInstall, getAllScripts, prepareInstall } from './scripts';
 import { broadcast } from './events';
 import { requestRegistration } from './registry';
@@ -27,11 +29,17 @@ function sameScriptPermission(a: UserScript, b: UserScript): boolean {
 }
 
 async function fetchText(url: string): Promise<string> {
-  const response = await fetch(url, { credentials: 'include', cache: 'no-cache' });
-  if (!response.ok) {
-    throw new AppError('update.httpError', { status: response.status }, `HTTP ${response.status}`);
-  }
-  return response.text();
+  // Updates belong to an already-installed script, so authenticated update
+  // servers (and localhost dev servers) remain supported; the timeout and
+  // streamed byte cap still apply.
+  const response = await fetchLimited(url, {
+    maxBytes: MAX_SCRIPT_BYTES,
+    timeoutMs: 20_000,
+    credentials: 'include',
+    allowPrivate: true,
+    cache: 'no-cache',
+  });
+  return response.text;
 }
 
 export interface UpdateCheckResult {

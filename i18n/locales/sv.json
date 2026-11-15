@@ -17,7 +17,8 @@
     "install": "Installera",
     "level": "Nivå",
     "discard": "Släng",
-    "noResults": "Inga resultat."
+    "noResults": "Inga resultat.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}, {{count}} oläst fel",
       "unreadErrors_other": "{{label}}, {{count}} olästa fel",
       "pendingRequests_one": "{{label}}, {{count}} väntande åtkomstbegäran",
-      "pendingRequests_other": "{{label}}, {{count}} väntande åtkomstförfrågningar"
+      "pendingRequests_other": "{{label}}, {{count}} väntande åtkomstförfrågningar",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "Utseende",

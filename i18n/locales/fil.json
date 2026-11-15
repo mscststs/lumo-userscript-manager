@@ -17,7 +17,8 @@
     "install": "I-install",
     "level": "Antas",
     "discard": "Itapon",
-    "noResults": "Walang resulta."
+    "noResults": "Walang resulta.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}, {{count}} hindi pa nababasang error",
       "unreadErrors_other": "{{label}}, {{count}} hindi pa nababasang mga error",
       "pendingRequests_one": "{{label}}, {{count}} nakabinbing kahilingan sa pag-access",
-      "pendingRequests_other": "{{label}}, {{count}} nakabinbing mga kahilingan sa pag-access"
+      "pendingRequests_other": "{{label}}, {{count}} nakabinbing mga kahilingan sa pag-access",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "Hitsura",

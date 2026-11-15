@@ -127,20 +127,21 @@ export interface EngineGlobal {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var __LUMO_RUNNER__: EngineGlobal | undefined;
-  // eslint-disable-next-line no-var
   var __LUMO_RUNNER_QUEUE__: RuntimeScriptPayload[] | undefined;
-  // eslint-disable-next-line no-var
   var __LUMO_HOST__: EngineGlobal | undefined;
-  // eslint-disable-next-line no-var
   var __LUMO_HOST_QUEUE__: RuntimeScriptPayload[] | undefined;
 }
 
 /** Narrow helpers so callers never trust a partially-shaped message. */
 export function isBridgeHello(value: unknown): value is BridgeHello {
   const data = value as Partial<BridgeHello> | null;
-  return Boolean(data && data.__lumo === BRIDGE_HELLO && typeof data.nonce === 'string');
+  return Boolean(
+    data &&
+      data.__lumo === BRIDGE_HELLO &&
+      typeof data.nonce === 'string' &&
+      (data.kind === 'main' || data.kind === 'userscript'),
+  );
 }
 
 export function isBridgeRpc(value: unknown): value is BridgeRpc {

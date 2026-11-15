@@ -17,7 +17,8 @@
     "install": "Instalar",
     "level": "Nível",
     "discard": "Descartar",
-    "noResults": "Nenhum resultado."
+    "noResults": "Nenhum resultado.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo — gerenciador de scripts de usuário",
@@ -56,7 +57,8 @@
       "pendingRequests_one": "{{label}}, {{count}} solicitação de acesso pendente",
       "pendingRequests_other": "{{label}}, {{count}} solicitações de acesso pendentes",
       "unreadErrors_many": "{{label}}, {{count}} erros não lidos",
-      "pendingRequests_many": "{{label}}, {{count}} solicitações de acesso pendentes"
+      "pendingRequests_many": "{{label}}, {{count}} solicitações de acesso pendentes",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "Aparência",

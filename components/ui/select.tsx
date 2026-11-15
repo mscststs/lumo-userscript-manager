@@ -6,10 +6,15 @@ import { cn } from '@/lib/utils';
 /**
  * Select.
  *
- * The trigger is one control height (32px) with the label line-clamped, so a
- * long language name cannot push the chevron out of the row. The panel is a
- * popover surface with the same elevation as the dropdown menu — base
- * components must feel like one family (interaction normalisation).
+ * The trigger is one form-control height (32px) with the value line-clamped, so
+ * a long option cannot push the chevron out of the row. The chevron, the panel
+ * surface and the item highlight are the same ones `dropdown-menu.tsx` uses:
+ * base components must feel like one family (interaction normalisation).
+ *
+ * Option content is not limited to text. Enum settings pass an `EnumValue`, so
+ * the trigger and the option list show the translated label next to the raw
+ * value that is actually persisted — the same two slots the read-only info rows
+ * use.
  */
 const Select = SelectPrimitive.Root;
 const SelectGroup = SelectPrimitive.Group;
@@ -23,11 +28,13 @@ const SelectTrigger = React.forwardRef<
     ref={ref}
     className={cn(
       'flex h-8 w-full min-w-0 items-center justify-between gap-2 rounded-control border border-input bg-background px-2.5 text-sm text-foreground',
-      'transition-[border-color,background-color] duration-150 ease-standard',
+      'transition-[border-color,background-color] duration-150 ease-standard motion-reduce:transition-none',
       'hover:border-muted-foreground/50',
       'disabled:cursor-not-allowed disabled:opacity-50',
       'data-[placeholder]:text-muted-foreground',
-      '[&>span]:min-w-0 [&>span]:flex-1 [&>span]:truncate [&>span]:text-start',
+      // The value slot owns the remaining width and keeps its content on one
+      // line; `EnumValue` truncates the label and never the raw value.
+      '[&>span]:flex [&>span]:min-w-0 [&>span]:flex-1 [&>span]:items-center [&>span]:overflow-hidden [&>span]:text-start',
       className,
     )}
     {...props}
@@ -76,10 +83,7 @@ const SelectLabel = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SelectPrimitive.Label
     ref={ref}
-    className={cn(
-      'py-1 ps-7 pe-2 text-2xs font-semibold text-muted-foreground',
-      className,
-    )}
+    className={cn('px-2 py-1 ps-7 text-2xs font-semibold text-muted-foreground', className)}
     {...props}
   />
 ));
@@ -105,17 +109,9 @@ const SelectItem = React.forwardRef<
         <Check className="h-3.5 w-3.5" />
       </SelectPrimitive.ItemIndicator>
     </span>
-    <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+    <SelectPrimitive.ItemText className="min-w-0 flex-1">{children}</SelectPrimitive.ItemText>
   </SelectPrimitive.Item>
 ));
 SelectItem.displayName = SelectPrimitive.Item.displayName;
 
-export {
-  Select,
-  SelectGroup,
-  SelectLabel,
-  SelectValue,
-  SelectTrigger,
-  SelectContent,
-  SelectItem,
-};
+export { Select, SelectGroup, SelectLabel, SelectValue, SelectTrigger, SelectContent, SelectItem };

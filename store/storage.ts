@@ -16,7 +16,6 @@ async function getField<K extends StorageKey>(key: K): Promise<StorageSchema[K]>
   const result = await chrome.storage.local.get(key);
   const raw = result[key] as StorageSchema[K] | undefined;
   if (raw === undefined) return field.defaultValue;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return field.normalize ? (field.normalize as any)(raw) : raw;
 }
 
@@ -117,10 +116,8 @@ export const storage = {
     for (const key of keys) {
       const field = STORAGE_FIELDS[key];
       const raw = result[key];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const value = raw === undefined ? field.defaultValue : (field.normalize ? (field.normalize as any)(raw) : raw);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (config as any)[key] = value;
+          const value = raw === undefined ? field.defaultValue : (field.normalize ? (field.normalize as any)(raw) : raw);
+          (config as any)[key] = value;
     }
 
     return config;
@@ -139,8 +136,7 @@ export const storage = {
       if (value === undefined) continue;
 
       const field = STORAGE_FIELDS[key];
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      writes[key] = field.normalize ? (field.normalize as any)(value) : value;
+          writes[key] = field.normalize ? (field.normalize as any)(value) : value;
     }
 
     // Batch write for atomicity.

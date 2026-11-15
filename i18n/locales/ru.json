@@ -17,7 +17,8 @@
     "install": "Установить",
     "level": "Уровень",
     "discard": "Отменить",
-    "noResults": "Ничего не найдено."
+    "noResults": "Ничего не найдено.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo — менеджер пользовательских скриптов",
@@ -59,7 +60,8 @@
       "unreadErrors_few": "{{label}}, {{count}} непрочитанные ошибки",
       "unreadErrors_many": "{{label}}, {{count}} непрочитанных ошибок",
       "pendingRequests_few": "{{label}}, {{count}} ожидающих запроса доступа",
-      "pendingRequests_many": "{{label}}, {{count}} ожидающих запросов доступа"
+      "pendingRequests_many": "{{label}}, {{count}} ожидающих запросов доступа",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "Оформление",

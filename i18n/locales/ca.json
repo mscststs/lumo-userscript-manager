@@ -17,7 +17,8 @@
     "install": "Instal·lar",
     "level": "Nivell",
     "discard": "Descartar",
-    "noResults": "Sense resultats."
+    "noResults": "Sense resultats.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -56,7 +57,8 @@
       "pendingRequests_one": "{{label}}, {{count}} sol·licitud d'accés pendent",
       "pendingRequests_other": "{{label}}, {{count}} sol·licituds d'accés pendents",
       "unreadErrors_many": "{{label}}, {{count}} errors no llegits",
-      "pendingRequests_many": "{{label}}, {{count}} sol·licituds d'accés pendents"
+      "pendingRequests_many": "{{label}}, {{count}} sol·licituds d'accés pendents",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "Aparença",

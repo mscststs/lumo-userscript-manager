@@ -585,7 +585,7 @@ export function registerAgentTools(
     (args) =>
       guardedWrite(senderId, 'install', args, async (target, access) => {
         const review = access.settings.reviewWrites;
-        const prepared = await prepareInstall({ sourceUrl: args.url });
+        const prepared = await prepareInstall({ sourceUrl: args.url, previewResources: false });
         const committed = await commitInstall(prepared.token, {
           enabled: review ? false : (args.enabled ?? true),
           ...(review ? { pendingReview: true } : {}),

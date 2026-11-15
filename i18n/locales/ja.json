@@ -17,7 +17,8 @@
     "install": "インストール",
     "level": "レベル",
     "discard": "破棄",
-    "noResults": "結果がありません。"
+    "noResults": "結果がありません。",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo ユーザースクリプトマネージャー",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}、{{count}} 件の未読エラー",
       "unreadErrors_other": "{{label}}、{{count}} 件の未読エラー",
       "pendingRequests_one": "{{label}}、{{count}} 件の保留中のアクセス要求",
-      "pendingRequests_other": "{{label}}、{{count}} 件の保留中のアクセス要求"
+      "pendingRequests_other": "{{label}}、{{count}} 件の保留中のアクセス要求",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "外観",

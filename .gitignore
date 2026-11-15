@@ -29,3 +29,7 @@ spec
 
 # Generated userScripts runtime bundles
 public/user-scripts
+
+# Agent skill mirrors created by `npx skills`; .agents/skills is canonical.
+/.claude/
+/agent/

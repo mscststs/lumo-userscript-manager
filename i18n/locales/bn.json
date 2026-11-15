@@ -17,7 +17,8 @@
     "install": "ইনস্টল করুন",
     "level": "স্তর",
     "discard": "বাতিল করুন",
-    "noResults": "কোন ফলাফল নেই।"
+    "noResults": "কোন ফলাফল নেই।",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}, {{count}} অপঠিত ত্রুটি",
       "unreadErrors_other": "{{label}}, {{count}} অপঠিত ত্রুটি",
       "pendingRequests_one": "{{label}}, {{count}} মুলতুবি অ্যাক্সেস অনুরোধ",
-      "pendingRequests_other": "{{label}}, {{count}} মুলতুবি অ্যাক্সেস অনুরোধ"
+      "pendingRequests_other": "{{label}}, {{count}} মুলতুবি অ্যাক্সেস অনুরোধ",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "চেহারা",

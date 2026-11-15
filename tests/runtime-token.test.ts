@@ -35,6 +35,8 @@ describe('runtime tokens', () => {
     const token = await createRuntimeToken('uuid-verify', 'USER_SCRIPT');
 
     await expect(verifyRuntimeToken(token, 'uuid-verify')).resolves.toBe(true);
+    await expect(verifyRuntimeToken(token, 'uuid-verify', 'USER_SCRIPT')).resolves.toBe(true);
+    await expect(verifyRuntimeToken(token, 'uuid-verify', 'MAIN')).resolves.toBe(false);
     await expect(verifyRuntimeToken(token, 'uuid-other')).resolves.toBe(false);
   });
 

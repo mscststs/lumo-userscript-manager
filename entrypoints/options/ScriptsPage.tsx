@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useErrorText } from '@/lib/use-error-text';
 import { appErrorFromResponse } from '@/lib/errors';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import {
   FileCode2,
   FilePlus2,
@@ -20,6 +20,7 @@ import type { ManagerScript } from '@/types';
 import { sendBg, onLumoEvent } from '@/lib/messages';
 import { cn, formatBytes } from '@/lib/utils';
 import { formatDateTime, formatRelativeTime } from '@/lib/format';
+import { isImeComposing } from '@/lib/keyboard';
 import { useNow } from '@/lib/use-now';
 import { mergeMetadata } from '@/lib/script/metadata';
 import { ScriptIcon } from '@/components/script/ScriptIcon';
@@ -50,6 +51,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { preloadPage } from './routes';
 
 type Filter = 'all' | 'enabled' | 'disabled' | 'updates';
 
@@ -91,9 +93,11 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
   const [checking, setChecking] = useState(false);
   const [urlOpen, setUrlOpen] = useState(false);
   const [url, setUrl] = useState('');
+  const [urlError, setUrlError] = useState<string | null>(null);
   const [pending, setPending] = useState<PendingAction | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const now = useNow(60_000);
+  const reduceMotion = useReducedMotion();
 
   // Skeleton on first load only. Later reloads (every toggle echoes back as
   // `scripts-changed`) keep the current rows on screen until the fresh list
@@ -107,7 +111,7 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
     } finally {
       setLoading(false);
     }
-  }, [showTrash]);
+  }, [errorText, showTrash]);
 
   useEffect(() => {
     void load();
@@ -278,13 +282,19 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
 
   const installUrl = async () => {
     if (!url.trim()) {
-      setError(t('scripts.urlRequired'));
+      setUrlError(t('scripts.urlRequired'));
       return;
     }
+    setUrlError(null);
     setBusy(true);
     try {
       const { token } = await sendBg<{ token: string }>('install:prepare', {
         sourceUrl: url.trim(),
+        // The user typed this URL and pressed Install: allow a localhost/dev
+        // server and keep the old authenticated-download behaviour. Web-
+        // triggered installs (`?src=`) keep both guards.
+        allowPrivate: true,
+        sendCredentials: true,
       });
       setUrlOpen(false);
       setUrl('');
@@ -292,7 +302,9 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
         url: `${chrome.runtime.getURL('install.html')}?token=${token}`,
       });
     } catch (e) {
-      setError(errorText(e));
+      // The dialog is modal: a page-level banner behind the overlay would be
+      // invisible. Keep the failure next to the field that caused it.
+      setUrlError(errorText(e));
     } finally {
       setBusy(false);
     }
@@ -349,7 +361,12 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
       title={t('scripts.title')}
       actions={
         <>
-          <Button size="default" onClick={() => onOpenEditor('new')}>
+          <Button
+            size="default"
+            onClick={() => onOpenEditor('new')}
+            onPointerEnter={() => preloadPage('editor')}
+            onFocus={() => preloadPage('editor')}
+          >
             <FilePlus2 className="h-3.5 w-3.5" />
             {t('scripts.new')}
           </Button>
@@ -360,7 +377,7 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
             onClick={() => void checkUpdates()}
           >
             {checking ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              <Loader2 className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />
             ) : (
               <RefreshCw className="h-3.5 w-3.5" />
             )}
@@ -518,7 +535,7 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
                 animate={{ height: 'auto', opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
                 transition={
-                  filtered.length > ROW_MOTION_LIMIT
+                  reduceMotion || filtered.length > ROW_MOTION_LIMIT
                     ? { duration: 0 }
                     : { duration: 0.2, ease: [0.16, 1, 0.3, 1] }
                 }
@@ -554,7 +571,7 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
             initial={{ y: 16, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 16, opacity: 0 }}
-            transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
+            transition={reduceMotion ? { duration: 0 } : { duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
             className="sticky bottom-3 z-30 mx-auto mt-3 flex w-fit max-w-full flex-wrap items-center gap-1 rounded-card border border-border bg-popover py-1 ps-1 pe-1.5 shadow-elev3"
           >
             <Checkbox
@@ -589,7 +606,16 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
         )}
       </AnimatePresence>
 
-      <Dialog open={urlOpen} onOpenChange={setUrlOpen}>
+      <Dialog
+        open={urlOpen}
+        onOpenChange={(open) => {
+          setUrlOpen(open);
+          if (!open) {
+            setUrl('');
+            setUrlError(null);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md" closeLabel={t('common.close')}>
           <DialogHeader>
             <DialogTitle>{t('scripts.fromUrl')}</DialogTitle>
@@ -597,13 +623,30 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
           </DialogHeader>
           <Input
             value={url}
-            onChange={(event) => setUrl(event.target.value)}
+            onChange={(event) => {
+              setUrl(event.target.value);
+              if (urlError) setUrlError(null);
+            }}
             placeholder={t('scripts.urlPlaceholder')}
+            aria-label={t('scripts.fromUrl')}
+            aria-invalid={urlError ? true : undefined}
+            aria-describedby={urlError ? 'install-url-error' : undefined}
             autoFocus
             onKeyDown={(event) => {
-              if (event.key === 'Enter') void installUrl();
+              if (event.key !== 'Enter' || isImeComposing(event)) return;
+              event.preventDefault();
+              void installUrl();
             }}
           />
+          {urlError && (
+            <p
+              id="install-url-error"
+              role="alert"
+              className="whitespace-pre-wrap break-words text-xs leading-relaxed text-destructive"
+            >
+              {urlError}
+            </p>
+          )}
           <DialogFooter>
             <Button variant="ghost" onClick={() => setUrlOpen(false)}>
               {t('common.cancel')}
@@ -715,6 +758,10 @@ function ScriptRow({
       <button
         type="button"
         onClick={onOpen}
+        // The editor bundle carries CodeMirror and Shiki: warm it only when the
+        // pointer/focus says the user is about to open a script.
+        onPointerEnter={() => preloadPage('editor')}
+        onFocus={() => preloadPage('editor')}
         disabled={removed}
         className="min-w-0 rounded-sm text-start disabled:cursor-default"
       >

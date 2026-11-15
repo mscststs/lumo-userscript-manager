@@ -76,7 +76,7 @@ const PAIRS: [string, string][] = [
 ];
 
 describe('contrast matrix', () => {
-  for (const [name, definition] of Object.entries(THEMES) as [keyof typeof THEMES, ThemeDefinition][]) {
+  for (const [name] of Object.entries(THEMES) as [keyof typeof THEMES, ThemeDefinition][]) {
     describe(name, () => {
       it.each(PAIRS)('%s on %s clears WCAG AA for body text', (fgToken, bgToken) => {
         const source = BLOCKS[name];
@@ -169,7 +169,7 @@ describe('accessibility invariants', () => {
   });
 
   it('scales the entire UI from `html` font-size', () => {
-    expect(CSS).toMatch(/html\s*\{[^}]*font-size:\s*16px/);
+    expect(CSS).toMatch(/html\s*\{[^}]*font-size:\s*100%/);
     // The ramp must match Tailwind's defaults for body-sized text: the same user
     // font size has to read the same here as on every other Lumo surface, so a
     // private step-down ramp (13/15/17) is a regression, not a density choice.

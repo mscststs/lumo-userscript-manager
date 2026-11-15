@@ -289,12 +289,14 @@ export class ExtensionHarness {
   }
 
   async openPage(): Promise<void> {
-    const { targetId } = await this.browser!.send<{ targetId: string }>('Target.createTarget', {
-      url: 'about:blank',
-    });
+    // Navigate through the extension's own tabs API. The CDP `Page.navigate`
+    // path can stall in current headless Chrome when an unpacked extension with
+    // a document_start content script is loaded, even though the page itself
+    // loads normally.
+    await this.extEval(`chrome.tabs.create({url: ${JSON.stringify(this.pageUrl)}})`);
     const target = await waitFor(async () => {
       const targets = await this.targets();
-      return targets.find((item) => item.id === targetId);
+      return targets.find((item) => item.url.startsWith(this.pageUrl));
     }, 10_000);
     this.pageTargetId = target.id;
     this.page = await Cdp.connect(target.webSocketDebuggerUrl!);
@@ -323,7 +325,6 @@ export class ExtensionHarness {
       }
     });
 
-    await this.page.send('Page.navigate', { url: this.pageUrl });
     await this.waitForPage(`document.readyState === 'complete'`, 15_000);
   }
 

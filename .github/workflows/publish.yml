@@ -51,6 +51,7 @@ jobs:
 
       # 类型错误不该由商店审核帮我们发现；构建之前先过一遍。
       - run: npm run compile
+      - run: npm run lint
       - run: npm run i18n:check
       - run: npm run i18n:scan
       - run: npm run i18n:manifest -- --check

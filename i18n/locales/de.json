@@ -17,7 +17,8 @@
     "install": "Installieren",
     "level": "Stufe",
     "discard": "Verwerfen",
-    "noResults": "Keine Ergebnisse."
+    "noResults": "Keine Ergebnisse.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscript-Manager",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}, {{count}} ungelesener Fehler",
       "unreadErrors_other": "{{label}}, {{count}} ungelesene Fehler",
       "pendingRequests_one": "{{label}}, {{count}} ausstehende Zugriffsanfrage",
-      "pendingRequests_other": "{{label}}, {{count}} ausstehende Zugriffsanfragen"
+      "pendingRequests_other": "{{label}}, {{count}} ausstehende Zugriffsanfragen",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "Darstellung",

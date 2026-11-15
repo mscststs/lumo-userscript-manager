@@ -17,6 +17,9 @@ import { storage } from '@/store/storage';
  */
 
 const encoder = new TextEncoder();
+// Cache lifetime only: the HMAC is deterministic for a script + world, so a
+// cached token is re-used while the worker lives. Authorization is bounded by
+// URL/active-script checks on every RPC, not by token expiry.
 const TOKEN_TTL_MS = 5 * 60_000;
 
 let keyPromise: Promise<CryptoKey> | null = null;
@@ -90,10 +93,15 @@ export function parseRuntimeToken(token: string): ParsedRuntimeToken | null {
   return { world, signature };
 }
 
-export async function verifyRuntimeToken(token: string, uuid: string): Promise<boolean> {
+export async function verifyRuntimeToken(
+  token: string,
+  uuid: string,
+  expectedWorld?: ScriptWorld,
+): Promise<boolean> {
   if (!token || !uuid) return false;
   const parsed = parseRuntimeToken(token);
   if (!parsed) return false;
+  if (expectedWorld && parsed.world !== expectedWorld) return false;
   try {
     const expected = await sign(uuid, parsed.world);
     return constantTimeEqual(parsed.signature, expected);

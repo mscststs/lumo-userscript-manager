@@ -17,7 +17,8 @@
     "install": "Įdiegti",
     "level": "Lygis",
     "discard": "Išmesti",
-    "noResults": "Jokių rezultatų."
+    "noResults": "Jokių rezultatų.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -59,7 +60,8 @@
       "unreadErrors_few": "{{label}}, {{count}} neskaitytos klaidos",
       "unreadErrors_many": "{{label}}, {{count}} neskaitytos klaidos",
       "pendingRequests_few": "{{label}}, {{count}} laukiančių prieigos užklausų",
-      "pendingRequests_many": "{{label}}, {{count}} laukiančių prieigos užklausų"
+      "pendingRequests_many": "{{label}}, {{count}} laukiančių prieigos užklausų",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "Išvaizda",

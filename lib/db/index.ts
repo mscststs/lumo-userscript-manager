@@ -73,8 +73,24 @@ export function openDb(): Promise<IDBDatabase> {
       }
     };
 
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error ?? new Error('Failed to open IndexedDB'));
+    request.onsuccess = () => {
+      const db = request.result;
+      // A newer version opened by another tab must not be blocked by this
+      // connection. Closing lets the upgrade proceed; subsequent requests
+      // reopen lazily.
+      db.onversionchange = () => db.close();
+      resolve(db);
+    };
+    request.onerror = () => {
+      // Never cache a rejected open: a transient quota/version error would
+      // otherwise poison every later request for the life of the worker.
+      dbPromise = null;
+      reject(request.error ?? new Error('Failed to open IndexedDB'));
+    };
+    request.onblocked = () => {
+      dbPromise = null;
+      reject(new Error('IndexedDB upgrade is blocked by another open page.'));
+    };
   });
 
   return dbPromise;
@@ -102,9 +118,18 @@ async function withStore<T>(
 ): Promise<T> {
   const db = await openDb();
   const tx = db.transaction(storeName, mode);
-  const result = await fn(tx.objectStore(storeName));
-  await txDone(tx);
-  return result;
+  try {
+    const result = await fn(tx.objectStore(storeName));
+    await txDone(tx);
+    return result;
+  } catch (error) {
+    try {
+      tx.abort();
+    } catch {
+      // Already completed/aborted.
+    }
+    throw error;
+  }
 }
 
 export async function getAll<T>(storeName: string): Promise<T[]> {
@@ -181,7 +206,7 @@ export async function saveScript(
   codes.put({ uuid: script.uuid, code });
   if (options.snapshot !== false) {
     const version: ScriptVersion = {
-      id: `${script.uuid}:${Date.now()}`,
+      id: `${script.uuid}:${Date.now()}:${crypto.randomUUID()}`,
       uuid: script.uuid,
       code,
       metadata: script.metadata,
@@ -191,6 +216,9 @@ export async function saveScript(
   }
 
   await txDone(tx);
+  if (options.snapshot !== false) {
+    void pruneVersionsForScript(script.uuid).catch(() => undefined);
+  }
 }
 
 export async function setScriptEnabled(uuid: string, enabled: boolean): Promise<void> {
@@ -235,8 +263,59 @@ export async function purgeScript(uuid: string): Promise<void> {
 }
 
 export async function listVersions(uuid: string): Promise<ScriptVersion[]> {
+  return withStore('versions', 'readonly', async (store) => {
+    const versions = await requestResult(
+      store.index('uuid').getAll(IDBKeyRange.only(uuid)) as IDBRequest<ScriptVersion[]>,
+    );
+    return versions.sort((a, b) => b.createdAt - a.createdAt);
+  });
+}
+
+/**
+ * Keep history bounded: newest N versions per script, and nothing older than
+ * `maxAgeMs`. Called after a save; the write is intentionally fire-and-forget.
+ */
+export async function pruneVersionsForScript(
+  uuid: string,
+  maxPerScript = 50,
+  maxAgeMs = 30 * 24 * 60 * 60 * 1000,
+): Promise<void> {
+  const versions = await listVersions(uuid);
+  const cutoff = Date.now() - maxAgeMs;
+  const remove = versions.filter(
+    (version, index) => index >= maxPerScript || version.createdAt < cutoff,
+  );
+  if (remove.length === 0) return;
+  const db = await openDb();
+  const tx = db.transaction('versions', 'readwrite');
+  for (const version of remove) tx.objectStore('versions').delete(version.id);
+  await txDone(tx);
+}
+
+export async function pruneVersions(
+  maxPerScript = 50,
+  maxAgeMs = 30 * 24 * 60 * 60 * 1000,
+): Promise<void> {
   const versions = await getAll<ScriptVersion>('versions');
-  return versions.filter((version) => version.uuid === uuid).sort((a, b) => b.createdAt - a.createdAt);
+  const byScript = new Map<string, ScriptVersion[]>();
+  for (const version of versions) {
+    const list = byScript.get(version.uuid) ?? [];
+    list.push(version);
+    byScript.set(version.uuid, list);
+  }
+  const remove: ScriptVersion[] = [];
+  const cutoff = Date.now() - maxAgeMs;
+  for (const list of byScript.values()) {
+    list.sort((a, b) => b.createdAt - a.createdAt);
+    list.forEach((version, index) => {
+      if (index >= maxPerScript || version.createdAt < cutoff) remove.push(version);
+    });
+  }
+  if (remove.length === 0) return;
+  const db = await openDb();
+  const tx = db.transaction('versions', 'readwrite');
+  for (const version of remove) tx.objectStore('versions').delete(version.id);
+  await txDone(tx);
 }
 
 export async function recordRun(
@@ -277,11 +356,13 @@ interface StoredValue {
 }
 
 export async function getValues(storageName: string): Promise<Record<string, unknown>> {
-  const rows = await getAll<StoredValue>('values');
+  const rows = await withStore('values', 'readonly', (store) =>
+    requestResult(
+      store.index('storageName').getAll(IDBKeyRange.only(storageName)) as IDBRequest<StoredValue[]>,
+    ),
+  );
   const values: Record<string, unknown> = Object.create(null);
-  for (const row of rows) {
-    if (row.storageName === storageName) values[row.key] = row.value;
-  }
+  for (const row of rows) values[row.key] = row.value;
   return values;
 }
 
@@ -333,8 +414,11 @@ export async function clearScriptIcons(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 export async function getResources(uuid: string): Promise<StoredResource[]> {
-  const rows = await getAll<StoredResource>('resources');
-  return rows.filter((row) => row.uuid === uuid);
+  return withStore('resources', 'readonly', (store) =>
+    requestResult(
+      store.index('uuid').getAll(IDBKeyRange.only(uuid)) as IDBRequest<StoredResource[]>,
+    ),
+  );
 }
 
 export async function replaceResources(uuid: string, resources: StoredResource[]): Promise<void> {
@@ -351,15 +435,67 @@ export async function replaceResources(uuid: string, resources: StoredResource[]
 // ---------------------------------------------------------------------------
 
 export async function addLog(entry: LogEntry): Promise<void> {
-  await putRecord('logs', { ...entry, time: entry.time || Date.now() });
+  await addLogs([entry]);
+}
+
+export async function addLogs(entries: LogEntry[]): Promise<void> {
+  if (entries.length === 0) return;
+  const db = await openDb();
+  const tx = db.transaction('logs', 'readwrite');
+  const store = tx.objectStore('logs');
+  for (const entry of entries) store.put({ ...entry, time: entry.time || Date.now() });
+  await txDone(tx);
 }
 
 export async function listLogs(limit = 500, uuid?: string): Promise<LogEntry[]> {
-  const entries = await getAll<LogEntry>('logs');
-  return entries
-    .filter((entry) => !uuid || entry.uuid === uuid)
-    .sort((a, b) => b.time - a.time)
-    .slice(0, limit);
+  if (limit <= 0) return [];
+  const db = await openDb();
+  const tx = db.transaction('logs', 'readonly');
+  const index = tx.objectStore('logs').index('time');
+  const request = index.openCursor(null, 'prev');
+  const result: LogEntry[] = [];
+
+  await new Promise<void>((resolve, reject) => {
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) return resolve();
+      const entry = cursor.value as LogEntry;
+      if (!uuid || entry.uuid === uuid) result.push(entry);
+      if (result.length >= limit) return resolve();
+      cursor.continue();
+    };
+    request.onerror = () => reject(request.error ?? new Error('IndexedDB request failed'));
+  });
+
+  return result;
+}
+
+/** Keep logs bounded by count and age; safe to run on every service-worker start. */
+export async function pruneLogs(
+  maxEntries = 5000,
+  maxAgeMs = 30 * 24 * 60 * 60 * 1000,
+): Promise<void> {
+  const db = await openDb();
+  const tx = db.transaction('logs', 'readwrite');
+  const index = tx.objectStore('logs').index('time');
+  const request = index.openCursor(null, 'prev');
+  const cutoff = Date.now() - maxAgeMs;
+  let kept = 0;
+
+  await new Promise<void>((resolve, reject) => {
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) return resolve();
+      if (kept >= maxEntries || cursor.value.time < cutoff) {
+        cursor.delete();
+      } else {
+        kept += 1;
+      }
+      cursor.continue();
+    };
+    request.onerror = () => reject(request.error ?? new Error('IndexedDB request failed'));
+  });
+  await txDone(tx);
 }
 
 /**
@@ -394,12 +530,19 @@ export async function clearLogs(uuid?: string): Promise<void> {
     await clearStore('logs');
     return;
   }
-  const entries = await getAll<LogEntry>('logs');
   const db = await openDb();
   const tx = db.transaction('logs', 'readwrite');
-  for (const entry of entries) {
-    if (entry.uuid === uuid && entry.id !== undefined) tx.objectStore('logs').delete(entry.id);
-  }
+  const index = tx.objectStore('logs').index('uuid');
+  const request = index.openCursor(IDBKeyRange.only(uuid));
+  await new Promise<void>((resolve, reject) => {
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) return resolve();
+      cursor.delete();
+      cursor.continue();
+    };
+    request.onerror = () => reject(request.error ?? new Error('IndexedDB request failed'));
+  });
   await txDone(tx);
 }
 

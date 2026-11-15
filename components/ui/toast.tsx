@@ -40,15 +40,53 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
   const [toasts, setToasts] = React.useState<ToastItem[]>([]);
   const timers = React.useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  const durations = React.useRef(new Map<string, number>());
+  // A toast must not disappear while the user is reading it or tabbing to its
+  // close control. Pause on hover and on focus inside, and only restart when
+  // both are gone.
+  const interaction = React.useRef(new Map<string, { hover: boolean; focus: boolean }>());
+
+  const startTimer = React.useCallback((id: string) => {
+    const duration = durations.current.get(id);
+    if (duration === undefined) return;
+    const existing = timers.current.get(id);
+    if (existing) clearTimeout(existing);
+    timers.current.set(
+      id,
+      setTimeout(() => {
+        // The timer can outlive the toast during a fast dismiss/reopen cycle.
+        setToasts((current) => current.filter((toast) => toast.id !== id));
+        timers.current.delete(id);
+        durations.current.delete(id);
+        interaction.current.delete(id);
+      }, duration),
+    );
+  }, []);
 
   const dismiss = React.useCallback((id: string) => {
     setToasts((current) => current.filter((toast) => toast.id !== id));
     const timer = timers.current.get(id);
-    if (timer) {
-      clearTimeout(timer);
-      timers.current.delete(id);
-    }
+    if (timer) clearTimeout(timer);
+    timers.current.delete(id);
+    durations.current.delete(id);
+    interaction.current.delete(id);
   }, []);
+
+  const setInteraction = React.useCallback(
+    (id: string, kind: 'hover' | 'focus', active: boolean) => {
+      const state = interaction.current.get(id) ?? { hover: false, focus: false };
+      state[kind] = active;
+      interaction.current.set(id, state);
+      if (state.hover || state.focus) {
+        const timer = timers.current.get(id);
+        if (timer) clearTimeout(timer);
+        timers.current.delete(id);
+      } else {
+        startTimer(id);
+      }
+    },
+    [startTimer],
+  );
 
   const push = React.useCallback(
     (input: ToastInput) => {
@@ -56,18 +94,19 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
       const variant = input.variant ?? 'default';
       const duration = input.duration ?? (variant === 'error' ? 6000 : 3000);
       setToasts((current) => [...current.slice(-2), { ...input, id, variant, duration }]);
-      timers.current.set(
-        id,
-        setTimeout(() => dismiss(id), duration),
-      );
+      durations.current.set(id, duration);
+      interaction.current.set(id, { hover: false, focus: false });
+      startTimer(id);
     },
-    [dismiss],
+    [startTimer],
   );
 
   React.useEffect(
     () => () => {
       for (const timer of timers.current.values()) clearTimeout(timer);
       timers.current.clear();
+      durations.current.clear();
+      interaction.current.clear();
     },
     [],
   );
@@ -76,6 +115,8 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     <ToastContext.Provider value={push}>
       {children}
       <div
+        role="region"
+        aria-label={t('common.notifications')}
         aria-live="polite"
         aria-atomic="false"
         className="pointer-events-none fixed bottom-4 end-4 z-[70] flex w-[min(22rem,calc(100vw-2rem))] flex-col gap-2"
@@ -90,6 +131,14 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               exit={{ opacity: 0, y: 4, scale: 0.99 }}
               transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
               role={toast.variant === 'error' ? 'alert' : 'status'}
+              onMouseEnter={() => setInteraction(toast.id, 'hover', true)}
+              onMouseLeave={() => setInteraction(toast.id, 'hover', false)}
+              onFocusCapture={() => setInteraction(toast.id, 'focus', true)}
+              onBlurCapture={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                  setInteraction(toast.id, 'focus', false);
+                }
+              }}
               className={cn(
                 'pointer-events-auto flex items-start gap-2.5 rounded-card border bg-popover px-3 py-2.5 shadow-elev2',
                 toast.variant === 'error'

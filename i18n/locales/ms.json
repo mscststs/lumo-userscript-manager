@@ -17,7 +17,8 @@
     "install": "Pasang",
     "level": "Tahap",
     "discard": "Buang",
-    "noResults": "Tiada hasil."
+    "noResults": "Tiada hasil.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}, {{count}} ralat belum dibaca",
       "unreadErrors_other": "{{label}}, {{count}} ralat belum dibaca",
       "pendingRequests_one": "{{label}}, {{count}} menunggu permintaan akses",
-      "pendingRequests_other": "{{label}}, {{count}} menunggu permintaan akses"
+      "pendingRequests_other": "{{label}}, {{count}} menunggu permintaan akses",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "Penampilan",

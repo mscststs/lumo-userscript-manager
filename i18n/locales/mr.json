@@ -17,7 +17,8 @@
     "install": "स्थापित करा",
     "level": "पातळी",
     "discard": "टाकून द्या",
-    "noResults": "कोणतेही परिणाम नाहीत."
+    "noResults": "कोणतेही परिणाम नाहीत.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}, {{count}} न वाचलेली त्रुटी",
       "unreadErrors_other": "{{label}}, {{count}} न वाचलेल्या त्रुटी",
       "pendingRequests_one": "{{label}}, {{count}} प्रलंबित प्रवेश विनंती",
-      "pendingRequests_other": "{{label}}, {{count}} प्रलंबित प्रवेश विनंत्या"
+      "pendingRequests_other": "{{label}}, {{count}} प्रलंबित प्रवेश विनंत्या",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "देखावा",

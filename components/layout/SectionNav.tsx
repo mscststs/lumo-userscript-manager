@@ -47,16 +47,12 @@ export function SectionNav<T extends string>({
 
   return (
     <div
-      role="tablist"
+      // These switch a view inside one page; they are not a tab widget with
+      // tabpanels. `group` + `aria-pressed` describes that honestly, while the
+      // arrow keys still move through the same physical strip.
+      role="group"
       aria-label={ariaLabel}
       className={cn('-mb-px flex items-center gap-5 overflow-x-auto', className)}
-      onKeyDown={(event) => {
-        if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-        event.preventDefault();
-        const delta = (event.key === 'ArrowRight' ? 1 : -1) * (rtl ? -1 : 1);
-        const next = items[(index + delta + items.length) % items.length];
-        if (next) onChange(next.value);
-      }}
     >
       {items.map((item) => {
         const active = item.value === value;
@@ -64,10 +60,30 @@ export function SectionNav<T extends string>({
           <button
             key={item.value}
             type="button"
-            role="tab"
-            aria-selected={active}
-            tabIndex={active ? 0 : -1}
+            aria-pressed={active}
             onClick={() => onChange(item.value)}
+            onKeyDown={(event) => {
+              if (
+                event.key !== 'ArrowLeft' &&
+                event.key !== 'ArrowRight' &&
+                event.key !== 'Home' &&
+                event.key !== 'End'
+              ) {
+                return;
+              }
+              event.preventDefault();
+              if (event.key === 'Home') {
+                onChange(items[0]!.value);
+                return;
+              }
+              if (event.key === 'End') {
+                onChange(items[items.length - 1]!.value);
+                return;
+              }
+              const delta = (event.key === 'ArrowRight' ? 1 : -1) * (rtl ? -1 : 1);
+              const next = items[(index + delta + items.length) % items.length];
+              if (next) onChange(next.value);
+            }}
             className={cn(
               'relative shrink-0 pb-2.5 pt-0.5 text-sm font-medium transition-colors duration-150 ease-standard',
               active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',

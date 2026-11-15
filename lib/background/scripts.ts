@@ -12,7 +12,6 @@ import {
   getScript,
   getScriptCode,
   getScriptWithCode,
-  getValues,
   listScripts,
   listVersions,
   moveScriptToTrash,
@@ -22,18 +21,18 @@ import {
   restoreScript,
   saveScript,
   setScriptEnabled,
-  updateScriptPartial,
 } from '@/lib/db';
 import {
   mergeMetadata,
   parseMetadata,
   getMeta,
-  getMetaList,
   hasMeta,
   splitTags,
   resolveMetadataUrls,
 } from '@/lib/script/metadata';
 import { getPageAccess, isFileUrl, type PageAccess } from '@/lib/page-access';
+import { fetchLimited } from '@/lib/net';
+import { MAX_SCRIPT_BYTES } from '@/lib/limits';
 import { byteLength, sha256Hex } from '@/lib/script/hash';
 import { getStorageName } from '@/lib/script/storage-name';
 import { collectMetadataWarnings } from '@/lib/script/analyze';
@@ -203,6 +202,9 @@ export async function saveScriptFromCode(
   sourceUrl = '',
   options: SaveScriptOptions = {},
 ): Promise<UserScript> {
+  if (byteLength(code) > MAX_SCRIPT_BYTES) {
+    throw new AppError('script.tooLarge', undefined, 'Script is larger than 5 MB.');
+  }
   const parsed = parseMetadata(code);
   if (parsed.errors.length) {
     throw new AppError('script.invalidMetadata', undefined, formatDiagnostics(parsed.errors));
@@ -225,7 +227,11 @@ export async function saveScriptFromCode(
   if (options.enabled !== undefined) record.enabled = options.enabled;
   if (options.pendingReview !== undefined) record.pendingReview = options.pendingReview;
   await saveScript(record, code);
-  await refreshScriptResources(record.uuid, metadata);
+  await refreshScriptResources(
+    record.uuid,
+    metadata,
+    sourceUrl || existing?.origin || '',
+  );
   // Identity icon: warm the cache now so the popup paints a real favicon on
   // first open instead of paying for the request itself.
   void cacheScriptIcon(record.uuid, record.icon);
@@ -296,7 +302,11 @@ export async function updateSelfMetadata(uuid: string, selfMetadata: ScriptMetad
   const code = await getScriptCode(uuid);
   if (code === undefined) throw new AppError('script.codeMissing', undefined, 'Script code missing.');
   await saveScript(next, code, { snapshot: false });
-  await refreshScriptResources(uuid, effective);
+  await refreshScriptResources(
+    uuid,
+    effective,
+    script.origin || script.downloadUrl || script.updateUrl || '',
+  );
   void cacheScriptIcon(uuid, next.icon);
   await requestRegistration();
   broadcast('scripts-changed');
@@ -379,6 +389,16 @@ export async function prepareInstall(input: {
   sourceUrl?: string;
   code?: string;
   source?: string;
+  /** User typed the URL themselves (dev/localhost workflows). */
+  allowPrivate?: boolean;
+  /** Opt-in for authenticated script downloads; off by default. */
+  sendCredentials?: boolean;
+  /**
+   * Fetch `@require`/`@resource` bodies while staging the review. Web-triggered
+   * installs disable this so a page cannot cause a network fetch before the user
+   * has pressed Install; commit fetches them afterwards.
+   */
+  previewResources?: boolean;
 }): Promise<{ token: string; summary: Record<string, unknown> }> {
   const sourceUrl = input.sourceUrl?.trim() ?? '';
   let code = input.code;
@@ -386,25 +406,16 @@ export async function prepareInstall(input: {
     if (!sourceUrl) {
       throw new AppError('script.sourceRequired', undefined, 'A script URL or source is required.');
     }
-    const response = await fetch(sourceUrl, {
-      credentials: 'include',
-      redirect: 'follow',
-      headers: { 'Cache-Control': 'no-cache' },
+    const response = await fetchLimited(sourceUrl, {
+      maxBytes: MAX_SCRIPT_BYTES,
+      timeoutMs: 15_000,
+      credentials: input.sendCredentials ? 'include' : 'omit',
+      allowPrivate: input.allowPrivate === true,
+      cache: 'no-cache',
     });
-    if (!response.ok) {
-      throw new AppError(
-        'update.httpError',
-        { status: response.status },
-        `Failed to download script: HTTP ${response.status}`,
-      );
-    }
-    const size = Number(response.headers.get('content-length') ?? 0);
-    if (size > 5 * 1024 * 1024) {
-      throw new AppError('script.tooLarge', undefined, 'Script is larger than 5 MB.');
-    }
-    code = await response.text();
+    code = response.text;
   }
-  if (byteLength(code) > 5 * 1024 * 1024) {
+  if (byteLength(code) > MAX_SCRIPT_BYTES) {
     throw new AppError('script.tooLarge', undefined, 'Script is larger than 5 MB.');
   }
 
@@ -422,7 +433,10 @@ export async function prepareInstall(input: {
   // script's resources before the user confirms an update would silently alter
   // the version they are still running.
   const draftUuid = crypto.randomUUID();
-  const resourceRecords = await refreshScriptResources(draftUuid, metadata);
+  const resourceRecords =
+    input.previewResources === false
+      ? []
+      : await refreshScriptResources(draftUuid, metadata, sourceUrl);
   const warnings = collectMetadataWarnings(metadata, parsed.warnings);
   const requireDetails = (metadata.require ?? []).map((url) => {
     const resource = resourceRecords.find((item) => item.url === url);
@@ -504,7 +518,7 @@ export async function commitInstall(
       draft.resourceRecords.map((resource) => ({ ...resource, uuid: record.uuid })),
     );
   } else {
-    await refreshScriptResources(record.uuid, metadata);
+    await refreshScriptResources(record.uuid, metadata, draft.sourceUrl);
   }
   if (draft.draftUuid !== record.uuid) await replaceResources(draft.draftUuid, []);
   await deleteDraft(token);

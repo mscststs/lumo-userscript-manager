@@ -2,8 +2,8 @@ import type { ScriptMetadata, StoredResource } from '@/types';
 import { getResources, replaceResources } from '@/lib/db';
 import { metadataRequires, metadataRequiresCss, metadataResources } from '@/lib/script/metadata';
 import { byteLength, sha256Hex } from '@/lib/script/hash';
-
-const MAX_RESOURCE_BYTES = 5 * 1024 * 1024;
+import { fetchLimited, isPrivateHost } from '@/lib/net';
+import { MAX_RESOURCE_BYTES } from '@/lib/limits';
 
 export interface FetchedResource {
   url: string;
@@ -16,16 +16,23 @@ function isBinaryType(contentType: string): boolean {
   return !/^text\/|javascript|json|xml|css|html|svg|plain/i.test(contentType);
 }
 
-async function fetchOne(url: string): Promise<FetchedResource> {
-  const response = await fetch(url, { credentials: 'include', redirect: 'follow' });
-  if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
-  const buffer = await response.arrayBuffer();
-  if (buffer.byteLength > MAX_RESOURCE_BYTES) {
-    throw new Error(`Resource is larger than ${MAX_RESOURCE_BYTES} bytes: ${url}`);
-  }
-  const contentType = response.headers.get('content-type') ?? 'application/octet-stream';
+async function fetchOne(
+  url: string,
+  credentials: RequestCredentials,
+  allowPrivate: boolean,
+): Promise<FetchedResource> {
+  // Resources are fetched before the user confirms the install, so they must
+  // not carry the browser's cookies to an arbitrary host. A script that needs
+  // authenticated requests should use GM_xmlhttpRequest after installation.
+  const response = await fetchLimited(url, {
+    maxBytes: MAX_RESOURCE_BYTES,
+    timeoutMs: 15_000,
+    credentials,
+    allowPrivate,
+  });
+  const contentType = response.contentType || 'application/octet-stream';
   if (isBinaryType(contentType)) {
-    const bytes = new Uint8Array(buffer);
+    const bytes = response.bytes;
     let binary = '';
     const chunk = 0x8000;
     for (let i = 0; i < bytes.length; i += chunk) {
@@ -33,13 +40,25 @@ async function fetchOne(url: string): Promise<FetchedResource> {
     }
     return { url, content: '', contentType, base64: btoa(binary) };
   }
-  return { url, content: new TextDecoder().decode(buffer), contentType };
+  return { url, content: response.text, contentType };
 }
 
 export async function refreshScriptResources(
   uuid: string,
   metadata: ScriptMetadata,
+  sourceUrl = '',
 ): Promise<StoredResource[]> {
+  let sourceOrigin = '';
+  let sourceIsPrivate = false;
+  try {
+    if (sourceUrl) {
+      const source = new URL(sourceUrl);
+      sourceOrigin = source.origin;
+      sourceIsPrivate = isPrivateHost(source.hostname);
+    }
+  } catch {
+    // A malformed source simply means no same-origin allowance.
+  }
   const existing = await getResources(uuid);
   const existingByUrl = new Map(existing.map((resource) => [resource.url, resource]));
   const resources: StoredResource[] = [];
@@ -61,7 +80,19 @@ export async function refreshScriptResources(
       continue;
     }
     try {
-      const fetched = await fetchOne(task.url);
+      let credentials: RequestCredentials = 'omit';
+      let allowPrivate = false;
+      try {
+        if (sourceOrigin && new URL(task.url).origin === sourceOrigin) {
+          credentials = 'include';
+          // A script the user installed from a localhost/dev server is allowed
+          // to load its own same-origin resources from that server.
+          allowPrivate = sourceIsPrivate;
+        }
+      } catch {
+        // Keep the safe default for an unparseable resource URL.
+      }
+      const fetched = await fetchOne(task.url, credentials, allowPrivate);
       resources.push({
         uuid,
         url: task.url,

@@ -17,7 +17,8 @@
     "install": "ઇન્સ્ટોલ કરો",
     "level": "સ્તર",
     "discard": "છોડી દો",
-    "noResults": "કોઈ પરિણામ નથી."
+    "noResults": "કોઈ પરિણામ નથી.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}, {{count}} વાંચ્યા વગરની ભૂલ",
       "unreadErrors_other": "{{label}}, {{count}} ન વાંચેલી ભૂલો",
       "pendingRequests_one": "{{label}}, {{count}} બાકી ઍક્સેસ વિનંતી",
-      "pendingRequests_other": "{{label}}, {{count}} ઍક્સેસ વિનંતીઓ બાકી છે"
+      "pendingRequests_other": "{{label}}, {{count}} ઍક્સેસ વિનંતીઓ બાકી છે",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "દેખાવ",

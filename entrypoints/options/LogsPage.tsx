@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useErrorText } from '@/lib/use-error-text';
 import {
@@ -67,36 +67,48 @@ export function LogsPage() {
   const [error, setError] = useState<string | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
   const now = useNow(30_000);
+  const seenWrittenAt = useRef(0);
 
   // Skeleton on first load only; live reloads swap the rows in place.
-  const load = useCallback(async () => {
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const entries = await sendBg<LogEntry[]>('logs:list', { limit: 500 });
       setLogs(entries);
       setError(null);
       // Everything on screen has now been seen: advance the pointer the
-      // sidebar badge counts from. The newest entry's time, not `Date.now()`,
-      // so an error written while this request was in flight still counts.
+      // sidebar badge counts from. Throttle the write: a noisy script can
+      // otherwise turn a live log view into a storage write per event.
       const newest = entries[0]?.time;
-      if (newest) void storage.setLogsSeenAt(newest).catch(() => undefined);
+      const nowMs = Date.now();
+      if (newest && nowMs - seenWrittenAt.current > 1_000) {
+        seenWrittenAt.current = nowMs;
+        void storage.setLogsSeenAt(newest).catch(() => undefined);
+      }
     } catch (e) {
       setError(errorText(e));
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, []);
+  }, [errorText]);
 
   useEffect(() => {
-    void load();
+    void load(false);
   }, [load]);
 
-  useEffect(
-    () =>
-      onLumoEvent((event) => {
-        if (event === 'logs-changed') void load();
-      }),
-    [load],
-  );
+  useEffect(() => {
+    // Coalesce bursts: one reload per ~250 ms is enough for a human view.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const unsubscribe = onLumoEvent((event) => {
+      if (event !== 'logs-changed') return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => void load(true), 250);
+    });
+    return () => {
+      unsubscribe();
+      if (timer) clearTimeout(timer);
+    };
+  }, [load]);
 
   const refresh = async () => {
     setRefreshing(true);
@@ -156,7 +168,7 @@ export function LogsPage() {
             onClick={() => void refresh()}
             disabled={loading || refreshing}
           >
-            <RefreshCw className={cn('h-3.5 w-3.5', refreshing && 'animate-spin')} />
+            <RefreshCw className={cn('h-3.5 w-3.5', refreshing && 'animate-spin motion-reduce:animate-none')} />
             {t('common.refresh')}
           </Button>
           <Button

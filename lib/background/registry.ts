@@ -13,7 +13,6 @@ import {
   mergeMetadata,
   parseMetadata,
   getMeta,
-  getMetaList,
   hasMeta,
   resolveMetadataUrls,
 } from '@/lib/script/metadata';
@@ -339,13 +338,15 @@ async function performRegistration(): Promise<RuntimeStatus> {
         }
       }
     }
-    let alreadyRegistered = false;
+    let current: chrome.userScripts.RegisteredUserScript[] = [];
     try {
-      alreadyRegistered = sameRegistrations(await chrome.userScripts.getScripts(), registrations);
+      current = await chrome.userScripts.getScripts();
     } catch {
-      // Treat an unreadable registration list as stale.
+      // Treat an unreadable registration list as stale and fall back to a full
+      // replacement below.
+      current = [];
     }
-    if (alreadyRegistered) {
+    if (sameRegistrations(current, registrations)) {
       status = {
         userScriptsAvailable: true,
         scriptsEnabled: true,
@@ -355,17 +356,47 @@ async function performRegistration(): Promise<RuntimeStatus> {
       };
       return status;
     }
-    try {
-      await chrome.userScripts.unregister();
-    } catch {
-      // Nothing registered yet.
+
+    // Diff instead of unregistering the whole table. A single toggle used to
+    // rebuild every script's registration (including its code), which becomes
+    // noticeable on a large library. Only changed/new IDs are touched; IDs that
+    // disappeared are removed.
+    const currentById = new Map(current.map((registration) => [registration.id, registration]));
+    const desiredById = new Map(
+      registrations.map((registration) => [registration.id, registration]),
+    );
+    const removedIds = current
+      .filter((registration) => !desiredById.has(registration.id))
+      .map((registration) => registration.id);
+    const updates: chrome.userScripts.RegisteredUserScript[] = [];
+    const additions: chrome.userScripts.RegisteredUserScript[] = [];
+    for (const registration of registrations) {
+      const existing = currentById.get(registration.id);
+      if (!existing) additions.push(registration);
+      else if (registrationSignature(existing) !== registrationSignature(registration)) {
+        updates.push(registration);
+      }
     }
+
     try {
-      await chrome.userScripts.register(registrations);
+      if (removedIds.length > 0) {
+        await chrome.userScripts.unregister({ ids: removedIds });
+      }
+      if (updates.length > 0) {
+        await chrome.userScripts.update(updates);
+      }
+      if (additions.length > 0) {
+        await chrome.userScripts.register(additions);
+      }
     } catch (batchError) {
       // A single malformed script must not prevent every other script from
-      // running. Register one by one and keep the first failure as the status.
+      // running. Replace the table one by one and keep the first failure.
       let firstError: unknown = batchError;
+      try {
+        await chrome.userScripts.unregister();
+      } catch {
+        // Nothing registered yet.
+      }
       for (const registration of registrations) {
         try {
           await chrome.userScripts.register([registration]);
@@ -374,7 +405,6 @@ async function performRegistration(): Promise<RuntimeStatus> {
         }
       }
       if (firstError !== batchError) {
-        // At least one registration succeeded; surface the first failure.
         console.warn('[Lumo Userscripts] A script failed to register:', firstError);
       }
     }

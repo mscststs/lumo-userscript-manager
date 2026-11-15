@@ -17,7 +17,8 @@
     "install": "Asenna",
     "level": "Taso",
     "discard": "Hylkää",
-    "noResults": "Ei tuloksia."
+    "noResults": "Ei tuloksia.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}, {{count}} lukematon virhe",
       "unreadErrors_other": "{{label}}, {{count}} lukemattomia virheitä",
       "pendingRequests_one": "{{label}}, {{count}} odottaa käyttöoikeuspyyntöä",
-      "pendingRequests_other": "{{label}}, {{count}} odottavia käyttöpyyntöjä"
+      "pendingRequests_other": "{{label}}, {{count}} odottavia käyttöpyyntöjä",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "Ulkonäkö",

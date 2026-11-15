@@ -17,7 +17,8 @@
     "install": "ጫን",
     "level": "ደረጃ",
     "discard": "አስወግድ",
-    "noResults": "ምንም ውጤት የለም።"
+    "noResults": "ምንም ውጤት የለም።",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}፣ {{count}} ያልተነበበ ስህተት",
       "unreadErrors_other": "{{label}}፣ {{count}} ያልተነበቡ ስህተቶች",
       "pendingRequests_one": "{{label}}፣ {{count}} በመጠባበቅ ላይ ያለ የመዳረሻ ጥያቄ",
-      "pendingRequests_other": "{{label}}፣ {{count}} በመጠባበቅ ላይ ያሉ የመዳረሻ ጥያቄዎች"
+      "pendingRequests_other": "{{label}}፣ {{count}} በመጠባበቅ ላይ ያሉ የመዳረሻ ጥያቄዎች",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "መልክ",

@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useState, type CSSProperties, type ReactNode } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check } from 'lucide-react';
 import type { AccentColor, FontSize, ThemeMode, UISettings } from '@/types';
@@ -11,7 +18,7 @@ import {
   THEMES,
 } from '@/lib/theme';
 import { applyFontSize } from '@/lib/font-size';
-import { applyLanguage } from '@/i18n';
+import { applyLanguage, localeDirection } from '@/i18n';
 import {
   ACCENT_OPTIONS,
   DARK_THEME_OPTIONS,
@@ -19,6 +26,7 @@ import {
   type ThemeDefinition,
 } from '@/lib/theme-registry';
 import { FONT_SIZE_OPTIONS } from '@/lib/font-size-registry';
+import { EnumValue } from '@/components/ui/enum';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageLayout } from '@/components/layout/PageLayout';
@@ -26,13 +34,7 @@ import { SettingRow } from '@/components/settings/SettingRow';
 import { SettingsGroup } from '@/components/settings/SettingsGroup';
 import { Switch } from '@/components/ui/switch';
 import { LanguagePicker } from '@/components/ui/language-picker';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 /**
  * Appearance page (top-level).
@@ -55,8 +57,36 @@ import {
  * cards, on the same grid, so the two questions read as one family of choices
  * and each card shows what it will do before it is picked.
  */
+function moveRadio<T extends string>(
+  event: ReactKeyboardEvent,
+  values: readonly T[],
+  current: T,
+  rtl: boolean,
+  onChange: (value: T) => void,
+): void {
+  const keys = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'];
+  if (!keys.includes(event.key)) return;
+  event.preventDefault();
+  const index = Math.max(0, values.indexOf(current));
+  if (event.key === 'Home') {
+    const first = values[0];
+    if (first) onChange(first);
+    return;
+  }
+  if (event.key === 'End') {
+    const last = values[values.length - 1];
+    if (last) onChange(last);
+    return;
+  }
+  const delta =
+    (event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : -1) * (rtl ? -1 : 1);
+  const next = values[(index + delta + values.length) % values.length];
+  if (next) onChange(next);
+}
+
 export function AppearancePage() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const rtl = localeDirection(i18n.language) === 'rtl';
   const { mode, darkTheme, accent, setMode, setDarkTheme, setAccent } = useTheme();
   const [settings, setSettings] = useState<UISettings | null>(null);
 
@@ -95,7 +125,17 @@ export function AppearancePage() {
         <div
           role="radiogroup"
           aria-label={t('options.appearance.mode')}
+          tabIndex={-1}
           className={CARD_GRID}
+          onKeyDown={(event) =>
+            moveRadio(
+              event,
+              THEME_MODE_OPTIONS.map((option) => option.value),
+              mode,
+              rtl,
+              (value) => void setMode(value),
+            )
+          }
         >
           {THEME_MODE_OPTIONS.map((option) => (
             <ChoiceCard
@@ -117,7 +157,17 @@ export function AppearancePage() {
         <div
           role="radiogroup"
           aria-label={t('options.appearance.darkTheme')}
+          tabIndex={-1}
           className={CARD_GRID}
+          onKeyDown={(event) =>
+            moveRadio(
+              event,
+              DARK_THEME_OPTIONS.map((option) => option.value),
+              darkTheme,
+              rtl,
+              (value) => void setDarkTheme(value),
+            )
+          }
         >
           {DARK_THEME_OPTIONS.map((option) => (
             <ChoiceCard
@@ -144,7 +194,17 @@ export function AppearancePage() {
         <div
           role="radiogroup"
           aria-label={t('options.appearance.accent')}
+          tabIndex={-1}
           className="flex flex-wrap items-center gap-1.5"
+          onKeyDown={(event) =>
+            moveRadio(
+              event,
+              ACCENT_OPTIONS.map((option) => option.value),
+              accent,
+              rtl,
+              (value) => void setAccent(value),
+            )
+          }
         >
           {ACCENT_OPTIONS.map((option) => {
             const active = accent === option.value;
@@ -155,6 +215,7 @@ export function AppearancePage() {
                 type="button"
                 role="radio"
                 aria-checked={active}
+                tabIndex={active ? 0 : -1}
                 aria-label={t(option.labelKey)}
                 title={t(option.labelKey)}
                 onClick={() => void setAccent(option.value)}
@@ -205,6 +266,7 @@ export function AppearancePage() {
           description={t('options.appearance.languageHint')}
           control={
             <LanguagePicker
+              id="appearance-language"
               value={language}
               onChange={(value) => void update({ language: value })}
               className="w-48"
@@ -230,7 +292,10 @@ export function AppearancePage() {
               <SelectContent>
                 {FONT_SIZE_OPTIONS.map((option) => (
                   <SelectItem key={option.value} value={String(option.value)}>
-                    {t(option.labelKey)} · {option.value}px
+                    <EnumValue
+                      label={t(option.labelKey)}
+                      raw={`${Math.round((option.value / 16) * 100)}%`}
+                    />
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -285,6 +350,7 @@ function ChoiceCard({
       type="button"
       role="radio"
       aria-checked={active}
+      tabIndex={active ? 0 : -1}
       onClick={onClick}
       className={cn(
         'flex min-w-0 flex-col gap-1.5 rounded-card border p-1.5 text-start',

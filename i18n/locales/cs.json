@@ -17,7 +17,8 @@
     "install": "Nainstalovat",
     "level": "Úroveň",
     "discard": "Zahodit",
-    "noResults": "Žádné výsledky."
+    "noResults": "Žádné výsledky.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -59,7 +60,8 @@
       "unreadErrors_few": "{{label}}, {{count}} nepřečtené chyby",
       "unreadErrors_many": "{{label}}, {{count}} nepřečtené chyby",
       "pendingRequests_few": "{{label}}, {{count}} čekající žádosti o přístup",
-      "pendingRequests_many": "{{label}}, {{count}} čekající žádosti o přístup"
+      "pendingRequests_many": "{{label}}, {{count}} čekající žádosti o přístup",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "Vzhled",

@@ -17,7 +17,8 @@
     "install": "ഇൻസ്റ്റാൾ ചെയ്യുക",
     "level": "ലെവൽ",
     "discard": "ഉപേക്ഷിക്കുക",
-    "noResults": "ഫലങ്ങളൊന്നുമില്ല."
+    "noResults": "ഫലങ്ങളൊന്നുമില്ല.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}, {{count}} വായിക്കാത്ത പിശക്",
       "unreadErrors_other": "{{label}}, {{count}} വായിക്കാത്ത പിശകുകൾ",
       "pendingRequests_one": "{{label}}, {{count}} ആക്സസ് അഭ്യർത്ഥന തീർച്ചപ്പെടുത്തിയിട്ടില്ല",
-      "pendingRequests_other": "{{label}}, {{count}} ആക്സസ് അഭ്യർത്ഥനകൾ തീർച്ചപ്പെടുത്തിയിട്ടില്ല"
+      "pendingRequests_other": "{{label}}, {{count}} ആക്സസ് അഭ്യർത്ഥനകൾ തീർച്ചപ്പെടുത്തിയിട്ടില്ല",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "രൂപഭാവം",

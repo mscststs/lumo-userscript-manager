@@ -67,10 +67,6 @@ function metaFirst(meta: ScriptMetadata, key: string): string | undefined {
   return meta[key]?.[0];
 }
 
-function hasGrant(grant: string[], name: string): boolean {
-  return grant.includes('none') ? false : grant.includes(name);
-}
-
 function serializeXhrOptions(options: Record<string, unknown>): Record<string, unknown> {
   const allowed = [
     'method',
@@ -273,7 +269,10 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
     const resolver = downloadResolvers.get(requestId);
     downloadResolvers.delete(requestId);
     if (!callbacks) {
-      if (resolver) error ? resolver.reject(new Error(error)) : resolver.resolve(result);
+      if (resolver) {
+        if (error) resolver.reject(new Error(error));
+        else resolver.resolve(result);
+      }
       return;
     }
     downloadCallbacks.delete(requestId);
@@ -883,7 +882,7 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
     // Only install the proxy when a window API is granted so ordinary scripts
     // keep the real page window and its identity semantics.
     scopedGM.window = new Proxy(pageWindow as any, {
-      get(target, prop, receiver) {
+      get(target, prop, _receiver) {
         if (prop === 'close' && allowed.has('window.close')) {
           return () => transport.call('window.close', []);
         }

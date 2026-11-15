@@ -17,7 +17,8 @@
     "install": "تثبيت",
     "level": "المستوى",
     "discard": "تجاهل",
-    "noResults": "لا توجد نتائج."
+    "noResults": "لا توجد نتائج.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo — مدير سكربتات المستخدم",
@@ -65,7 +66,8 @@
       "pendingRequests_two": "{{label}}، {{count}} طلبا وصول معلّقان",
       "pendingRequests_few": "{{label}}، {{count}} طلبات وصول معلّقة",
       "pendingRequests_many": "{{label}}، {{count}} طلب وصول معلّق",
-      "pendingRequests_other": "{{label}}، {{count}} طلب وصول معلّق"
+      "pendingRequests_other": "{{label}}، {{count}} طلب وصول معلّق",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "المظهر",

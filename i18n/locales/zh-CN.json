@@ -17,7 +17,8 @@
     "install": "安装",
     "level": "级别",
     "discard": "放弃",
-    "noResults": "没有结果。"
+    "noResults": "没有结果。",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo 用户脚本管理器",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}，{{count}} 条未读错误",
       "unreadErrors_other": "{{label}}，{{count}} 条未读错误",
       "pendingRequests_one": "{{label}}，{{count}} 个待处理的访问请求",
-      "pendingRequests_other": "{{label}}，{{count}} 个待处理的访问请求"
+      "pendingRequests_other": "{{label}}，{{count}} 个待处理的访问请求",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "外观",

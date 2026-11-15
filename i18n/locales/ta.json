@@ -17,7 +17,8 @@
     "install": "நிறுவவும்",
     "level": "நிலை",
     "discard": "நிராகரிக்கவும்",
-    "noResults": "முடிவுகள் இல்லை."
+    "noResults": "முடிவுகள் இல்லை.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}, {{count}} படிக்காத பிழை",
       "unreadErrors_other": "{{label}}, {{count}} படிக்காத பிழைகள்",
       "pendingRequests_one": "{{label}}, {{count}} அணுகல் கோரிக்கை நிலுவையில் உள்ளது",
-      "pendingRequests_other": "{{label}}, {{count}} அணுகல் கோரிக்கைகள் நிலுவையில் உள்ளன"
+      "pendingRequests_other": "{{label}}, {{count}} அணுகல் கோரிக்கைகள் நிலுவையில் உள்ளன",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "தோற்றம்",

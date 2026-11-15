@@ -17,7 +17,8 @@
     "install": "Instalează",
     "level": "Nivel",
     "discard": "Renunță",
-    "noResults": "Niciun rezultat."
+    "noResults": "Niciun rezultat.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -56,7 +57,8 @@
       "pendingRequests_one": "{{label}}, {{count}} cerere de acces în așteptare",
       "pendingRequests_other": "{{label}}, {{count}} solicitări de acces în așteptare",
       "unreadErrors_few": "{{label}}, {{count}} erori necitite",
-      "pendingRequests_few": "{{label}}, {{count}} solicitări de acces în așteptare"
+      "pendingRequests_few": "{{label}}, {{count}} solicitări de acces în așteptare",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "Aspect",

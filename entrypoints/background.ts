@@ -11,6 +11,8 @@ import {
   replaceResources,
   cleanupDrafts,
   listAgentAudit,
+  pruneLogs,
+  pruneVersions,
 } from '@/lib/db';
 import { parseMetadata } from '@/lib/script/metadata';
 import { validateBackupData } from '@/lib/backup-format';
@@ -77,7 +79,6 @@ import {
   resetFrameInjectedState,
   resetTabInjectedState,
 } from '@/lib/background/injected-state';
-import { createAgentMcpServer } from '@/lib/agent/mcp-server';
 import { resolveAgentAccess } from '@/lib/agent/policy';
 import {
   approvePendingRequest,
@@ -123,6 +124,11 @@ async function installRedirectRules(): Promise<void> {
 async function bootstrapRuntime(): Promise<void> {
   await installRedirectRules();
   await cleanupDrafts();
+  // Retention is maintenance, not a prerequisite for serving the UI. Do not
+  // make a cold service-worker start wait for a large log/version trim.
+  void Promise.all([pruneLogs(), pruneVersions()]).catch((error) =>
+    console.warn('[Lumo Userscripts] Storage retention failed:', error),
+  );
   await setupUpdateAlarm();
   await requestRegistration();
 }
@@ -236,6 +242,9 @@ async function handleRuntimeMessage(
       return prepareInstall({
         sourceUrl: payload.sourceUrl ? String(payload.sourceUrl) : undefined,
         code: payload.code ? String(payload.code) : undefined,
+        allowPrivate: payload.allowPrivate === true,
+        sendCredentials: payload.sendCredentials === true,
+        previewResources: payload.previewResources !== false,
       });
     case 'install:commit':
       return commitInstall(String(payload.token ?? ''), { enabled: payload.enabled !== false });
@@ -488,7 +497,11 @@ async function importBackup(payload: Record<string, any>): Promise<ImportBackupR
   return { imported, skipped, settingsImported, failed };
 }
 
-export default defineBackground(() => {
+export default defineBackground({
+  // ESM lets the large optional MCP SDK live in a shared chunk instead of
+  // being inlined into the service-worker cold-start bundle.
+  type: 'module',
+  main: () => {
   chrome.runtime.onInstalled.addListener(() => {
     void bootstrapRuntime()
       .then(() => checkScriptUpdates())
@@ -554,6 +567,9 @@ export default defineBackground(() => {
         await transport.close();
         return;
       }
+      // The MCP SDK and zod are large and only needed when a host actually
+      // opens a session; keep them out of the service worker's cold start.
+      const { createAgentMcpServer } = await import('@/lib/agent/mcp-server');
       const server = createAgentMcpServer(port.sender?.id, access.settings);
       transport.onclose = () => {
         void server.close().catch(() => undefined);
@@ -660,4 +676,5 @@ export default defineBackground(() => {
   void bootstrapRuntime().catch((error) =>
     console.error('[Lumo Userscripts] Bootstrap failed:', error),
   );
+  },
 });

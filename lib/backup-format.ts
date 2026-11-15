@@ -1,3 +1,11 @@
+import {
+  MAX_BACKUP_JSON_BYTES,
+  MAX_BACKUP_RESOURCES_PER_SCRIPT,
+  MAX_BACKUP_SCRIPTS,
+  MAX_BACKUP_VALUES_PER_SCRIPT,
+  MAX_SCRIPT_BYTES,
+} from './limits';
+
 /**
  * Backup payload contract shared by the options UI and the service worker.
  *
@@ -65,10 +73,35 @@ export function validateBackupData(raw: unknown): BackupData {
   const data = raw as BackupData;
   if (data.format !== BACKUP_FORMAT) throw new BackupError('invalid-format');
   if (!Array.isArray(data.scripts)) throw new BackupError('invalid-shape');
+  if (data.scripts.length > MAX_BACKUP_SCRIPTS) throw new BackupError('invalid-shape');
+
+  for (const entry of data.scripts) {
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+      throw new BackupError('invalid-shape');
+    }
+    if (typeof entry.code !== 'string') throw new BackupError('invalid-shape');
+    if (new TextEncoder().encode(entry.code).byteLength > MAX_SCRIPT_BYTES) {
+      throw new BackupError('invalid-shape');
+    }
+    if (entry.values !== undefined) {
+      if (!entry.values || typeof entry.values !== 'object' || Array.isArray(entry.values)) {
+        throw new BackupError('invalid-shape');
+      }
+      if (Object.keys(entry.values).length > MAX_BACKUP_VALUES_PER_SCRIPT) {
+        throw new BackupError('invalid-shape');
+      }
+    }
+    if (entry.resources !== undefined) {
+      if (!Array.isArray(entry.resources) || entry.resources.length > MAX_BACKUP_RESOURCES_PER_SCRIPT) {
+        throw new BackupError('invalid-shape');
+      }
+    }
+  }
   return data;
 }
 
 export function parseBackupJson(text: string): BackupData {
+  if (text.length > MAX_BACKUP_JSON_BYTES) throw new BackupError('invalid-shape');
   let raw: unknown;
   try {
     raw = JSON.parse(text);

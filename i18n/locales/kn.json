@@ -17,7 +17,8 @@
     "install": "ಸ್ಥಾಪಿಸಿ",
     "level": "ಮಟ್ಟ",
     "discard": "ತಿರಸ್ಕರಿಸು",
-    "noResults": "ಯಾವುದೇ ಫಲಿತಾಂಶಗಳಿಲ್ಲ."
+    "noResults": "ಯಾವುದೇ ಫಲಿತಾಂಶಗಳಿಲ್ಲ.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}, {{count}} ಓದದಿರುವ ದೋಷ",
       "unreadErrors_other": "{{label}}, {{count}} ಓದದಿರುವ ದೋಷಗಳು",
       "pendingRequests_one": "{{label}}, {{count}} ಬಾಕಿ ಇರುವ ಪ್ರವೇಶ ವಿನಂತಿ",
-      "pendingRequests_other": "{{label}}, {{count}} ಬಾಕಿ ಇರುವ ಪ್ರವೇಶ ವಿನಂತಿಗಳು"
+      "pendingRequests_other": "{{label}}, {{count}} ಬಾಕಿ ಇರುವ ಪ್ರವೇಶ ವಿನಂತಿಗಳು",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "ಗೋಚರತೆ",

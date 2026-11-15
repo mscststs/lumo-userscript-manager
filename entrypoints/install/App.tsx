@@ -68,7 +68,7 @@ const STATE_MOTION = {
  */
 export default function App() {
   useDocumentTitle('install.title');
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const errorText = useErrorText();
   const [state, setState] = useState<State>({ status: 'loading' });
   const [enabled, setEnabled] = useState(true);
@@ -101,12 +101,16 @@ export default function App() {
       return;
     }
 
-    sendBg<{ token: string; summary: InstallDraftSummary }>('install:prepare', { sourceUrl: src })
+    sendBg<{ token: string; summary: InstallDraftSummary }>('install:prepare', {
+      sourceUrl: src,
+      // Do not fetch the author's remote code before the user presses Install.
+      previewResources: false,
+    })
       .then(({ token: nextToken, summary }) =>
         setState({ status: 'ready', token: nextToken, summary, installing: false }),
       )
       .catch((error: Error) => setState({ status: 'error', message: errorText(error) }));
-  }, [params, t]);
+  }, [errorText, params, t]);
 
   const install = async () => {
     if (state.status !== 'ready' || state.installing) return;
@@ -385,7 +389,7 @@ function ReviewView({
             </Button>
             <Button onClick={onInstall} disabled={installing} aria-busy={installing}>
               {installing ? (
-                <LoaderCircle className="h-3.5 w-3.5 animate-spin" />
+                <LoaderCircle className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none" />
               ) : (
                 <Download className="h-3.5 w-3.5" />
               )}

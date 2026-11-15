@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  Suspense,
+  startTransition,
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { motion } from 'motion/react';
 import {
@@ -23,12 +31,17 @@ import { AgentAccessDialog } from '@/components/agent/AgentAccessDialog';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Button } from '@/components/ui/button';
 import { ToastProvider } from '@/components/ui/toast';
-import { ScriptsPage } from './ScriptsPage';
-import { EditorPage } from './EditorPage';
-import { SettingsPage } from './SettingsPage';
-import { LogsPage } from './LogsPage';
-import { AboutPage } from './About';
-import { AppearancePage } from './AppearancePage';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  AboutPage,
+  AppearancePage,
+  EditorPage,
+  LogsPage,
+  ScriptsPage,
+  SettingsPage,
+  preloadIdlePages,
+  preloadPage,
+} from './routes';
 
 type RouteName = 'scripts' | 'editor' | 'settings' | 'appearance' | 'logs' | 'about';
 type SettingsSection = 'general' | 'updates' | 'data' | 'agent';
@@ -69,22 +82,41 @@ function routeToHash(route: Route): string {
   return `#/${route.name}`;
 }
 
+/** Same destination: `navigate` already committed, so the `hashchange` echo
+ * must not schedule a second render (or restart the nav chip animation). */
+function sameRoute(a: Route, b: Route): boolean {
+  return (
+    a.name === b.name && a.uuid === b.uuid && a.panel === b.panel && a.section === b.section
+  );
+}
+
 function useHashRoute() {
   const [route, setRoute] = useState<Route>(parseHash);
 
-  useEffect(() => {
-    const onChange = () => setRoute(parseHash());
-    window.addEventListener('hashchange', onChange);
-    return () => window.removeEventListener('hashchange', onChange);
+  // A route change is a transition: the page module may still be importing,
+  // and React should keep the current page on screen until the next one is
+  // ready instead of committing a fallback. The hash itself moves immediately
+  // so the address bar and the back button stay honest.
+  const commit = useCallback((next: Route) => {
+    startTransition(() => setRoute((current) => (sameRoute(current, next) ? current : next)));
   }, []);
 
-  const navigate = useCallback((next: Route) => {
-    // Route changes commit synchronously: no cross-fade, no ghost snapshot. The
-    // old page is never visible on top of the new one, so a page that loads its
-    // own data cannot appear to "flash back" mid-navigation.
-    window.location.hash = routeToHash(next);
-    setRoute(next);
-  }, []);
+  useEffect(() => {
+    const onChange = () => commit(parseHash());
+    window.addEventListener('hashchange', onChange);
+    return () => window.removeEventListener('hashchange', onChange);
+  }, [commit]);
+
+  const navigate = useCallback(
+    (next: Route) => {
+      // Route changes commit without a cross-fade or ghost snapshot: the old
+      // page is never painted on top of the new one, so a page that loads its
+      // own data cannot appear to "flash back" mid-navigation.
+      window.location.hash = routeToHash(next);
+      commit(next);
+    },
+    [commit],
+  );
 
   return { route, navigate };
 }
@@ -149,6 +181,13 @@ export default function App() {
   // Shared with the approval dialog: the same queue drives the nav badge.
   const agentAccess = useAgentAccess();
 
+  // Warm the small pages while the browser is idle. The first navigation to a
+  // page then resumes from a settled module instead of paying a disk read in
+  // front of the user's click.
+  useEffect(() => {
+    preloadIdlePages();
+  }, []);
+
   const content = useMemo(() => {
     if (route.name === 'scripts') {
       return (
@@ -188,13 +227,26 @@ export default function App() {
               sits on it as one raised panel. Navigation reads as part of the
               window rather than as a second pane competing with the content. */}
           <div className="flex h-dvh w-full overflow-hidden bg-sidebar text-foreground">
+            <a
+              href="#lumo-main"
+              onClick={(event) => {
+                // The app uses the hash as its router; letting the skip link
+                // change it would be parsed as an unknown route and bounce the
+                // user back to Scripts. Focus the target directly instead.
+                event.preventDefault();
+                document.getElementById('lumo-main')?.focus();
+              }}
+              className="sr-only focus:not-sr-only focus:fixed focus:start-3 focus:top-3 focus:z-[80] focus:rounded-control focus:border focus:border-border focus:bg-card focus:px-3 focus:py-2 focus:text-sm focus:text-foreground focus:shadow-elev2"
+            >
+              {t('options.nav.skip')}
+            </a>
             <ThemeInit />
             <FontSizeInit />
 
             <nav
               aria-label={t('options.nav.label')}
               className={cn(
-                'flex h-full shrink-0 flex-col py-2 transition-[width] duration-200 ease-standard',
+                'flex h-full shrink-0 flex-col py-2 transition-[width] duration-200 ease-standard motion-reduce:transition-none',
                 collapsed ? 'w-14' : 'w-14 md:w-56',
               )}
             >
@@ -241,9 +293,20 @@ export default function App() {
                     return (
                       <Tooltip key={item.name}>
                         <TooltipTrigger asChild>
-                          <button
-                            type="button"
-                            onClick={() => navigate({ name: item.name })}
+                          <a
+                            href={routeToHash({ name: item.name })}
+                            onClick={(event) => {
+                              if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+                                return;
+                              }
+                              event.preventDefault();
+                              navigate({ name: item.name });
+                            }}
+                            // Pointer/focus intent is the cheapest prefetch
+                            // signal: hovering a menu row always precedes the
+                            // click by several frames.
+                            onPointerEnter={() => preloadPage(item.name)}
+                            onFocus={() => preloadPage(item.name)}
                             aria-current={isActive ? 'page' : undefined}
                             // Named explicitly: the visible label collapses to
                             // zero width, which would leave the button nameless.
@@ -315,7 +378,7 @@ export default function App() {
                                 {badge > 99 ? '99+' : badge}
                               </span>
                             )}
-                          </button>
+                          </a>
                         </TooltipTrigger>
                         <TooltipContent side="right" className={collapsed ? '' : 'md:hidden'}>
                           {label}
@@ -357,10 +420,27 @@ export default function App() {
             {/* Each page owns its scrolling (see PageLayout): the panel itself
                 never scrolls, so its rounded corners and the page heading stay
                 put while the content moves underneath. */}
-            <main className="my-2 me-2 min-h-0 min-w-0 flex-1 overflow-hidden rounded-card border border-border/70 bg-background shadow-panel">
-              <div key={route.name} className="h-full">
-                {content}
-              </div>
+            <main
+              id="lumo-main"
+              tabIndex={-1}
+              className="my-2 me-2 min-h-0 min-w-0 flex-1 overflow-hidden rounded-card border border-border/70 bg-background shadow-panel"
+            >
+              {/* The boundary outlives the route: during a transition React
+                  keeps the current page on screen until the next module is
+                  ready, so navigating never flashes a skeleton for a page that
+                  loads in a few milliseconds. The keyed child still remounts on
+                  every route, which is what resets per-page state. */}
+              <Suspense
+                fallback={
+                  <div className="flex h-full items-center justify-center p-8">
+                    <Skeleton className="h-6 w-40" />
+                  </div>
+                }
+              >
+                <div key={route.name} className="h-full">
+                  {content}
+                </div>
+              </Suspense>
             </main>
           </div>
 

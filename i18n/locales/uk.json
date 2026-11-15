@@ -17,7 +17,8 @@
     "install": "Встановити",
     "level": "Рівень",
     "discard": "Відкинути",
-    "noResults": "Результатів немає."
+    "noResults": "Результатів немає.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -59,7 +60,8 @@
       "unreadErrors_few": "{{label}}, {{count}} непрочитаних помилок",
       "unreadErrors_many": "{{label}}, {{count}} непрочитаних помилок",
       "pendingRequests_few": "{{label}}, {{count}} запитів на доступ, що очікують на розгляд",
-      "pendingRequests_many": "{{label}}, {{count}} запитів на доступ, що очікують на розгляд"
+      "pendingRequests_many": "{{label}}, {{count}} запитів на доступ, що очікують на розгляд",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "Зовнішній вигляд",

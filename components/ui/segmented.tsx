@@ -49,9 +49,29 @@ export function Segmented<T extends string>({
   );
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    if (
+      event.key !== 'ArrowLeft' &&
+      event.key !== 'ArrowRight' &&
+      event.key !== 'ArrowUp' &&
+      event.key !== 'ArrowDown' &&
+      event.key !== 'Home' &&
+      event.key !== 'End'
+    ) {
+      return;
+    }
     event.preventDefault();
-    const delta = (event.key === 'ArrowRight' ? 1 : -1) * (rtl ? -1 : 1);
+    if (event.key === 'Home') {
+      const first = options[0];
+      if (first) onChange(first.value);
+      return;
+    }
+    if (event.key === 'End') {
+      const last = options[options.length - 1];
+      if (last) onChange(last.value);
+      return;
+    }
+    const delta =
+      (event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : -1) * (rtl ? -1 : 1);
     const nextIndex = (activeIndex + delta + options.length) % options.length;
     const next = options[nextIndex];
     if (next) onChange(next.value);
@@ -61,6 +81,7 @@ export function Segmented<T extends string>({
     <div
       role="radiogroup"
       aria-label={ariaLabel}
+      tabIndex={-1}
       onKeyDown={handleKeyDown}
       className={cn(
         'inline-flex items-center gap-0.5 rounded-control border border-border bg-muted p-0.5',

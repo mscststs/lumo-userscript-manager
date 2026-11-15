@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useErrorText } from '@/lib/use-error-text';
 import { DIAGNOSTIC_KEYS, type Diagnostic } from '@/lib/diagnostics';
@@ -115,7 +115,11 @@ export function EditorPage({ uuid, initialPanel, onBack, onSaved }: EditorPagePr
   const [error, setError] = useState<string | null>(null);
   const [confirmDiscard, setConfirmDiscard] = useState(false);
 
-  const parsed = useMemo(() => parseMetadata(code), [code]);
+  // Parsing a large metablock on every keystroke blocks the editor. The
+  // deferred value keeps the input responsive while the diagnostics panel
+  // catches up; saves validate the live `code` synchronously below.
+  const deferredCode = useDeferredValue(code);
+  const parsed = useMemo(() => parseMetadata(deferredCode), [deferredCode]);
   const codeDirty = code !== originalCode;
   const overridesDirty = !sameMetadata(selfMetadata, savedSelfMetadata);
   const unsaved = codeDirty || overridesDirty;
@@ -152,7 +156,7 @@ export function EditorPage({ uuid, initialPanel, onBack, onSaved }: EditorPagePr
     } finally {
       setLoading(false);
     }
-  }, [isNew, t, uuid]);
+  }, [errorText, isNew, t, uuid]);
 
   useEffect(() => {
     void load();
@@ -175,8 +179,9 @@ export function EditorPage({ uuid, initialPanel, onBack, onSaved }: EditorPagePr
     // While an existing record is still loading there is no identity to save
     // against; a save here would silently create a duplicate script.
     if (loading || (!isNew && !script)) return;
-    if (parsed.errors.length) {
-      setError(parsed.errors.map(diagnosticText).join('\n'));
+    const current = parseMetadata(code);
+    if (current.errors.length) {
+      setError(current.errors.map(diagnosticText).join('\n'));
       return;
     }
     setSaving(true);
@@ -418,7 +423,12 @@ export function EditorPage({ uuid, initialPanel, onBack, onSaved }: EditorPagePr
 
       {isCode ? (
         <div className="min-h-0 flex-1 overflow-hidden bg-code-bg">
-          <CodeEditor value={code} onChange={setCode} className="h-full" />
+          <CodeEditor
+            value={code}
+            onChange={setCode}
+            className="h-full"
+            ariaLabel={t('editor.code')}
+          />
         </div>
       ) : (
         <div className="scrollbar-lumo min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-7 sm:py-6">
@@ -436,7 +446,7 @@ export function EditorPage({ uuid, initialPanel, onBack, onSaved }: EditorPagePr
             {tab === 'resources' && <ResourcesPanel resources={resources} />}
             {tab === 'info' &&
               (script ? (
-                <InfoPanel script={script} lineCount={code.split(/\r?\n/).length} />
+                <InfoPanel script={script} lineCount={deferredCode.split(/\r?\n/).length} />
               ) : (
                 <InfoPanelEmpty />
               ))}

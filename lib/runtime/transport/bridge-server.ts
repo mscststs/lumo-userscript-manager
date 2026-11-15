@@ -3,7 +3,6 @@ import {
   BRIDGE_READY,
   BRIDGE_RESULT,
   BRIDGE_RESUME,
-  BRIDGE_RPC,
   HOST_RPC_TYPES,
   isBridgeHello,
   isBridgeRpc,
@@ -181,6 +180,10 @@ export function startContentBridge(): void {
       // The content script knows the current document URL even after a soft
       // navigation; the sender URL reported by the browser does not change.
       __pageUrl: location.href,
+      // The world is asserted by the channel that delivered the request, not
+      // by the payload's own claims. It lets the worker reject a USER_SCRIPT
+      // token replayed over the MAIN channel (and vice versa).
+      __world: record.kind === 'main' ? 'MAIN' : 'USER_SCRIPT',
     });
     const result: BridgeResult = response.ok
       ? { __lumo: BRIDGE_RESULT, id: message.id, result: response.result }

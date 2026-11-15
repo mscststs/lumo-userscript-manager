@@ -1,3 +1,4 @@
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { AppError, ERROR_KEYS } from './errors';
 
@@ -11,7 +12,7 @@ import { AppError, ERROR_KEYS } from './errors';
  */
 export function useErrorText(): (error: unknown) => string {
   const { t } = useTranslation();
-  return (error: unknown): string => {
+  return useCallback((error: unknown): string => {
     if (error instanceof AppError) {
       const headline = t(ERROR_KEYS[error.code], error.params);
       const detail = error.detail?.trim();
@@ -21,5 +22,5 @@ export function useErrorText(): (error: unknown) => string {
     }
     if (error instanceof Error) return error.message;
     return String(error);
-  };
+  }, [t]);
 }

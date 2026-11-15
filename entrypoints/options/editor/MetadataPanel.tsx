@@ -6,13 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { EnumValue } from '@/components/ui/enum';
 import { FieldToggleRow } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { MetaField } from '@/components/editor/MetaField';

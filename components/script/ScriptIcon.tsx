@@ -102,6 +102,7 @@ export function ScriptIcon({ src, dimmed = false, size = 'sm', className }: Scri
         )}
       />
       {src && status !== 'failed' && (
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- onLoad/onError track image decode, not interaction.
         <img
           src={src}
           alt=""

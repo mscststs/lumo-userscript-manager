@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react';
 import { storage } from '@/store/storage';
 import { useStorageWatch } from '@/store/useStorageWatch';
 import type { FontSize, UISettings } from '@/types';
+import { DEFAULT_FONT_SIZE } from './font-size-registry';
 
 export { FONT_SIZE_OPTIONS, DEFAULT_FONT_SIZE, normalizeFontSize } from './font-size-registry';
 
@@ -17,10 +18,14 @@ const MIRROR_KEY = 'lumo-us:font-size';
  * Apply a font-size to `<html>`. All `rem`-based sizing in Tailwind scales
  * automatically.
  *
+ * The preset is a *relative* scale, not an absolute pixel size: `100%` keeps
+ * the browser/OS default text size, which is an accessibility preference. A
+ * hard `16px` would silently override it.
+ *
  * Also refreshes the `localStorage` mirror the preload script reads.
  */
 export function applyFontSize(size: FontSize) {
-  document.documentElement.style.fontSize = `${size}px`;
+  document.documentElement.style.fontSize = `${(size / DEFAULT_FONT_SIZE) * 100}%`;
 
   try {
     localStorage.setItem(MIRROR_KEY, String(size));

@@ -17,7 +17,8 @@
     "install": "Installi",
     "level": "Tase",
     "discard": "Viska ära",
-    "noResults": "Tulemusi pole."
+    "noResults": "Tulemusi pole.",
+    "notifications": "Notifications"
   },
   "app": {
     "name": "Lumo Userscripts",
@@ -53,7 +54,8 @@
       "unreadErrors_one": "{{label}}, {{count}} lugemata viga",
       "unreadErrors_other": "{{label}}, {{count}} lugemata vigu",
       "pendingRequests_one": "{{label}}, {{count}} ootel juurdepääsutaotlus",
-      "pendingRequests_other": "{{label}}, {{count}} ootel juurdepääsutaotlust"
+      "pendingRequests_other": "{{label}}, {{count}} ootel juurdepääsutaotlust",
+      "skip": "Skip to content"
     },
     "appearance": {
       "title": "Välimus",

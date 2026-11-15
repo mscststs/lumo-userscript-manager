@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -100,6 +100,7 @@ export function CollapsibleContent({
   ...props
 }: React.HTMLAttributes<HTMLDivElement>) {
   const { open, contentId } = useCollapsible('CollapsibleContent');
+  const reduceMotion = useReducedMotion();
 
   return (
     <AnimatePresence initial={false}>
@@ -110,7 +111,7 @@ export function CollapsibleContent({
           initial={{ height: 0, opacity: 0 }}
           animate={{ height: 'auto', opacity: 1 }}
           exit={{ height: 0, opacity: 0 }}
-          transition={{ duration: 0.2, ease: [0.2, 0, 0, 1] }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.2, ease: [0.2, 0, 0, 1] }}
           className="overflow-hidden"
         >
           <div className={cn(className)} {...props}>

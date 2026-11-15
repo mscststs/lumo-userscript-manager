@@ -150,7 +150,7 @@ export default function App() {
     } finally {
       if (!silent) setInitialLoading(false);
     }
-  }, [t]);
+  }, [errorText, t]);
 
   useEffect(() => {
     void load();
@@ -289,7 +289,10 @@ export default function App() {
         )}
 
         {error && data && (
-          <div className="mb-1 flex items-center gap-2 rounded-md bg-destructive/8 px-2 py-1.5">
+          <div
+            role="alert"
+            className="mb-1 flex items-center gap-2 rounded-md bg-destructive/8 px-2 py-1.5"
+          >
             <CircleAlert className="h-3.5 w-3.5 shrink-0 text-destructive" aria-hidden="true" />
             <span className="min-w-0 flex-1 truncate text-2xs text-destructive" title={error}>
               {error}
@@ -584,7 +587,7 @@ function PopupEmpty({ title, icon: Icon = FileCode2 }: { title: string; icon?: L
 function PopupError({ message, onRetry }: { message: string; onRetry: () => void }) {
   const { t } = useTranslation();
   return (
-    <div className="flex flex-col items-center gap-2 px-6 py-8 text-center">
+    <div role="alert" className="flex flex-col items-center gap-2 px-6 py-8 text-center">
       <CircleAlert className="h-4.5 w-4.5 text-destructive" aria-hidden="true" />
       <p className="max-w-full break-words text-xs text-destructive">{message}</p>
       <button

@@ -4,6 +4,7 @@ import {
   parseBackupJson,
   type BackupData,
 } from './backup-format';
+import { MAX_BACKUP_JSON_BYTES, MAX_BACKUP_ZIP_BYTES } from './limits';
 
 export type { BackupData } from './backup-format';
 
@@ -28,13 +29,24 @@ export function createBackupZip(data: BackupData): Uint8Array {
 }
 
 export function readBackupZip(buffer: ArrayBuffer): BackupData {
+  if (buffer.byteLength > MAX_BACKUP_ZIP_BYTES) {
+    throw new BackupError('invalid-shape', 'The backup archive is too large.');
+  }
   let files: Record<string, Uint8Array>;
   try {
-    files = unzipSync(new Uint8Array(buffer));
+    files = unzipSync(new Uint8Array(buffer), {
+      // Only the manifest is needed; do not expand an attacker-controlled
+      // `scripts/` tree or a zip bomb.
+      filter: (file) =>
+        file.name === 'backup.json' && file.originalSize <= MAX_BACKUP_JSON_BYTES,
+    });
   } catch {
     throw new BackupError('invalid-shape', 'The file is not a readable ZIP archive.');
   }
   const raw = files['backup.json'];
   if (!raw) throw new BackupError('zip-missing-manifest');
+  if (raw.byteLength > MAX_BACKUP_JSON_BYTES) {
+    throw new BackupError('invalid-shape', 'The backup manifest is too large.');
+  }
   return parseBackupJson(strFromU8(raw));
 }
