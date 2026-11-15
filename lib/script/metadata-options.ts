@@ -1,4 +1,5 @@
 import type { ScriptInjectInto, ScriptRunAt } from '@/types';
+import type { TranslationKey } from '@/i18n/keys';
 
 /**
  * Vocabulary shared by every surface that names a `@run-at` / `@inject-into`
@@ -12,7 +13,7 @@ import type { ScriptInjectInto, ScriptRunAt } from '@/types';
 export interface MetadataOption<T extends string> {
   value: T;
   /** Translation key of the human label. The raw value is rendered beside it. */
-  labelKey: string;
+  labelKey: TranslationKey;
 }
 
 export const RUN_AT_OPTIONS: MetadataOption<ScriptRunAt>[] = [

@@ -48,7 +48,7 @@ export function AboutPage({ onOpenData }: { onOpenData: () => void }) {
               rel="noreferrer"
               className="inline-flex min-w-0 items-center gap-1 font-mono text-xs text-primary hover:underline"
             >
-              <span className="truncate">github.com/mscststs/lumo-userscript-manager</span>
+              <span className="truncate" dir="ltr">github.com/mscststs/lumo-userscript-manager</span>
               <ExternalLink className="h-3 w-3 shrink-0" aria-hidden="true" />
             </a>
           </div>

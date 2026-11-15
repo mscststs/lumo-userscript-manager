@@ -528,11 +528,15 @@ Chrome 在每次新文档 commit 时清空该 tab 的角标，因此 commit 时�
 
 ## 9. 国际化与文案
 
-- 所有可见文案来自 `i18n/{en,zh}.ts`；`tests/i18n-keys.test.ts` 保证两套 key 完全一致。
+- 所有可见文案来自 `i18n/locales/*.json`，`en.json` 是 canonical schema；`i18n/locales.ts` 是 55 个 Chrome locale 的单一事实源（`tag` / `chrome` / native name / `dir` / `status`）。
+- `npm run i18n:check` 保证 key、空值、`{{placeholder}}`、CLDR 复数范畴与 registry 一致；`npm run i18n:scan` 拒绝硬编码可见文案；`npm run i18n:manifest` 生成 `public/_locales`。
 - 文案只描述**状态与结果**：`已启用`、`脚本已安装`、`没有符合筛选条件的日志`。
 - 不写操作指令（「请点击这里」「在此输入」）。
 - 溢出：所有可能变长的文本节点带 `min-w-0` + `truncate` 或 `line-clamp`；按钮文字 `whitespace-nowrap`，由 `flex-wrap` 承担换行。
 - 枚举值必须本地化（`document-idle` → 文档空闲 / Document idle），技术标识（`@grant`、URL、权限名）保持原文。
+- RTL：`<html dir>` + Radix `DirectionProvider` 同时生效；布局只用逻辑属性（`ms/me`、`ps/pe`、`start/end`、`text-start/end`），`tests/i18n-direction.test.ts` 会拒绝物理方向类。代码、URL、扩展 ID 强制 LTR；阿拉伯语/希伯来语禁用 `letter-spacing` 与 `uppercase`。
+- 数字、日期、相对时间、字节大小通过 `Intl.*` 与解析后的 BCP-47 tag 格式化；复数使用 `_one/_other`（以及各语言 CLDR 额外范畴）。
+- 错误与诊断使用稳定 code（`lib/errors.ts`、`lib/diagnostics.ts`），UI 通过 `useErrorText` 渲染；原始英文 detail 只作为技术细节。
 
 ---
 
@@ -654,7 +658,7 @@ Popup 与浏览器自带的扩展面板同构：**一张 40px 行高的平铺列
 
 - [ ] 新增颜色来自语义令牌，且补了 `-foreground`
 - [ ] 新增/修改主题跑过 `theme.test.ts` 与 `design-tokens.test.ts`
-- [ ] 两套语言 key 一致，无硬编码可见文案
+- [ ] `i18n:check`、`i18n:scan`、`i18n:manifest --check` 全部通过；无硬编码可见文案
 - [ ] 所有按钮/输入有可访问名称，键盘可达
 - [ ] 加载态骨架与最终内容同高
 - [ ] 长文本在 360px / 56px 导航宽度下不破坏布局

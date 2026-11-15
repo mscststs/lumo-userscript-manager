@@ -1,0 +1,14 @@
+{
+  "extName": {
+    "message": "Lumo यूजरस्क्रिप्ट मॅनेजर",
+    "description": "The display name of the extension."
+  },
+  "extDescription": {
+    "message": "तुमच्या ब्राउझरसाठी शक्तिशाली आणि उत्तम रचलेला यूजरस्क्रिप्ट मॅनेजर",
+    "description": "The description of the extension shown in browser extension stores (Chrome Web Store, Microsoft Edge Add-ons) and the extension management page."
+  },
+  "actionTitle": {
+    "message": "Lumo यूजरस्क्रिप्ट मॅनेजर उघडा",
+    "description": "Tooltip shown when hovering the extension's toolbar icon."
+  }
+}

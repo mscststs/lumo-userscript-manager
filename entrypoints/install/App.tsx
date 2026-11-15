@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useErrorText } from '@/lib/use-error-text';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   ChevronRight,
@@ -29,6 +30,8 @@ import { sendBg } from '@/lib/messages';
 import { ThemeInit } from '@/lib/theme';
 import { FontSizeInit } from '@/lib/font-size';
 import { cn, formatBytes } from '@/lib/utils';
+import { useDocumentTitle } from '@/lib/document-title';
+import { DIAGNOSTIC_KEYS } from '@/lib/diagnostics';
 
 type State =
   | { status: 'loading' }
@@ -64,7 +67,9 @@ const STATE_MOTION = {
  * progress indicator; the page only changes shape once there is a result.
  */
 export default function App() {
-  const { t } = useTranslation();
+  useDocumentTitle('install.title');
+  const { t, i18n } = useTranslation();
+  const errorText = useErrorText();
   const [state, setState] = useState<State>({ status: 'loading' });
   const [enabled, setEnabled] = useState(true);
   const params = useMemo(() => new URLSearchParams(location.search), []);
@@ -92,7 +97,7 @@ export default function App() {
           if (!draft) throw new Error(t('install.invalidSource'));
           setState({ status: 'ready', token, summary: draft, installing: false });
         })
-        .catch((error: Error) => setState({ status: 'error', message: error.message }));
+        .catch((error: Error) => setState({ status: 'error', message: errorText(error) }));
       return;
     }
 
@@ -100,7 +105,7 @@ export default function App() {
       .then(({ token: nextToken, summary }) =>
         setState({ status: 'ready', token: nextToken, summary, installing: false }),
       )
-      .catch((error: Error) => setState({ status: 'error', message: error.message }));
+      .catch((error: Error) => setState({ status: 'error', message: errorText(error) }));
   }, [params, t]);
 
   const install = async () => {
@@ -114,7 +119,7 @@ export default function App() {
       });
       setState({ status: 'installed', uuid: result.uuid, updated: result.updated, summary });
     } catch (error) {
-      setState({ status: 'error', message: error instanceof Error ? error.message : String(error) });
+      setState({ status: 'error', message: errorText(error) });
     }
   };
 
@@ -221,7 +226,7 @@ function ReviewView({
   onEnabledChange: (enabled: boolean) => void;
   onInstall: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const grants = summary.grant.filter((grant) => grant !== 'none');
   const scope = [...summary.matches, ...summary.includes];
   const lineCount = useMemo(() => summary.code.split('\n').length, [summary.code]);
@@ -234,7 +239,7 @@ function ReviewView({
             <ScriptIcon src={summary.icon} size="lg" />
             <div className="min-w-0 flex-1">
               <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                <h2 className="min-w-0 truncate text-lg font-semibold" title={summary.name}>
+                <h2 className="min-w-0 truncate text-lg font-semibold" title={summary.name} dir="auto">
                   {summary.name}
                 </h2>
                 {summary.isUpdate ? (
@@ -257,7 +262,7 @@ function ReviewView({
               </div>
               {(summary.author || summary.namespace) && (
                 <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                  {[summary.author, summary.namespace].filter(Boolean).join(' · ')}
+                  <span dir="auto">{[summary.author, summary.namespace].filter(Boolean).join(' · ')}</span>
                 </p>
               )}
               {summary.description && (
@@ -296,9 +301,9 @@ function ReviewView({
                 {summary.requireDetails.map((item) => (
                   <li key={item.url} className="flex min-w-0 items-baseline gap-2 text-xs">
                     <span className="shrink-0 tabular-nums text-foreground">
-                      {formatBytes(item.size)}
+                      {formatBytes(item.size, i18n.language)}
                     </span>
-                    <span className="min-w-0 truncate font-mono text-muted-foreground" title={item.url}>
+                    <span className="min-w-0 truncate font-mono text-muted-foreground" title={item.url} dir="ltr">
                       {item.url}
                     </span>
                     {item.hash && (
@@ -330,8 +335,8 @@ function ReviewView({
             <TriangleAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" aria-hidden="true" />
             <ul className="min-w-0 space-y-1 text-xs leading-relaxed text-foreground">
               {summary.warnings.map((warning) => (
-                <li key={warning} className="break-words">
-                  {warning}
+                <li key={`${warning.code}:${JSON.stringify(warning.params ?? {})}`} className="break-words">
+                  {t(DIAGNOSTIC_KEYS[warning.code], warning.params)}
                 </li>
               ))}
             </ul>
@@ -343,18 +348,18 @@ function ReviewView({
               would be cut off. */}
           <CollapsibleTrigger className="group gap-2 px-4 py-3 text-sm font-medium transition-colors duration-150 ease-standard hover:bg-accent/50 focus-visible:-outline-offset-2">
             <ChevronRight
-              className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 ease-standard group-data-[state=open]:rotate-90"
+              className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-200 ease-standard group-data-[state=open]:rotate-90 rtl:-scale-x-100"
               aria-hidden="true"
             />
             <span className="min-w-0 flex-1 truncate">{t('install.codePreview')}</span>
             <span className="shrink-0 text-2xs font-normal tabular-nums text-muted-foreground">
-              {t('install.lines', { count: lineCount })} · {formatBytes(summary.codeSize)}
+              {t('install.lines', { count: lineCount })} · {formatBytes(summary.codeSize, i18n.language)}
             </span>
           </CollapsibleTrigger>
           {/* Mounted on open only: highlighting a large script is the most
               expensive thing this page can do, and most installs never look. */}
           <CollapsibleContent>
-            <div className="scrollbar-lumo max-h-[28rem] overflow-auto border-t border-border bg-code-bg py-3 pr-4">
+            <div className="scrollbar-lumo max-h-[28rem] overflow-auto border-t border-border bg-code-bg py-3 pe-4">
               <CodeView code={summary.code} lineNumbers />
             </div>
           </CollapsibleContent>
@@ -364,8 +369,8 @@ function ReviewView({
       {/* The decision floats over the review like the list's batch bar: the
           same surface for "act on what you are looking at" everywhere. */}
       <div className="sticky bottom-0 z-10 mt-auto pb-4 pt-1">
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-popover/95 py-2 pl-2.5 pr-2 shadow-elev2 backdrop-blur-md">
-          <label className="-ml-1.5 flex cursor-pointer items-center gap-0.5 text-sm text-foreground">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-card border border-border bg-popover/95 py-2 ps-2.5 pe-2 shadow-elev2 backdrop-blur-md">
+          <label className="-ms-1.5 flex cursor-pointer items-center gap-0.5 text-sm text-foreground">
             <Checkbox
               checked={enabled}
               onCheckedChange={onEnabledChange}

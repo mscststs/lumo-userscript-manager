@@ -1,0 +1,14 @@
+{
+  "extName": {
+    "message": "Lumo — användarskriptshanterare",
+    "description": "The display name of the extension."
+  },
+  "extDescription": {
+    "message": "En kraftfull och genomtänkt användarskriptshanterare för din webbläsare",
+    "description": "The description of the extension shown in browser extension stores (Chrome Web Store, Microsoft Edge Add-ons) and the extension management page."
+  },
+  "actionTitle": {
+    "message": "Öppna Lumo — användarskriptshanterare",
+    "description": "Tooltip shown when hovering the extension's toolbar icon."
+  }
+}

@@ -51,6 +51,10 @@ jobs:
 
       # 类型错误不该由商店审核帮我们发现；构建之前先过一遍。
       - run: npm run compile
+      - run: npm run i18n:check
+      - run: npm run i18n:scan
+      - run: npm run i18n:manifest -- --check
+      - run: npm test
 
       # `npm run zip` 会先构建再打包（prezip 负责生成 public/user-scripts 运行时
       # bundle，它被 gitignore，不能指望 checkout 里带着）。

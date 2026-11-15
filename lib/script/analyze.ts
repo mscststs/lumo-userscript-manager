@@ -1,4 +1,5 @@
 import type { ScriptMetadata } from '@/types';
+import { diagnostic, type Diagnostic } from '@/lib/diagnostics';
 import { parseMetadata, resolveMetadataUrls, splitTags, getMeta, getMetaList } from './metadata';
 import { unsupportedGrants } from './grants';
 import { byteLength } from './hash';
@@ -28,27 +29,54 @@ const UNSUPPORTED_TAGS = [
  */
 export function collectMetadataWarnings(
   metadata: ScriptMetadata,
-  parsedWarnings: readonly string[] = [],
-): string[] {
+  parsedWarnings: readonly Diagnostic[] = [],
+): Diagnostic[] {
   const warnings = [...parsedWarnings];
 
   if (!metadata.match?.length && !metadata.include?.length) {
-    warnings.push('No @match or @include rule; the script will run on every page.');
+    warnings.push(
+      diagnostic(
+        'metadata.noMatch',
+        'No @match or @include rule; the script will run on every page.',
+      ),
+    );
   }
   for (const grant of unsupportedGrants(metadata.grant)) {
-    warnings.push(`Unsupported @grant: ${grant}`);
+    warnings.push(
+      diagnostic('metadata.unsupportedGrant', `Unsupported @grant: ${grant}`, { grant }),
+    );
   }
   if (metadata.grant?.includes('unsafeWindow') && metadata['inject-into']?.[0] === 'content') {
-    warnings.push('unsafeWindow requires the page world; @inject-into content is ignored.');
+    warnings.push(
+      diagnostic(
+        'metadata.unsafeWindowPageWorld',
+        'unsafeWindow requires the page world; @inject-into content is ignored.',
+      ),
+    );
   }
   for (const feature of metadata.antifeature ?? []) {
-    if (feature.trim()) warnings.push(`@antifeature: ${feature.trim()}`);
+    if (feature.trim()) {
+      warnings.push(
+        diagnostic('metadata.antifeature', `@antifeature: ${feature.trim()}`, {
+          feature: feature.trim(),
+        }),
+      );
+    }
   }
   if (metadata['run-in']?.length) {
-    warnings.push('@run-in is not supported; the script runs in normal tabs.');
+    warnings.push(
+      diagnostic(
+        'metadata.runInUnsupported',
+        '@run-in is not supported; the script runs in normal tabs.',
+      ),
+    );
   }
   for (const tag of UNSUPPORTED_TAGS) {
-    if (metadata[tag]?.length) warnings.push(`@${tag} is not supported.`);
+    if (metadata[tag]?.length) {
+      warnings.push(
+        diagnostic('metadata.unsupportedTag', `@${tag} is not supported.`, { tag }),
+      );
+    }
   }
 
   return warnings;
@@ -56,8 +84,8 @@ export function collectMetadataWarnings(
 
 export interface ScriptAnalysis {
   ok: boolean;
-  errors: string[];
-  warnings: string[];
+  errors: Diagnostic[];
+  warnings: Diagnostic[];
   metadata: {
     name: string;
     namespace: string;

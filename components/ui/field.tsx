@@ -65,7 +65,7 @@ export function Field({
       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
         <Label htmlFor={controlId} className="text-xs text-muted-foreground">
           {label}
-          {required && <span className="ml-0.5 text-destructive">*</span>}
+          {required && <span className="ms-0.5 text-destructive">*</span>}
         </Label>
         {labelAccessory}
       </div>

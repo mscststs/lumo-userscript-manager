@@ -117,6 +117,7 @@ export function MetadataPanel({
           >
             {(props) => (
               <Textarea
+                dir="ltr"
                 {...props}
                 value={linesOf(selfMetadata, field.key)}
                 onChange={(event) => onChange(field.key, toLines(event.target.value))}
@@ -248,6 +249,7 @@ export function MetadataPanel({
           >
             {(props) => (
               <Input
+                dir="ltr"
                 {...props}
                 value={selfMetadata[field.key]?.[0] ?? ''}
                 onChange={(event) =>

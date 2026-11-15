@@ -1,4 +1,6 @@
 import { useId } from 'react';
+import { useTranslation } from 'react-i18next';
+import { localeDirection } from '@/i18n/locales';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 
@@ -36,6 +38,8 @@ export function SectionNav<T extends string>({
   className,
 }: SectionNavProps<T>) {
   const id = useId();
+  const { i18n } = useTranslation();
+  const rtl = localeDirection(i18n.language) === 'rtl';
   const index = Math.max(
     0,
     items.findIndex((item) => item.value === value),
@@ -49,7 +53,7 @@ export function SectionNav<T extends string>({
       onKeyDown={(event) => {
         if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
         event.preventDefault();
-        const delta = event.key === 'ArrowRight' ? 1 : -1;
+        const delta = (event.key === 'ArrowRight' ? 1 : -1) * (rtl ? -1 : 1);
         const next = items[(index + delta + items.length) % items.length];
         if (next) onChange(next.value);
       }}

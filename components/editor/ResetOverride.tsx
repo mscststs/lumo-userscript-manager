@@ -19,7 +19,7 @@ export function ResetOverride({ onReset, className }: { onReset: () => void; cla
           onClick={onReset}
           aria-label={t('editor.resetField')}
           className={cn(
-            'ml-auto inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground',
+            'ms-auto inline-flex h-5 w-5 shrink-0 items-center justify-center rounded text-muted-foreground',
             'transition-colors duration-150 ease-standard hover:bg-accent hover:text-accent-foreground',
             className,
           )}

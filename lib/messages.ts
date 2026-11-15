@@ -1,8 +1,14 @@
+import { appErrorFromResponse } from '@/lib/errors';
+
 export interface BackgroundResponse<T> {
   ok: boolean;
   result?: T;
   error?: string;
+  /** Stable user-facing failure code (see `lib/errors.ts`). */
+  code?: string;
+  params?: Record<string, unknown>;
 }
+
 
 export async function sendBg<T = unknown>(
   type: string,
@@ -11,7 +17,9 @@ export async function sendBg<T = unknown>(
   const response = (await chrome.runtime.sendMessage({ type, payload })) as
     | BackgroundResponse<T>
     | undefined;
-  if (!response?.ok) throw new Error(response?.error ?? 'Background request failed.');
+  if (!response?.ok) {
+    throw appErrorFromResponse(response?.code, response?.error, response?.params);
+  }
   return response.result as T;
 }
 

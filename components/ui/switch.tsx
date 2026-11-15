@@ -37,8 +37,8 @@ const Switch = React.forwardRef<React.ComponentRef<typeof SwitchPrimitives.Root>
           'pointer-events-none block rounded-full bg-white shadow-elev1 ring-0',
           'transition-transform duration-150 ease-standard',
           size === 'sm'
-            ? 'h-3 w-3 data-[state=checked]:translate-x-3 data-[state=unchecked]:translate-x-0'
-            : 'h-4 w-4 data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0',
+            ? 'h-3 w-3 data-[state=checked]:translate-x-3 data-[state=unchecked]:translate-x-0 rtl:data-[state=checked]:-translate-x-3'
+            : 'h-4 w-4 data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0 rtl:data-[state=checked]:-translate-x-4',
         )}
       />
     </SwitchPrimitives.Root>

@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useErrorText } from '@/lib/use-error-text';
+import { appErrorFromResponse } from '@/lib/errors';
+import type { TranslationKey } from '@/i18n/keys';
 import {
   Check,
   Copy,
@@ -13,7 +16,12 @@ import {
   X,
 } from 'lucide-react';
 import type { AgentAuditEntry } from '@/lib/db';
-import type { AgentSettings, RuntimeStatus, UISettings } from '@/types';
+import type {
+  AgentSettings,
+  RuntimeStatus,
+  UISettings,
+  UserScriptsAvailabilityCode,
+} from '@/types';
 import { storage } from '@/store/storage';
 import { useStorageWatch } from '@/store/useStorageWatch';
 import { useAgentAccess } from '@/store/useAgentAccess';
@@ -60,6 +68,17 @@ export type SettingsSection = 'general' | 'updates' | 'data' | 'agent';
 const RUN_AT = RUN_AT_OPTIONS.filter((option) => DEFAULT_RUN_AT_VALUES.includes(option.value));
 const INJECT_INTO = INJECT_INTO_OPTIONS;
 const LOG_LEVELS = ['error', 'warn', 'info', 'debug'] as const;
+const LOG_LEVEL_KEYS: Record<(typeof LOG_LEVELS)[number], TranslationKey> = {
+  error: 'settings.logLevels.error',
+  warn: 'settings.logLevels.warn',
+  info: 'settings.logLevels.info',
+  debug: 'settings.logLevels.debug',
+};
+const RUNTIME_ERROR_KEYS: Record<UserScriptsAvailabilityCode, TranslationKey> = {
+  'api-unavailable': 'settings.runtimeErrors.api-unavailable',
+  'unexpected-result': 'settings.runtimeErrors.unexpected-result',
+  disabled: 'settings.runtimeErrors.disabled',
+};
 
 interface BackupStats {
   scripts: number;
@@ -73,7 +92,12 @@ interface ImportResult {
   imported: number;
   skipped: number;
   settingsImported: boolean;
-  failed: { name: string; message: string }[];
+  failed: {
+    name: string;
+    message: string;
+    code?: string;
+    params?: Record<string, unknown>;
+  }[];
 }
 
 type ImportConflict = 'overwrite' | 'skip';
@@ -94,6 +118,7 @@ interface SettingsPageProps {
  */
 export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
   const { t, i18n } = useTranslation();
+  const errorText = useErrorText();
   const toast = useToast();
   const [settings, setSettings] = useState<UISettings | null>(null);
   const [agent, setAgent] = useState<AgentSettings | null>(null);
@@ -126,7 +151,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
     try {
       setRuntime(await sendBg<RuntimeStatus>('runtime:status'));
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
   }, []);
 
@@ -134,11 +159,11 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
     storage
       .getUISettings()
       .then(setSettings)
-      .catch((e: Error) => setError(e.message));
+      .catch((e: Error) => setError(errorText(e)));
     storage
       .getAgentSettings()
       .then(setAgent)
-      .catch((e: Error) => setError(e.message));
+      .catch((e: Error) => setError(errorText(e)));
     void loadRuntime();
   }, [loadRuntime]);
 
@@ -146,7 +171,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
     try {
       setBackupStats(await sendBg<BackupStats>('backup:stats'));
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
   }, []);
 
@@ -194,7 +219,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
       }
       toast({ title: t('settings.saved'), variant: 'success' });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
   };
 
@@ -207,7 +232,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
       await storage.setAgentSettings(next);
       toast({ title: t('settings.saved'), variant: 'success' });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
   };
 
@@ -249,7 +274,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
       await agentAccess.approve(id);
       toast({ title: t('settings.agent.approved'), variant: 'success' });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
   };
 
@@ -257,7 +282,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
     try {
       await agentAccess.dismiss(id);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
   };
 
@@ -267,7 +292,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1500);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
   };
 
@@ -286,7 +311,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
     }
     // Errors crossing the runtime message boundary lose their class, so the
     // service worker's coded failures arrive as plain strings.
-    const message = error instanceof Error ? error.message : String(error);
+    const message = errorText(error);
     if (message === 'zip-missing-manifest') return t('settings.backupErrors.zipMissingManifest');
     if (message === 'invalid-format') return t('settings.backupErrors.invalidFormat');
     if (message === 'invalid-json') return t('settings.backupErrors.invalidJson');
@@ -535,7 +560,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
             {runtime?.lastError && (
               <p className="whitespace-pre-wrap break-words py-2.5 text-2xs leading-relaxed text-destructive">
                 {runtime.lastErrorCode
-                  ? t(`settings.runtimeErrors.${runtime.lastErrorCode}`)
+                  ? t(RUNTIME_ERROR_KEYS[runtime.lastErrorCode])
                   : runtime.lastError}
               </p>
             )}
@@ -571,7 +596,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
                   <SelectContent>
                     {LOG_LEVELS.map((level) => (
                       <SelectItem key={level} value={level}>
-                        <EnumValue label={t(`settings.logLevels.${level}`)} raw={level} />
+                        <EnumValue label={t(LOG_LEVEL_KEYS[level])} raw={level} />
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -638,7 +663,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
                         <Badge variant="outline">{request.version}</Badge>
                       )}
                     </div>
-                    <code className="mt-0.5 block select-all truncate font-mono text-2xs text-muted-foreground">
+                    <code className="mt-0.5 block select-all truncate font-mono text-2xs text-muted-foreground" dir="ltr">
                       {request.id}
                     </code>
                   </div>
@@ -749,6 +774,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
                       <div className="min-w-0 flex-1">
                         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                           <p
+                            dir="auto"
                             className={cn(
                               'min-w-0 truncate',
                               client.name
@@ -761,7 +787,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
                           {client.version && <Badge variant="outline">{client.version}</Badge>}
                         </div>
                         {client.name && (
-                          <code className="mt-0.5 block select-all truncate font-mono text-2xs text-muted-foreground">
+                          <code className="mt-0.5 block select-all truncate font-mono text-2xs text-muted-foreground" dir="ltr">
                             {client.id}
                           </code>
                         )}
@@ -797,6 +823,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
                     }}
                     placeholder={t('settings.agent.namePlaceholder')}
                     aria-label={t('settings.agent.namePlaceholder')}
+                    dir="auto"
                     className="min-w-0 flex-1 basis-32 text-xs"
                     maxLength={80}
                   />
@@ -812,6 +839,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
                     }}
                     placeholder={t('settings.agent.idPlaceholder')}
                     aria-label={t('settings.agent.idPlaceholder')}
+                    dir="ltr"
                     className="min-w-0 flex-1 basis-52 font-mono text-xs"
                     spellCheck={false}
                   />
@@ -892,7 +920,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
               />
               <Stat
                 label={t('settings.overviewCodeSize')}
-                value={backupStats ? formatBytes(backupStats.codeBytes) : '—'}
+                value={backupStats ? formatBytes(backupStats.codeBytes, i18n.language) : '—'}
               />
             </dl>
           </SettingsGroup>
@@ -1136,7 +1164,9 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
                             {failure.name}
                           </p>
                           <p className="whitespace-pre-wrap break-words text-2xs text-destructive">
-                            {failure.message}
+                            {errorText(
+                              appErrorFromResponse(failure.code, failure.message, failure.params),
+                            )}
                           </p>
                         </div>
                       ))}
@@ -1185,7 +1215,7 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
 function BackupMeta({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-2xs uppercase tracking-wider text-muted-foreground">{label}</dt>
+      <dt className="text-2xs text-muted-foreground">{label}</dt>
       <dd
         className="mt-0.5 truncate text-xs font-medium tabular-nums text-foreground"
         title={value}
@@ -1263,7 +1293,7 @@ function NumberField({
             commit();
           }
         }}
-        className="w-20 text-right tabular-nums"
+        className="w-20 text-end tabular-nums"
       />
       {suffix && <span className="text-xs text-muted-foreground">{suffix}</span>}
     </div>

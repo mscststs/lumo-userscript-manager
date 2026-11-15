@@ -28,14 +28,15 @@
  */
 
 import type { AccentColor, DarkTheme, ResolvedTheme, ThemeMode } from '@/types';
+import type { TranslationKey } from '@/i18n/keys';
 
 export type ThemeScheme = 'light' | 'dark';
 
 export interface ThemeDefinition {
   /** Drives the `.dark` class, `color-scheme`, and the Shiki dark overrides. */
   scheme: ThemeScheme;
-  labelKey: string;
-  descriptionKey: string;
+  labelKey: TranslationKey;
+  descriptionKey: TranslationKey;
   /**
    * The first-paint canvas colour. Must be byte-identical to the palette's
    * `--color-background` in `assets/globals.css`. OKLCH is used verbatim so
@@ -103,7 +104,7 @@ export const THEMES: Record<ResolvedTheme, ThemeDefinition> = {
 /** Accent presets. `hue`/`chroma`/`lightness` mirror the `[data-accent]` blocks. */
 export const ACCENTS: Record<
   AccentColor,
-  { labelKey: string; hue: number; chroma: number; lightness: number }
+  { labelKey: TranslationKey; hue: number; chroma: number; lightness: number }
 > = {
   azure: { labelKey: 'options.appearance.accentAzure', hue: 258, chroma: 0.17, lightness: 0.552 },
   violet: {
@@ -129,8 +130,8 @@ export const THEME_PALETTES = Object.keys(THEMES) as ResolvedTheme[];
 /** Palettes that can be selected for dark mode. */
 export const DARK_THEME_OPTIONS: {
   value: DarkTheme;
-  labelKey: string;
-  descriptionKey: string;
+  labelKey: TranslationKey;
+  descriptionKey: TranslationKey;
 }[] = (['dark', 'midnight'] as DarkTheme[]).map((value) => ({
   value,
   labelKey: THEMES[value].labelKey,
@@ -140,7 +141,7 @@ export const DARK_THEME_OPTIONS: {
 /** Light/dark preference, in display order (`system` last). */
 export const THEME_MODE_OPTIONS: {
   value: ThemeMode;
-  labelKey: string;
+  labelKey: TranslationKey;
 }[] = [
   { value: 'light', labelKey: 'options.appearance.modeLight' },
   { value: 'dark', labelKey: 'options.appearance.modeDark' },

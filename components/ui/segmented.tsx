@@ -1,4 +1,6 @@
 import * as React from 'react';
+import { useTranslation } from 'react-i18next';
+import { localeDirection } from '@/i18n/locales';
 import { motion } from 'motion/react';
 import { cn } from '@/lib/utils';
 
@@ -39,6 +41,8 @@ export function Segmented<T extends string>({
   size = 'default',
 }: SegmentedProps<T>) {
   const id = React.useId();
+  const { i18n } = useTranslation();
+  const rtl = localeDirection(i18n.language) === 'rtl';
   const activeIndex = Math.max(
     0,
     options.findIndex((option) => option.value === value),
@@ -47,7 +51,7 @@ export function Segmented<T extends string>({
   const handleKeyDown = (event: React.KeyboardEvent) => {
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
     event.preventDefault();
-    const delta = event.key === 'ArrowRight' ? 1 : -1;
+    const delta = (event.key === 'ArrowRight' ? 1 : -1) * (rtl ? -1 : 1);
     const nextIndex = (activeIndex + delta + options.length) % options.length;
     const next = options[nextIndex];
     if (next) onChange(next.value);

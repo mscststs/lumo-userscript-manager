@@ -1,0 +1,277 @@
+{
+  "am": {
+    "name": "Lumo የተጠቃሚ ስክሪፕቶች",
+    "description": "ለአሳሽዎ ኃይለኛ የተጠቃሚ ስክሪፕት አስተዳዳሪ",
+    "actionTitle": "የLumo የተጠቃሚ ስክሪፕቶችን ክፈት"
+  },
+  "ar": {
+    "name": "Lumo — مدير سكربتات المستخدم",
+    "description": "مدير سكربتات مستخدم قوي ومتقن لمتصفحك",
+    "actionTitle": "فتح Lumo — مدير سكربتات المستخدم"
+  },
+  "bg": {
+    "name": "Lumo — мениджър на потребителски скриптове",
+    "description": "Мощен мениджър на потребителски скриптове за вашия браузър",
+    "actionTitle": "Отвори Lumo — мениджър на потребителски скриптове"
+  },
+  "bn": {
+    "name": "Lumo ইউজারস্ক্রিপ্ট ম্যানেজার",
+    "description": "আপনার ব্রাউজারের জন্য একটি শক্তিশালী ইউজারস্ক্রিপ্ট ম্যানেজার",
+    "actionTitle": "Lumo ইউজারস্ক্রিপ্ট ম্যানেজার খুলুন"
+  },
+  "ca": {
+    "name": "Lumo — gestor d'userscripts",
+    "description": "Un gestor d'userscripts potent i ben cuidat per al navegador",
+    "actionTitle": "Obre Lumo — gestor d'userscripts"
+  },
+  "cs": {
+    "name": "Lumo — správce uživatelských skriptů",
+    "description": "Výkonný správce uživatelských skriptů pro váš prohlížeč",
+    "actionTitle": "Otevřít Lumo — správce uživatelských skriptů"
+  },
+  "da": {
+    "name": "Lumo — brugerscript-administrator",
+    "description": "En kraftfuld og gennemført brugerscript-administrator til din browser",
+    "actionTitle": "Åbn Lumo — brugerscript-administrator"
+  },
+  "de": {
+    "name": "Lumo Userscript-Manager",
+    "description": "Ein leistungsstarker Userscript-Manager für deinen Browser",
+    "actionTitle": "Lumo Userscript-Manager öffnen"
+  },
+  "el": {
+    "name": "Lumo — διαχειριστής σεναρίων χρήστη",
+    "description": "Ένας ισχυρός διαχειριστής σεναρίων χρήστη για το πρόγραμμα περιήγησής σας",
+    "actionTitle": "Άνοιγμα Lumo — διαχειριστής σεναρίων χρήστη"
+  },
+  "en": {
+    "name": "Lumo Userscripts",
+    "description": "A powerful, well-crafted userscript manager for your browser",
+    "actionTitle": "Open Lumo Userscripts"
+  },
+  "en_AU": {
+    "name": "Lumo Userscripts",
+    "description": "A powerful, well-crafted userscript manager for your browser",
+    "actionTitle": "Open Lumo Userscripts"
+  },
+  "en_GB": {
+    "name": "Lumo Userscripts",
+    "description": "A powerful, well-crafted userscript manager for your browser",
+    "actionTitle": "Open Lumo Userscripts"
+  },
+  "en_US": {
+    "name": "Lumo Userscripts",
+    "description": "A powerful, well-crafted userscript manager for your browser",
+    "actionTitle": "Open Lumo Userscripts"
+  },
+  "es": {
+    "name": "Lumo — gestor de scripts de usuario",
+    "description": "Un gestor de scripts de usuario potente y cuidado para tu navegador",
+    "actionTitle": "Abrir Lumo — gestor de scripts de usuario"
+  },
+  "es_419": {
+    "name": "Lumo — gestor de scripts de usuario",
+    "description": "Un gestor de scripts de usuario potente y cuidado para tu navegador",
+    "actionTitle": "Abrir Lumo — gestor de scripts de usuario"
+  },
+  "et": {
+    "name": "Lumo — kasutajaskriptide haldur",
+    "description": "Võimas ja hoolikalt loodud kasutajaskriptide haldur sinu brauserile",
+    "actionTitle": "Ava Lumo — kasutajaskriptide haldur"
+  },
+  "fa": {
+    "name": "Lumo — مدیر اسکریپت کاربر",
+    "description": "مدیر اسکریپت کاربر قدرتمند و دقیق برای مرورگر شما",
+    "actionTitle": "باز کردن Lumo — مدیر اسکریپت کاربر"
+  },
+  "fi": {
+    "name": "Lumo — käyttäjäskriptien hallinta",
+    "description": "Tehokas ja huolellisesti tehty käyttäjäskriptien hallinta selaimellesi",
+    "actionTitle": "Avaa Lumo — käyttäjäskriptien hallinta"
+  },
+  "fil": {
+    "name": "Lumo Userskript Manager",
+    "description": "Isang makapangyarihan at maingat na userscript manager para sa iyong browser",
+    "actionTitle": "Buksan ang Lumo Userskript Manager"
+  },
+  "fr": {
+    "name": "Lumo — gestionnaire de scripts utilisateur",
+    "description": "Un gestionnaire de scripts utilisateur puissant et soigné pour votre navigateur",
+    "actionTitle": "Ouvrir Lumo — gestionnaire de scripts utilisateur"
+  },
+  "gu": {
+    "name": "Lumo યુઝરસ્ક્રિપ્ટ મેનેજર",
+    "description": "તમારા બ્રાઉઝર માટે શક્તિશાળી અને સુવ્યવસ્થિત યુઝરસ્ક્રિપ્ટ મેનેજર",
+    "actionTitle": "Lumo યુઝરસ્ક્રિપ્ટ મેનેજર ખોલો"
+  },
+  "he": {
+    "name": "Lumo — מנהל סקריפטים למשתמש",
+    "description": "מנהל סקריפטים למשתמש חזק ומלוטש לדפדפן שלך",
+    "actionTitle": "פתיחת Lumo — מנהל סקריפטים למשתמש"
+  },
+  "hi": {
+    "name": "Lumo यूज़रस्क्रिप्ट मैनेजर",
+    "description": "आपके ब्राउज़र के लिए एक शक्तिशाली और बेहतरीन यूज़रस्क्रिप्ट मैनेजर",
+    "actionTitle": "Lumo यूज़रस्क्रिप्ट मैनेजर खोलें"
+  },
+  "hr": {
+    "name": "Lumo — upravitelj korisničkih skripti",
+    "description": "Snažan i pažljivo izrađen upravitelj korisničkih skripti za vaš preglednik",
+    "actionTitle": "Otvori Lumo — upravitelj korisničkih skripti"
+  },
+  "hu": {
+    "name": "Lumo — felhasználói szkriptkezelő",
+    "description": "Erőteljes, gondosan elkészített felhasználói szkriptkezelő a böngésződhöz",
+    "actionTitle": "Lumo — felhasználói szkriptkezelő megnyitása"
+  },
+  "id": {
+    "name": "Lumo Pengelola Userscript",
+    "description": "Pengelola userscript yang kuat dan tertata untuk browser Anda",
+    "actionTitle": "Buka Lumo Pengelola Userscript"
+  },
+  "it": {
+    "name": "Lumo — gestore di script utente",
+    "description": "Un gestore di script utente potente e curato per il tuo browser",
+    "actionTitle": "Apri Lumo — gestore di script utente"
+  },
+  "ja": {
+    "name": "Lumo ユーザースクリプトマネージャー",
+    "description": "ブラウザ向けの強力で使いやすいユーザースクリプトマネージャー",
+    "actionTitle": "Lumo ユーザースクリプトマネージャーを開く"
+  },
+  "kn": {
+    "name": "Lumo ಯೂಸರ್‌ಸ್ಕ್ರಿಪ್ಟ್ ಮ್ಯಾನೇಜರ್",
+    "description": "ನಿಮ್ಮ ಬ್ರೌಸರ್‌ಗಾಗಿ ಶಕ್ತಿಶಾಲಿ ಮತ್ತು ಚೆನ್ನಾಗಿ ರೂಪಿಸಿದ ಯೂಸರ್‌ಸ್ಕ್ರಿಪ್ಟ್ ಮ್ಯಾನೇಜರ್",
+    "actionTitle": "Lumo ಯೂಸರ್‌ಸ್ಕ್ರಿಪ್ಟ್ ಮ್ಯಾನೇಜರ್ ತೆರೆಯಿರಿ"
+  },
+  "ko": {
+    "name": "Lumo 사용자 스크립트 관리자",
+    "description": "브라우저를 위한 강력하고 정교한 사용자 스크립트 관리자",
+    "actionTitle": "Lumo 사용자 스크립트 관리자 열기"
+  },
+  "lt": {
+    "name": "Lumo — vartotojo scenarijų tvarkytuvas",
+    "description": "Galingas ir kruopščiai sukurtas vartotojo scenarijų tvarkytuvas jūsų naršyklei",
+    "actionTitle": "Atidaryti Lumo — vartotojo scenarijų tvarkytuvas"
+  },
+  "lv": {
+    "name": "Lumo — lietotāja skriptu pārvaldnieks",
+    "description": "Jaudīgs un rūpīgi veidots lietotāja skriptu pārvaldnieks jūsu pārlūkam",
+    "actionTitle": "Atvērt Lumo — lietotāja skriptu pārvaldnieks"
+  },
+  "ml": {
+    "name": "Lumo ഉപയോക്തൃസ്ക്രിപ്റ്റ് മാനേജർ",
+    "description": "നിങ്ങളുടെ ബ്രൗസറിനായി ശക്തവും മികച്ചതുമായ ഉപയോക്തൃസ്ക്രിപ്റ്റ് മാനേജർ",
+    "actionTitle": "Lumo ഉപയോക്തൃസ്ക്രിപ്റ്റ് മാനേജർ തുറക്കുക"
+  },
+  "mr": {
+    "name": "Lumo यूजरस्क्रिप्ट मॅनेजर",
+    "description": "तुमच्या ब्राउझरसाठी शक्तिशाली आणि उत्तम रचलेला यूजरस्क्रिप्ट मॅनेजर",
+    "actionTitle": "Lumo यूजरस्क्रिप्ट मॅनेजर उघडा"
+  },
+  "ms": {
+    "name": "Lumo Pengurus Userscript",
+    "description": "Pengurus userscript yang berkuasa dan tersusun untuk pelayar anda",
+    "actionTitle": "Buka Lumo Pengurus Userscript"
+  },
+  "nl": {
+    "name": "Lumo — gebruikersscriptbeheerder",
+    "description": "Een krachtige, zorgvuldig gemaakte gebruikersscriptbeheerder voor je browser",
+    "actionTitle": "Lumo — gebruikersscriptbeheerder openen"
+  },
+  "no": {
+    "name": "Lumo — brukerskriptbehandler",
+    "description": "En kraftig og gjennomført brukerskriptbehandler for nettleseren din",
+    "actionTitle": "Åpne Lumo — brukerskriptbehandler"
+  },
+  "pl": {
+    "name": "Lumo — menedżer skryptów użytkownika",
+    "description": "Wydajny i dopracowany menedżer skryptów użytkownika do Twojej przeglądarki",
+    "actionTitle": "Otwórz Lumo — menedżer skryptów użytkownika"
+  },
+  "pt_BR": {
+    "name": "Lumo — gerenciador de scripts de usuário",
+    "description": "Um gerenciador de scripts de usuário poderoso e bem elaborado para seu navegador",
+    "actionTitle": "Abrir Lumo — gerenciador de scripts de usuário"
+  },
+  "pt_PT": {
+    "name": "Lumo — gestor de scripts de utilizador",
+    "description": "Um gestor de scripts de utilizador poderoso e cuidado para o seu navegador",
+    "actionTitle": "Abrir Lumo — gestor de scripts de utilizador"
+  },
+  "ro": {
+    "name": "Lumo — manager de scripturi de utilizator",
+    "description": "Un manager de scripturi de utilizator puternic și bine realizat pentru browserul tău",
+    "actionTitle": "Deschide Lumo — manager de scripturi de utilizator"
+  },
+  "ru": {
+    "name": "Lumo — менеджер пользовательских скриптов",
+    "description": "Мощный и продуманный менеджер пользовательских скриптов для вашего браузера",
+    "actionTitle": "Открыть Lumo — менеджер пользовательских скриптов"
+  },
+  "sk": {
+    "name": "Lumo — správca používateľských skriptov",
+    "description": "Výkonný a starostlivo vytvorený správca používateľských skriptov pre váš prehliadač",
+    "actionTitle": "Otvoriť Lumo — správca používateľských skriptov"
+  },
+  "sl": {
+    "name": "Lumo — upravitelj uporabniških skriptov",
+    "description": "Zmogljiv in skrbno izdelan upravitelj uporabniških skriptov za vaš brskalnik",
+    "actionTitle": "Odpri Lumo — upravitelj uporabniških skriptov"
+  },
+  "sr": {
+    "name": "Lumo — менаџер корисничких скрипти",
+    "description": "Моћан и пажљиво израђен менаџер корисничких скрипти за ваш прегледач",
+    "actionTitle": "Отвори Lumo — менаџер корисничких скрипти"
+  },
+  "sv": {
+    "name": "Lumo — användarskriptshanterare",
+    "description": "En kraftfull och genomtänkt användarskriptshanterare för din webbläsare",
+    "actionTitle": "Öppna Lumo — användarskriptshanterare"
+  },
+  "sw": {
+    "name": "Lumo Msimamizi wa Skripti za Mtumiaji",
+    "description": "Msimamizi wa skripti za mtumiaji mwenye nguvu na ulioandaliwa vyema kwa kivinjari chako",
+    "actionTitle": "Fungua Lumo Msimamizi wa Skripti za Mtumiaji"
+  },
+  "ta": {
+    "name": "Lumo பயனர் ஸ்கிரிப்ட் மேலாளர்",
+    "description": "உங்கள் உலாவிக்கான சக்திவாய்ந்த, நன்கு வடிவமைக்கப்பட்ட பயனர் ஸ்கிரிப்ட் மேலாளர்",
+    "actionTitle": "Lumo பயனர் ஸ்கிரிப்ட் மேலாளரைத் திறக்கவும்"
+  },
+  "te": {
+    "name": "Lumo యూజర్‌స్క్రిప్ట్ మేనేజర్",
+    "description": "మీ బ్రౌజర్ కోసం శక్తివంతమైన, చక్కగా రూపొందించిన యూజర్‌స్క్రిప్ట్ మేనేజర్",
+    "actionTitle": "Lumo యూజర్‌స్క్రిప్ట్ మేనేజర్ తెరవండి"
+  },
+  "th": {
+    "name": "Lumo ตัวจัดการยูสเซอร์สคริปต์",
+    "description": "ตัวจัดการยูสเซอร์สคริปต์ที่ทรงพลังและออกแบบมาอย่างดีสำหรับเบราว์เซอร์ของคุณ",
+    "actionTitle": "เปิด Lumo ตัวจัดการยูสเซอร์สคริปต์"
+  },
+  "tr": {
+    "name": "Lumo Kullanıcı Betiği Yöneticisi",
+    "description": "Tarayıcınız için güçlü ve özenle hazırlanmış kullanıcı betiği yöneticisi",
+    "actionTitle": "Lumo Kullanıcı Betiği Yöneticisi'ni aç"
+  },
+  "uk": {
+    "name": "Lumo — менеджер користувацьких скриптів",
+    "description": "Потужний і ретельно продуманий менеджер користувацьких скриптів для вашого браузера",
+    "actionTitle": "Відкрити Lumo — менеджер користувацьких скриптів"
+  },
+  "vi": {
+    "name": "Lumo Trình quản lý userscript",
+    "description": "Trình quản lý userscript mạnh mẽ và được trau chuốt cho trình duyệt của bạn",
+    "actionTitle": "Mở Lumo Trình quản lý userscript"
+  },
+  "zh_CN": {
+    "name": "Lumo 用户脚本管理器",
+    "description": "一个强大、好用的浏览器用户脚本管理器",
+    "actionTitle": "打开 Lumo 用户脚本管理器"
+  },
+  "zh_TW": {
+    "name": "Lumo 使用者腳本管理器",
+    "description": "一個強大、好用的瀏覽器使用者腳本管理器",
+    "actionTitle": "開啟 Lumo 使用者腳本管理器"
+  }
+}

@@ -1,4 +1,5 @@
 import type { ScriptMetadata } from '@/types';
+import { diagnostic, type Diagnostic } from '@/lib/diagnostics';
 
 const META_BLOCK_RE = /\/\/[ \t]*==UserScript==([\s\S]*?)\/\/[ \t]*==\/UserScript==/m;
 const META_LINE_RE = /^[ \t]*\/\/[ \t]*@([^\s]+)[ \t]*(.*)$/;
@@ -6,8 +7,8 @@ const META_LINE_RE = /^[ \t]*\/\/[ \t]*@([^\s]+)[ \t]*(.*)$/;
 export interface ParsedMetadata {
   metadata: ScriptMetadata;
   metaStr: string;
-  errors: string[];
-  warnings: string[];
+  errors: Diagnostic[];
+  warnings: Diagnostic[];
 }
 
 /** Split `name url` declarations used by `@resource`. */
@@ -18,8 +19,8 @@ export function parseResourceDeclaration(value: string): { name: string; url: st
 
 /** Parse the `==UserScript==` block. Never throws; problems are returned. */
 export function parseMetadata(code: string): ParsedMetadata {
-  const errors: string[] = [];
-  const warnings: string[] = [];
+  const errors: Diagnostic[] = [];
+  const warnings: Diagnostic[] = [];
   const metadata: ScriptMetadata = Object.create(null);
   const block = META_BLOCK_RE.exec(code);
 
@@ -27,7 +28,12 @@ export function parseMetadata(code: string): ParsedMetadata {
     return {
       metadata,
       metaStr: '',
-      errors: ['No ==UserScript== metadata block found.'],
+      errors: [
+        diagnostic(
+          'metadata.blockMissing',
+          'No ==UserScript== metadata block found.',
+        ),
+      ],
       warnings,
     };
   }
@@ -45,24 +51,39 @@ export function parseMetadata(code: string): ParsedMetadata {
     values.push(value);
   }
 
-  if (!metadata.name?.[0]) errors.push('@name is required.');
+  if (!metadata.name?.[0]) {
+    errors.push(diagnostic('metadata.nameRequired', '@name is required.'));
+  }
   if (metadata.namespace === undefined) metadata.namespace = [''];
 
   if (metadata.grant?.includes('none') && metadata.grant.length > 1) {
     metadata.grant = ['none'];
-    warnings.push('@grant none ignores the other @grant entries.');
+    warnings.push(
+      diagnostic(
+        'metadata.grantNoneIgnoresOthers',
+        '@grant none ignores the other @grant entries.',
+      ),
+    );
   }
 
   // A malformed match pattern is a hard error: silently dropping it makes a
   // script appear installed but never run.
   for (const pattern of metadata.match ?? []) {
     if (!isValidMatchPattern(pattern)) {
-      errors.push(`Invalid @match pattern: ${pattern}`);
+      errors.push(
+        diagnostic('metadata.matchInvalid', `Invalid @match pattern: ${pattern}`, { pattern }),
+      );
     }
   }
   for (const pattern of metadata['exclude-match'] ?? []) {
     if (!isValidMatchPattern(pattern)) {
-      errors.push(`Invalid @exclude-match pattern: ${pattern}`);
+      errors.push(
+        diagnostic(
+          'metadata.excludeMatchInvalid',
+          `Invalid @exclude-match pattern: ${pattern}`,
+          { pattern },
+        ),
+      );
     }
   }
 
@@ -70,9 +91,21 @@ export function parseMetadata(code: string): ParsedMetadata {
   for (const value of metadata.resource ?? []) {
     const resource = parseResourceDeclaration(value);
     if (!resource) {
-      warnings.push(`Invalid @resource declaration: ${value}`);
+      warnings.push(
+        diagnostic(
+          'metadata.resourceInvalid',
+          `Invalid @resource declaration: ${value}`,
+          { value },
+        ),
+      );
     } else if (resourceNames.has(resource.name)) {
-      warnings.push(`Duplicate @resource name: ${resource.name}`);
+      warnings.push(
+        diagnostic(
+          'metadata.resourceDuplicate',
+          `Duplicate @resource name: ${resource.name}`,
+          { name: resource.name },
+        ),
+      );
     } else {
       resourceNames.add(resource.name);
     }
@@ -90,11 +123,19 @@ export function parseMetadata(code: string): ParsedMetadata {
       'early-start',
     ].includes(runAt)
   ) {
-    warnings.push(`Unknown @run-at value: ${runAt}`);
+    warnings.push(
+      diagnostic('metadata.runAtUnknown', `Unknown @run-at value: ${runAt}`, { value: runAt }),
+    );
   }
   const injectInto = metadata['inject-into']?.[0];
   if (injectInto && !['auto', 'page', 'content'].includes(injectInto)) {
-    warnings.push(`Unknown @inject-into value: ${injectInto}`);
+    warnings.push(
+      diagnostic(
+        'metadata.injectIntoUnknown',
+        `Unknown @inject-into value: ${injectInto}`,
+        { value: injectInto },
+      ),
+    );
   }
 
   return { metadata, metaStr, errors, warnings };

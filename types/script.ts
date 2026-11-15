@@ -1,3 +1,5 @@
+import type { Diagnostic } from '@/lib/diagnostics';
+
 /** Normalized `@run-at` values, plus two non-standard extras. */
 export type ScriptRunAt =
   | 'document-start'
@@ -247,6 +249,6 @@ export interface InstallDraftSummary {
   includes: string[];
   code: string;
   codeSize: number;
-  warnings: string[];
-  errors: string[];
+  warnings: Diagnostic[];
+  errors: Diagnostic[];
 }

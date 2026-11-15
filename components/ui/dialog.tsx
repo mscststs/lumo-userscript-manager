@@ -1,6 +1,7 @@
 import * as React from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@/lib/utils';
 
 /**
@@ -46,12 +47,15 @@ interface DialogContentProps
 const DialogContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
   DialogContentProps
->(({ className, children, showCloseButton = true, closeLabel = 'Close', role = 'dialog', ...props }, ref) => (
+>(({ className, children, showCloseButton = true, closeLabel, role = 'dialog', ...props }, ref) => {
+  const { t } = useTranslation();
+  const label = closeLabel ?? t('common.close');
+  return (
   <DialogPrimitive.Portal>
     <DialogOverlay />
     {/*
       Centring is done by this flex wrapper rather than the usual
-      `top-1/2 left-1/2 -translate-1/2` trick. In Tailwind v4 `-translate-*`
+      `top-1/2 start-1/2 -translate-1/2` trick. In Tailwind v4 `-translate-*`
       compiles to the standalone `translate` property, not `transform`; a
       keyframe animating `transform` therefore composes with it instead of
       overriding it, which made the panel fly in from the top-left corner.
@@ -71,8 +75,8 @@ const DialogContent = React.forwardRef<
         {children}
         {showCloseButton && (
           <DialogPrimitive.Close
-            className="absolute right-3 top-3 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            aria-label={closeLabel}
+            className="absolute end-3 top-3 rounded-md p-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            aria-label={label}
           >
             <X className="h-3.5 w-3.5" />
           </DialogPrimitive.Close>
@@ -80,11 +84,12 @@ const DialogContent = React.forwardRef<
       </DialogPrimitive.Content>
     </div>
   </DialogPrimitive.Portal>
-));
+  );
+});
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
 function DialogHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn('flex flex-col gap-1 pr-8', className)} {...props} />;
+  return <div className={cn('flex flex-col gap-1 pe-8', className)} {...props} />;
 }
 
 function DialogBody({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {

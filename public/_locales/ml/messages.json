@@ -1,0 +1,14 @@
+{
+  "extName": {
+    "message": "Lumo ഉപയോക്തൃസ്ക്രിപ്റ്റ് മാനേജർ",
+    "description": "The display name of the extension."
+  },
+  "extDescription": {
+    "message": "നിങ്ങളുടെ ബ്രൗസറിനായി ശക്തവും മികച്ചതുമായ ഉപയോക്തൃസ്ക്രിപ്റ്റ് മാനേജർ",
+    "description": "The description of the extension shown in browser extension stores (Chrome Web Store, Microsoft Edge Add-ons) and the extension management page."
+  },
+  "actionTitle": {
+    "message": "Lumo ഉപയോക്തൃസ്ക്രിപ്റ്റ് മാനേജർ തുറക്കുക",
+    "description": "Tooltip shown when hovering the extension's toolbar icon."
+  }
+}

@@ -20,6 +20,7 @@ import {
 import { checkUserScriptsAvailable, getRuntimeStatus } from '@/lib/background/registry';
 import { evaluateScripts } from '@/lib/background/matching';
 import { analyzeScriptCode } from '@/lib/script/analyze';
+import { formatDiagnostic } from '@/lib/diagnostics';
 import { applyEdits } from '@/lib/script/edit';
 import { splitTags } from '@/lib/script/metadata';
 import { resolveAgentAccess, type AgentAccess } from './policy';
@@ -400,8 +401,8 @@ export function registerAgentTools(
         if (!analysis.ok) {
           return failed({
             code: 'INVALID_CODE',
-            errors: analysis.errors,
-            warnings: analysis.warnings,
+            errors: analysis.errors.map(formatDiagnostic),
+            warnings: analysis.warnings.map(formatDiagnostic),
           });
         }
         const review = access.settings.reviewWrites;
@@ -414,7 +415,7 @@ export function registerAgentTools(
           ok: true,
           reviewRequired: review,
           script: toSummary(record),
-          warnings: analysis.warnings,
+          warnings: analysis.warnings.map(formatDiagnostic),
         });
       }),
   );
@@ -472,8 +473,8 @@ export function registerAgentTools(
         if (!analysis.ok) {
           return failed({
             code: 'INVALID_CODE',
-            errors: analysis.errors,
-            warnings: analysis.warnings,
+            errors: analysis.errors.map(formatDiagnostic),
+            warnings: analysis.warnings.map(formatDiagnostic),
             note: 'Nothing was saved.',
           });
         }
@@ -486,7 +487,7 @@ export function registerAgentTools(
             strategy: applied.strategy,
             line: applied.line,
           })),
-          warnings: analysis.warnings,
+          warnings: analysis.warnings.map(formatDiagnostic),
           effectiveOnNextLoad: next.enabled && !next.removedAt,
         });
       }),
@@ -547,11 +548,11 @@ export function registerAgentTools(
           if (!analysis.ok) {
             return failed({
               code: 'INVALID_CODE',
-              errors: analysis.errors,
-              warnings: analysis.warnings,
+              errors: analysis.errors.map(formatDiagnostic),
+              warnings: analysis.warnings.map(formatDiagnostic),
             });
           }
-          warnings.push(...analysis.warnings);
+          warnings.push(...analysis.warnings.map(formatDiagnostic));
           next = await saveScriptFromCode(script.uuid, args.code, sourceUrl);
         }
         if (args.selfMetadata) {
@@ -592,7 +593,7 @@ export function registerAgentTools(
         target.uuid = committed.uuid;
         const script = await getScript(committed.uuid);
         const warnings = Array.isArray(prepared.summary.warnings)
-          ? prepared.summary.warnings
+          ? prepared.summary.warnings.map(formatDiagnostic)
           : [];
         return ok({
           ok: true,

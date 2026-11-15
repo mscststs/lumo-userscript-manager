@@ -1,15 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import path from 'node:path';
-import { en } from '@/i18n/en';
-import { zh } from '@/i18n/zh';
+import { DEFAULT_LOCALE, LOCALES } from '@/i18n/locales';
 import {
   ACCENT_OPTIONS,
   DARK_THEME_OPTIONS,
   THEME_MODE_OPTIONS,
 } from '@/lib/theme-registry';
 import { FONT_SIZE_OPTIONS } from '@/lib/font-size-registry';
-import { LANGUAGES } from '@/lib/language';
 
 function flatten(source: object, prefix = ''): string[] {
   return Object.entries(source).flatMap(([key, value]) => {
@@ -36,7 +34,7 @@ function usedKeys(): Set<string> {
       const key = match[1]!;
       // Doc comments show example calls (`t('...apiKey')`); only namespaced
       // keys are real translation lookups.
-      if (/^(common|app|popup|options|scripts|metadata|editor|settings|logs|install|errors)\./.test(key)) {
+      if (/^(common|app|popup|options|scripts|metadata|editor|settings|logs|install|errors|diagnostics)\./.test(key)) {
         keys.add(key);
       }
     }
@@ -44,27 +42,44 @@ function usedKeys(): Set<string> {
   return keys;
 }
 
+const PLURAL_SUFFIX = /_(zero|one|two|few|many|other)$/;
+
+function keySet(bundle: object): Set<string> {
+  const keys = new Set<string>();
+  for (const key of flatten(bundle)) keys.add(key.replace(PLURAL_SUFFIX, ''));
+  return keys;
+}
+
+const localeDir = path.resolve(__dirname, '../i18n/locales');
+const bundles = readdirSync(localeDir)
+  .filter((file) => file.endsWith('.json'))
+  .map((file) => [file.replace(/\.json$/, ''), JSON.parse(readFileSync(path.join(localeDir, file), 'utf8'))] as const);
+const en = bundles.find(([tag]) => tag === DEFAULT_LOCALE)![1];
+
 describe('i18n resources', () => {
-  it('ships the same key set in every language', () => {
-    expect(flatten(zh).sort()).toEqual(flatten(en).sort());
+  it('ships a complete bundle for every registered locale', () => {
+    expect(bundles).toHaveLength(LOCALES.length);
+    const canonical = [...keySet(en)].sort();
+    for (const [tag, bundle] of bundles) {
+      expect([...keySet(bundle)].sort(), tag).toEqual(canonical);
+    }
   });
 
   it('resolves every static t() key used by the UI', () => {
-    const keys = new Set(flatten(en));
+    const keys = keySet(en);
     for (const key of usedKeys()) {
       expect(keys.has(key), `missing translation for ${key}`).toBe(true);
     }
   });
 
   it('resolves every registry label key', () => {
-    const keys = new Set(flatten(en));
+    const keys = keySet(en);
     const registryKeys = [
       ...THEME_MODE_OPTIONS.map((option) => option.labelKey),
       ...DARK_THEME_OPTIONS.map((option) => option.labelKey),
       ...DARK_THEME_OPTIONS.map((option) => option.descriptionKey),
       ...ACCENT_OPTIONS.map((option) => option.labelKey),
       ...FONT_SIZE_OPTIONS.map((option) => option.labelKey),
-      ...LANGUAGES.map((option) => option.labelKey),
     ];
 
     for (const key of registryKeys) {

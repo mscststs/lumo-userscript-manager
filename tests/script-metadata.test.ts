@@ -45,7 +45,7 @@ describe('metadata parser', () => {
     const parsed = parseMetadata(
       '// ==UserScript==\n// @name X\n// @match not-a-pattern\n// ==/UserScript==',
     );
-    expect(parsed.errors.some((error) => error.includes('Invalid @match'))).toBe(true);
+    expect(parsed.errors.some((error) => error.message.includes('Invalid @match'))).toBe(true);
   });
 
   it('normalizes @grant none', () => {

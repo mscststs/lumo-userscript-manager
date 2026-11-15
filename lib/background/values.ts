@@ -1,4 +1,5 @@
 import { getScript, getValues, setStoredValue, deleteStoredValue } from '@/lib/db';
+import { AppError } from '@/lib/errors';
 import { getStorageName } from '@/lib/script/storage-name';
 import { mergeMetadata } from '@/lib/script/metadata';
 import { broadcastToHosts } from './host-ports';
@@ -8,7 +9,7 @@ export async function getValuesForScript(uuid: string): Promise<{
   values: Record<string, unknown>;
 }> {
   const script = await getScript(uuid);
-  if (!script) throw new Error('Script not found.');
+  if (!script) throw new AppError('script.notFound', undefined, 'Script not found.');
   const storageName = getStorageName({ ...script, metadata: mergeMetadata(script.metadata, script.selfMetadata) });
   return { storageName, values: await getValues(storageName) };
 }
@@ -28,7 +29,7 @@ export async function setValueForScript(
   options: { originUuid?: string } = {},
 ): Promise<void> {
   const script = await getScript(uuid);
-  if (!script) throw new Error('Script not found.');
+  if (!script) throw new AppError('script.notFound', undefined, 'Script not found.');
   const storageName = getStorageName({ ...script, metadata: mergeMetadata(script.metadata, script.selfMetadata) });
   const values = await getValues(storageName);
   const oldValue = values[key];

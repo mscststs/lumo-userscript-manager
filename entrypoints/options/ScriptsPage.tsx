@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useErrorText } from '@/lib/use-error-text';
+import { appErrorFromResponse } from '@/lib/errors';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   FileCode2,
@@ -76,6 +78,7 @@ interface PendingAction {
 
 export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
   const { t, i18n } = useTranslation();
+  const errorText = useErrorText();
   const toast = useToast();
   const [scripts, setScripts] = useState<ManagerScript[]>([]);
   const [loading, setLoading] = useState(true);
@@ -100,7 +103,7 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
     try {
       setScripts(await sendBg<ManagerScript[]>('scripts:list', { includeRemoved: showTrash }));
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setLoading(false);
     }
@@ -186,7 +189,7 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
       setScripts(previous);
       toast({
         title: t('common.error'),
-        description: e instanceof Error ? e.message : String(e),
+        description: errorText(e),
         variant: 'error',
       });
     }
@@ -198,7 +201,7 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
       toast({ title: t('scripts.movedToTrash'), description: script.name, variant: 'success' });
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
   };
 
@@ -207,7 +210,7 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
       await sendBg('scripts:purge', { uuid: script.uuid });
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
   };
 
@@ -216,7 +219,7 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
       await sendBg('scripts:restore', { uuid: script.uuid });
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
   };
 
@@ -227,16 +230,25 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
         checked: number;
         updated: number;
         available: number;
-        errors: string[];
+        errors: { script: string; code: Parameters<typeof appErrorFromResponse>[0]; message: string; params?: Record<string, unknown> }[];
       }>('updates:check');
       toast({
         title: t('scripts.checkUpdatesDone', result),
-        description: result.errors?.length ? result.errors.join('\n') : undefined,
+        description: result.errors?.length
+          ? result.errors
+              .map(
+                (item) =>
+                  `${item.script}: ${errorText(
+                    appErrorFromResponse(item.code, item.message, item.params),
+                  )}`,
+              )
+              .join('\n')
+          : undefined,
         variant: result.errors?.length ? 'error' : 'success',
       });
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setChecking(false);
     }
@@ -258,7 +270,7 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
       }
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }
@@ -280,7 +292,7 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
         url: `${chrome.runtime.getURL('install.html')}?token=${token}`,
       });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }
@@ -319,7 +331,7 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
       setSelected(new Set());
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }
@@ -378,20 +390,20 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
       {/* Toolbar: search grows, filter stays compact, trash is a toggle. */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-0 flex-1 basis-56">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Search className="pointer-events-none absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={t('scripts.searchPlaceholder')}
             aria-label={t('scripts.searchPlaceholder')}
-            className="pl-8"
+            className="ps-8"
           />
           {query && (
             <button
               type="button"
               onClick={() => setQuery('')}
               aria-label={t('common.clear')}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
+              className="absolute end-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
             >
               <X className="h-3 w-3" />
             </button>
@@ -543,7 +555,7 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 16, opacity: 0 }}
             transition={{ duration: 0.18, ease: [0.16, 1, 0.3, 1] }}
-            className="sticky bottom-3 z-30 mx-auto mt-3 flex w-fit max-w-full flex-wrap items-center gap-1 rounded-card border border-border bg-popover py-1 pl-1 pr-1.5 shadow-elev3"
+            className="sticky bottom-3 z-30 mx-auto mt-3 flex w-fit max-w-full flex-wrap items-center gap-1 rounded-card border border-border bg-popover py-1 ps-1 pe-1.5 shadow-elev3"
           >
             <Checkbox
               checked={allSelected}
@@ -551,7 +563,7 @@ export function ScriptsPage({ onOpenEditor }: ScriptsPageProps) {
               onCheckedChange={toggleAll}
               label={t('scripts.selectAll')}
             />
-            <span className="pr-1.5 text-xs tabular-nums text-muted-foreground">
+            <span className="pe-1.5 text-xs tabular-nums text-muted-foreground">
               {t('scripts.selected', { count: selected.size })}
             </span>
             <span className="mx-0.5 h-5 w-px bg-border" aria-hidden="true" />
@@ -704,7 +716,7 @@ function ScriptRow({
         type="button"
         onClick={onOpen}
         disabled={removed}
-        className="min-w-0 rounded-sm text-left disabled:cursor-default"
+        className="min-w-0 rounded-sm text-start disabled:cursor-default"
       >
         <span className="flex min-w-0 items-center gap-2">
           <span
@@ -713,6 +725,7 @@ function ScriptRow({
               off ? 'text-muted-foreground' : 'text-foreground',
             )}
             title={script.name}
+            dir="auto"
           >
             {script.name}
           </span>
@@ -731,25 +744,25 @@ function ScriptRow({
               <span aria-hidden="true">·</span>
             </>
           )}
-          <span className="min-w-0 truncate">{script.namespace || t('scripts.noSource')}</span>
+          <span className="min-w-0 truncate" dir="auto">{script.namespace || t('scripts.noSource')}</span>
           <span aria-hidden="true">·</span>
-          <span className="shrink-0 tabular-nums">{formatBytes(script.codeSize)}</span>
+          <span className="shrink-0 tabular-nums">{formatBytes(script.codeSize, locale)}</span>
           <span aria-hidden="true" className="hidden sm:inline">
             ·
           </span>
-          <span className="hidden min-w-0 truncate font-mono sm:inline">
+          <span className="hidden min-w-0 truncate font-mono sm:inline" dir="ltr">
             {matches.slice(0, 2).join(', ') || t('install.allPages')}
           </span>
         </span>
         {script.lastError && (
-          <span className="mt-0.5 block truncate text-2xs text-destructive">
+          <span className="mt-0.5 block truncate text-2xs text-destructive" dir="auto">
             {script.lastError}
           </span>
         )}
       </button>
 
       <span
-        className="hidden whitespace-nowrap text-right text-2xs tabular-nums text-muted-foreground sm:block"
+        className="hidden whitespace-nowrap text-end text-2xs tabular-nums text-muted-foreground sm:block"
         title={t('scripts.updatedAt', { time: formatDateTime(script.updatedAt, locale) })}
       >
         {formatRelativeTime(script.updatedAt, locale, now)}

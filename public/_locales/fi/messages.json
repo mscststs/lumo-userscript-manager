@@ -1,0 +1,14 @@
+{
+  "extName": {
+    "message": "Lumo — käyttäjäskriptien hallinta",
+    "description": "The display name of the extension."
+  },
+  "extDescription": {
+    "message": "Tehokas ja huolellisesti tehty käyttäjäskriptien hallinta selaimellesi",
+    "description": "The description of the extension shown in browser extension stores (Chrome Web Store, Microsoft Edge Add-ons) and the extension management page."
+  },
+  "actionTitle": {
+    "message": "Avaa Lumo — käyttäjäskriptien hallinta",
+    "description": "Tooltip shown when hovering the extension's toolbar icon."
+  }
+}

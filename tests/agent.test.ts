@@ -14,6 +14,7 @@ import {
   isProbeRequest,
 } from '@/lib/agent/protocol';
 import { analyzeScriptCode } from '@/lib/script/analyze';
+import { formatDiagnostic } from '@/lib/diagnostics';
 import { approvePendingRequest } from '@/lib/agent/pending';
 import { storage } from '@/store/storage';
 import { ChromePortTransport } from '@/lib/agent/transport';
@@ -396,14 +397,14 @@ console.log('hi');`;
 // @grant GM_futureThing
 // ==/UserScript==`);
     expect(result.ok).toBe(true);
-    expect(result.warnings.join('\n')).toContain('No @match or @include rule');
-    expect(result.warnings.join('\n')).toContain('Unsupported @grant');
-    expect(result.warnings.join('\n')).toContain('@background is not supported');
+    expect(result.warnings.map(formatDiagnostic).join('\n')).toContain('No @match or @include rule');
+    expect(result.warnings.map(formatDiagnostic).join('\n')).toContain('Unsupported @grant');
+    expect(result.warnings.map(formatDiagnostic).join('\n')).toContain('@background is not supported');
   });
 
   it('reports a missing metadata block as an error', () => {
     const result = analyzeScriptCode('console.log(1)');
     expect(result.ok).toBe(false);
-    expect(result.errors[0]).toContain('No ==UserScript== metadata block');
+    expect(result.errors[0]?.message).toContain('No ==UserScript== metadata block');
   });
 });

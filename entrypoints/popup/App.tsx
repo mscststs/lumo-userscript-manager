@@ -12,12 +12,14 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useErrorText } from '@/lib/use-error-text';
 import type { PopupScriptInfo } from '@/lib/background/scripts';
 import type { PageAccess } from '@/lib/page-access';
 import type { RuntimeMenuCommand, RuntimeStatus, UISettings } from '@/types';
 import { sendBg, onLumoEvent } from '@/lib/messages';
 import { storage } from '@/store/storage';
 import { cn } from '@/lib/utils';
+import { useDocumentTitle } from '@/lib/document-title';
 import { ThemeInit } from '@/lib/theme';
 import { FontSizeInit } from '@/lib/font-size';
 import { Input } from '@/components/ui/input';
@@ -38,10 +40,6 @@ interface PopupData {
   runtime: RuntimeStatus;
   scripts: PopupScriptInfo[];
   total: number;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 /**
@@ -120,7 +118,9 @@ function hostnameOf(url: string | undefined): string | null {
  * trailing glyph — the popup is for *this page*, not for authoring.
  */
 export default function App() {
+  useDocumentTitle();
   const { t } = useTranslation();
+  const errorText = useErrorText();
   const [data, setData] = useState<PopupData | null>(null);
   const [menus, setMenus] = useState<RuntimeMenuCommand[]>([]);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -146,7 +146,7 @@ export default function App() {
       setData({ ...next, scripts: ordered });
       setMenus(nextMenus);
     } catch (e) {
-      setError(errorMessage(e));
+      setError(errorText(e));
     } finally {
       if (!silent) setInitialLoading(false);
     }
@@ -201,7 +201,7 @@ export default function App() {
     try {
       await sendBg('options:open', { hash });
     } catch (e) {
-      setError(errorMessage(e));
+      setError(errorText(e));
     }
   };
 
@@ -220,7 +220,7 @@ export default function App() {
       await storage.setUISettings(nextSettings);
     } catch (e) {
       setData(previous);
-      setError(errorMessage(e));
+      setError(errorText(e));
       return;
     }
 
@@ -229,7 +229,7 @@ export default function App() {
     } catch (e) {
       // The preference is persisted; keep the optimistic state and let the
       // user retry from the reload hint or the dashboard.
-      setError(errorMessage(e));
+      setError(errorText(e));
     }
   };
 
@@ -247,7 +247,7 @@ export default function App() {
       await sendBg('scripts:toggle', { uuid: script.uuid, enabled });
     } catch (e) {
       setData(previous);
-      setError(errorMessage(e));
+      setError(errorText(e));
     }
   };
 
@@ -262,7 +262,7 @@ export default function App() {
       if (!delivered) throw new Error(t('popup.commandUnavailable'));
       window.close();
     } catch (e) {
-      setError(errorMessage(e));
+      setError(errorText(e));
     }
   };
 
@@ -391,7 +391,7 @@ export default function App() {
             aria-label={t('popup.injection')}
             disabled={!data}
             onClick={() => void toggleGlobal(!scriptsEnabled)}
-            className="flex h-10 w-full items-center gap-2.5 rounded-control pl-2 pr-1 text-left transition-colors duration-150 ease-standard hover:bg-accent active:bg-accent/70 disabled:cursor-not-allowed"
+            className="flex h-10 w-full items-center gap-2.5 rounded-control ps-2 pe-1 text-start transition-colors duration-150 ease-standard hover:bg-accent active:bg-accent/70 disabled:cursor-not-allowed"
           >
             <StateGlyph
               on={scriptsEnabled}
@@ -412,7 +412,7 @@ export default function App() {
           <button
             type="button"
             onClick={() => void openOptions('#/scripts')}
-            className="flex h-10 w-full items-center gap-2.5 rounded-control pl-2 pr-1 text-left transition-colors duration-150 ease-standard hover:bg-accent active:bg-accent/70"
+            className="flex h-10 w-full items-center gap-2.5 rounded-control ps-2 pe-1 text-start transition-colors duration-150 ease-standard hover:bg-accent active:bg-accent/70"
           >
             <LayoutDashboard
               className="h-4 w-4 shrink-0 text-muted-foreground"
@@ -448,7 +448,7 @@ function ScriptRow({ script, commands, onToggle, onInvoke, onEdit }: ScriptRowPr
 
   return (
     <div role="listitem">
-      <div className="flex h-10 items-center rounded-control pl-2 pr-1 transition-colors duration-150 ease-standard hover:bg-accent focus-within:bg-accent">
+      <div className="flex h-10 items-center rounded-control ps-2 pe-1 transition-colors duration-150 ease-standard hover:bg-accent focus-within:bg-accent">
         {/* The row is the switch. Its hit area is the full row minus the edit
             button, so enabling and disabling never requires hitting a widget —
             the state is read at a glance from the tile's saturation and the
@@ -459,7 +459,7 @@ function ScriptRow({ script, commands, onToggle, onInvoke, onEdit }: ScriptRowPr
           aria-pressed={script.enabled}
           aria-label={`${toggleLabel}: ${script.name}`}
           title={label}
-          className="flex h-full min-w-0 flex-1 items-center gap-2.5 text-left"
+          className="flex h-full min-w-0 flex-1 items-center gap-2.5 text-start"
         >
           <ScriptIcon src={script.icon} dimmed={!script.enabled} />
           <span
@@ -468,7 +468,7 @@ function ScriptRow({ script, commands, onToggle, onInvoke, onEdit }: ScriptRowPr
               script.enabled ? 'text-foreground' : 'text-muted-foreground',
             )}
           >
-            {script.name}
+            <span dir="auto">{script.name}</span>
           </span>
           {script.lastError && (
             <Tooltip>
@@ -497,7 +497,7 @@ function ScriptRow({ script, commands, onToggle, onInvoke, onEdit }: ScriptRowPr
               type="button"
               onClick={onEdit}
               aria-label={`${t('scripts.edit')}: ${script.name}`}
-              className="relative z-10 mr-2 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-150 ease-standard hover:bg-foreground/10 hover:text-foreground"
+              className="relative z-10 me-2 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-muted-foreground transition-colors duration-150 ease-standard hover:bg-foreground/10 hover:text-foreground"
             >
               <Pencil className="h-4 w-4" aria-hidden="true" />
             </button>
@@ -507,14 +507,14 @@ function ScriptRow({ script, commands, onToggle, onInvoke, onEdit }: ScriptRowPr
       </div>
 
       {commands.length > 0 && (
-        <div className="ml-8.5 border-l border-border pl-1.5 pr-1">
+        <div className="ms-8.5 border-s border-border ps-1.5 pe-1">
           {commands.map((command) => (
             <button
               key={command.id}
               type="button"
               onClick={() => onInvoke(command)}
               title={command.title}
-              className="flex h-8 w-full items-center truncate rounded-md px-2 text-left text-xs text-muted-foreground transition-colors duration-150 ease-standard hover:bg-accent hover:text-foreground"
+              className="flex h-8 w-full items-center truncate rounded-md px-2 text-start text-xs text-muted-foreground transition-colors duration-150 ease-standard hover:bg-accent hover:text-foreground"
             >
               <span className="min-w-0 truncate">{command.title}</span>
             </button>

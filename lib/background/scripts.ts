@@ -1,4 +1,6 @@
 import type { ManagerScript, ScriptMetadata, UserScript } from '@/types';
+import { AppError } from '@/lib/errors';
+import { formatDiagnostics } from '@/lib/diagnostics';
 import {
   addLog,
   replaceResources,
@@ -202,7 +204,9 @@ export async function saveScriptFromCode(
   options: SaveScriptOptions = {},
 ): Promise<UserScript> {
   const parsed = parseMetadata(code);
-  if (parsed.errors.length) throw new Error(parsed.errors.join('\n'));
+  if (parsed.errors.length) {
+    throw new AppError('script.invalidMetadata', undefined, formatDiagnostics(parsed.errors));
+  }
   const existing = uuid ? await getScript(uuid) : undefined;
   const metadata = resolveMetadataUrls(
     normalizeMetadata(parsed.metadata),
@@ -210,7 +214,11 @@ export async function saveScriptFromCode(
   );
   const byName = await findByNameNamespace(metadata.name?.[0] ?? '', metadata.namespace?.[0] ?? '');
   if (byName && byName.uuid !== existing?.uuid) {
-    throw new Error(`A script named "${byName.name}" in namespace "${byName.namespace}" already exists.`);
+    throw new AppError(
+      'script.duplicate',
+      { name: byName.name, namespace: byName.namespace },
+      `A script named "${byName.name}" in namespace "${byName.namespace}" already exists.`,
+    );
   }
 
   const record = await makeScriptRecord(metadata, code, existing, sourceUrl || existing?.origin || '');
@@ -228,7 +236,7 @@ export async function saveScriptFromCode(
 
 export async function updateSelfMetadata(uuid: string, selfMetadata: ScriptMetadata): Promise<UserScript> {
   const script = await getScript(uuid);
-  if (!script) throw new Error('Script not found.');
+  if (!script) throw new AppError('script.notFound', undefined, 'Script not found.');
   const effective = resolveMetadataUrls(
     mergeMetadata(script.metadata, selfMetadata),
     script.origin || script.downloadUrl || script.updateUrl,
@@ -238,7 +246,9 @@ export async function updateSelfMetadata(uuid: string, selfMetadata: ScriptMetad
       .flatMap(([key, values]) => (values ?? []).map((value) => `// @${key} ${value}`))
       .join('\n')}\n// ==/UserScript==`,
   );
-  if (parsed.errors.length) throw new Error(parsed.errors.join('\n'));
+  if (parsed.errors.length) {
+    throw new AppError('script.invalidMetadata', undefined, formatDiagnostics(parsed.errors));
+  }
 
   const next: UserScript = {
     ...script,
@@ -284,7 +294,7 @@ export async function updateSelfMetadata(uuid: string, selfMetadata: ScriptMetad
       : 'auto';
 
   const code = await getScriptCode(uuid);
-  if (code === undefined) throw new Error('Script code missing.');
+  if (code === undefined) throw new AppError('script.codeMissing', undefined, 'Script code missing.');
   await saveScript(next, code, { snapshot: false });
   await refreshScriptResources(uuid, effective);
   void cacheScriptIcon(uuid, next.icon);
@@ -373,21 +383,35 @@ export async function prepareInstall(input: {
   const sourceUrl = input.sourceUrl?.trim() ?? '';
   let code = input.code;
   if (!code) {
-    if (!sourceUrl) throw new Error('A script URL or source is required.');
+    if (!sourceUrl) {
+      throw new AppError('script.sourceRequired', undefined, 'A script URL or source is required.');
+    }
     const response = await fetch(sourceUrl, {
       credentials: 'include',
       redirect: 'follow',
       headers: { 'Cache-Control': 'no-cache' },
     });
-    if (!response.ok) throw new Error(`Failed to download script: HTTP ${response.status}`);
+    if (!response.ok) {
+      throw new AppError(
+        'update.httpError',
+        { status: response.status },
+        `Failed to download script: HTTP ${response.status}`,
+      );
+    }
     const size = Number(response.headers.get('content-length') ?? 0);
-    if (size > 5 * 1024 * 1024) throw new Error('Script is larger than 5 MB.');
+    if (size > 5 * 1024 * 1024) {
+      throw new AppError('script.tooLarge', undefined, 'Script is larger than 5 MB.');
+    }
     code = await response.text();
   }
-  if (byteLength(code) > 5 * 1024 * 1024) throw new Error('Script is larger than 5 MB.');
+  if (byteLength(code) > 5 * 1024 * 1024) {
+    throw new AppError('script.tooLarge', undefined, 'Script is larger than 5 MB.');
+  }
 
   const parsed = parseMetadata(code);
-  if (parsed.errors.length) throw new Error(parsed.errors.join('\n'));
+  if (parsed.errors.length) {
+    throw new AppError('script.invalidMetadata', undefined, formatDiagnostics(parsed.errors));
+  }
   const metadata = resolveMetadataUrls(
     normalizeMetadata(parsed.metadata),
     sourceUrl,
@@ -452,7 +476,13 @@ export async function commitInstall(
   options: { enabled?: boolean; pendingReview?: boolean } = {},
 ): Promise<{ uuid: string; updated: boolean }> {
   const draft = await getDraft(token);
-  if (!draft) throw new Error('Install draft expired or not found.');
+  if (!draft) {
+    throw new AppError(
+      'install.draftExpired',
+      undefined,
+      'Install draft expired or not found.',
+    );
+  }
   const metadata = draft.metadata;
   const existing = draft.existingUuid ? await getScript(draft.existingUuid) : undefined;
   const byName = await findByNameNamespace(draft.name, draft.namespace);

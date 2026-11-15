@@ -7,6 +7,7 @@ import {
   LUMO_REPOSITORY_URL,
 } from '@/lib/lumo-agent';
 import { Button } from '@/components/ui/button';
+import type { TranslationKey } from '@/i18n/keys';
 import {
   Dialog,
   DialogClose,
@@ -33,6 +34,18 @@ const STEPS = [
   { id: 'service', detail: true },
   { id: 'id', detail: true },
 ] as const;
+
+const STEP_KEYS: Record<(typeof STEPS)[number]['id'], { title: TranslationKey; description?: TranslationKey }> = {
+  install: { title: 'settings.agent.intro.steps.install.title' },
+  service: {
+    title: 'settings.agent.intro.steps.service.title',
+    description: 'settings.agent.intro.steps.service.description',
+  },
+  id: {
+    title: 'settings.agent.intro.steps.id.title',
+    description: 'settings.agent.intro.steps.id.description',
+  },
+};
 
 /**
  * Onboarding entry for the agent endpoint.
@@ -78,7 +91,7 @@ export function AgentIntro() {
       <DialogTrigger asChild>
         <button
           type="button"
-          className="group flex w-full items-center gap-2.5 rounded-card border border-border bg-card px-3.5 py-2.5 text-left shadow-surface transition-colors hover:border-input hover:bg-accent/40"
+          className="group flex w-full items-center gap-2.5 rounded-card border border-border bg-card px-3.5 py-2.5 text-start shadow-surface transition-colors hover:border-input hover:bg-accent/40"
         >
           <Sparkles aria-hidden="true" className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
           <span className="min-w-0 flex-1">
@@ -91,7 +104,7 @@ export function AgentIntro() {
           </span>
           <ChevronRight
             aria-hidden="true"
-            className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-150 ease-standard group-hover:translate-x-0.5"
+            className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-150 ease-standard group-hover:translate-x-0.5 rtl:-scale-x-100 rtl:group-hover:-translate-x-0.5"
           />
         </button>
       </DialogTrigger>
@@ -113,11 +126,11 @@ export function AgentIntro() {
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-foreground">
-                  {t(`settings.agent.intro.steps.${step.id}.title`)}
+                  {t(STEP_KEYS[step.id].title)}
                 </p>
                 {step.detail && (
                   <p className="mt-1 text-xs leading-relaxed text-muted-foreground text-pretty">
-                    {t(`settings.agent.intro.steps.${step.id}.description`)}
+                    {t(STEP_KEYS[step.id].description!)}
                   </p>
                 )}
 

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useErrorText } from '@/lib/use-error-text';
 import {
   Bug,
   CircleX,
@@ -56,6 +57,7 @@ interface DayGroup {
 
 export function LogsPage() {
   const { t, i18n } = useTranslation();
+  const errorText = useErrorText();
   const toast = useToast();
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -78,7 +80,7 @@ export function LogsPage() {
       const newest = entries[0]?.time;
       if (newest) void storage.setLogsSeenAt(newest).catch(() => undefined);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setLoading(false);
     }
@@ -175,20 +177,20 @@ export function LogsPage() {
     <PageLayout header={header}>
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-0 flex-1 basis-56">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          <Search className="pointer-events-none absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder={t('common.search')}
             aria-label={t('common.search')}
-            className="pl-8"
+            className="ps-8"
           />
           {query && (
             <button
               type="button"
               onClick={() => setQuery('')}
               aria-label={t('common.clear')}
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
+              className="absolute end-1.5 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:text-foreground"
             >
               <X className="h-3 w-3" />
             </button>
@@ -301,7 +303,7 @@ function LogRow({
       {style.rail && (
         <span
           aria-hidden="true"
-          className={cn('absolute bottom-2 left-0 top-2 w-[3px] rounded-r-full', style.rail)}
+          className={cn('absolute bottom-2 start-0 top-2 w-[3px] rounded-e-full', style.rail)}
         />
       )}
       <Icon className={cn('mt-0.5 h-3.5 w-3.5 shrink-0', style.ink)} aria-hidden="true" />
@@ -321,12 +323,12 @@ function LogRow({
           <time
             dateTime={new Date(entry.time).toISOString()}
             title={formatDateTime(entry.time, locale)}
-            className="ml-auto shrink-0 pl-2 tabular-nums"
+            className="ms-auto shrink-0 ps-2 tabular-nums"
           >
             {relative ? formatRelativeTime(entry.time, locale, now) : formatClockTime(entry.time, locale)}
           </time>
         </div>
-        <pre className="mt-0.5 whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground">
+        <pre className="mt-0.5 whitespace-pre-wrap break-words font-mono text-xs leading-relaxed text-foreground" dir="auto">
           {entry.message}
         </pre>
       </div>

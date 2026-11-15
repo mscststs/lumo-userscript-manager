@@ -23,7 +23,7 @@ export function EnumValue({
     <span className={cn('flex min-w-0 flex-1 items-center justify-between gap-2', className)}>
       <span className="min-w-0 truncate">{label}</span>
       {raw ? (
-        <span className="shrink-0 font-mono text-2xs text-muted-foreground">{raw}</span>
+        <span className="shrink-0 font-mono text-2xs text-muted-foreground" dir="ltr">{raw}</span>
       ) : null}
     </span>
   );

@@ -19,6 +19,15 @@ jobs:
 
       - run: npm ci
 
+      # Locale bundles and the manifest copy are build inputs: a missing key,
+      # a placeholder mismatch, a hardcoded label or a stale `_locales` tree
+      # must fail here instead of shipping.
+      - run: npm run compile
+      - run: npm run i18n:check
+      - run: npm run i18n:scan
+      - run: npm run i18n:manifest -- --check
+      - run: npm test
+
       - run: npm run build
 
       - uses: actions/upload-artifact@v6

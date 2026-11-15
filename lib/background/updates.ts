@@ -1,4 +1,5 @@
 import type { UserScript } from '@/types';
+import { AppError, serializeError, type ErrorCode } from '@/lib/errors';
 import { getScript, listScripts, updateScriptPartial } from '@/lib/db';
 import { parseMetadata, resolveMetadataUrls } from '@/lib/script/metadata';
 import { isNewerVersion } from '@/lib/script/semver';
@@ -27,7 +28,9 @@ function sameScriptPermission(a: UserScript, b: UserScript): boolean {
 
 async function fetchText(url: string): Promise<string> {
   const response = await fetch(url, { credentials: 'include', cache: 'no-cache' });
-  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  if (!response.ok) {
+    throw new AppError('update.httpError', { status: response.status }, `HTTP ${response.status}`);
+  }
   return response.text();
 }
 
@@ -35,7 +38,12 @@ export interface UpdateCheckResult {
   checked: number;
   updated: number;
   available: number;
-  errors: string[];
+  errors: {
+    script: string;
+    code: ErrorCode;
+    message: string;
+    params?: Record<string, string | number>;
+  }[];
 }
 
 export async function checkScriptUpdates(uuid?: string): Promise<UpdateCheckResult> {
@@ -90,9 +98,12 @@ export async function checkScriptUpdates(uuid?: string): Promise<UpdateCheckResu
         broadcast('scripts-changed');
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      result.errors.push(`${script.name}: ${message}`);
-      await updateScriptPartial(script.uuid, { updateState: 'error', lastError: message });
+      const serialized = serializeError(error);
+      result.errors.push({ script: script.name, ...serialized });
+      await updateScriptPartial(script.uuid, {
+        updateState: 'error',
+        lastError: serialized.message,
+      });
     }
   }
 

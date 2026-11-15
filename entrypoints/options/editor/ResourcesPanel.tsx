@@ -15,7 +15,7 @@ import { SettingsGroup } from '@/components/settings/SettingsGroup';
  * truth.
  */
 export function ResourcesPanel({ resources }: { resources: StoredResource[] }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   return (
     <SettingsGroup title={t('editor.groupResources')} description={t('editor.resourcesHint')}>
@@ -37,7 +37,10 @@ export function ResourcesPanel({ resources }: { resources: StoredResource[] }) {
                 {resource.name}
               </span>
               <span className="shrink-0 text-2xs tabular-nums text-muted-foreground">
-                {formatBytes((resource.content?.length ?? 0) + (resource.base64?.length ?? 0))}
+                {formatBytes(
+                  (resource.content?.length ?? 0) + (resource.base64?.length ?? 0),
+                  i18n.language,
+                )}
               </span>
             </div>
             <p className="mt-1 break-all font-mono text-2xs leading-relaxed text-muted-foreground">

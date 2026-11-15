@@ -12,12 +12,19 @@ export function cn(...inputs: ClassValue[]) {
  * same numbers (a file's size is part of both totals), and two formatters would
  * eventually disagree on rounding.
  */
-export function formatBytes(bytes: number): string {
+export function formatBytes(bytes: number, locale?: string): string {
   if (bytes === 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB'];
   const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
   const value = bytes / Math.pow(1024, i);
-  return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+  try {
+    return `${new Intl.NumberFormat(locale, {
+      maximumFractionDigits: i === 0 ? 0 : 1,
+      minimumFractionDigits: 0,
+    }).format(value)} ${units[i]}`;
+  } catch {
+    return `${value.toFixed(i === 0 ? 0 : 1)} ${units[i]}`;
+  }
 }
 
 /**

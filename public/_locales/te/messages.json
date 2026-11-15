@@ -1,0 +1,14 @@
+{
+  "extName": {
+    "message": "Lumo యూజర్‌స్క్రిప్ట్ మేనేజర్",
+    "description": "The display name of the extension."
+  },
+  "extDescription": {
+    "message": "మీ బ్రౌజర్ కోసం శక్తివంతమైన, చక్కగా రూపొందించిన యూజర్‌స్క్రిప్ట్ మేనేజర్",
+    "description": "The description of the extension shown in browser extension stores (Chrome Web Store, Microsoft Edge Add-ons) and the extension management page."
+  },
+  "actionTitle": {
+    "message": "Lumo యూజర్‌స్క్రిప్ట్ మేనేజర్ తెరవండి",
+    "description": "Tooltip shown when hovering the extension's toolbar icon."
+  }
+}

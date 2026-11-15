@@ -1,3 +1,5 @@
+import type { LanguagePreference } from '@/i18n/locales';
+
 /**
  * Allowed font-size presets (in pixels). Applied to `<html>` to scale all
  * `rem`-based UI proportionally.
@@ -34,7 +36,7 @@ export type ThemeMode = 'light' | 'dark' | 'system';
 export type AccentColor = 'azure' | 'violet' | 'emerald' | 'amber' | 'rose';
 
 /** Stored language preference. `auto` follows the browser UI language. */
-export type Language = 'auto' | 'en' | 'zh';
+export type Language = LanguagePreference;
 
 export type DefaultRunAt = 'document-idle' | 'document-end' | 'document-start';
 export type DefaultInjectInto = 'auto' | 'page' | 'content';

@@ -1,14 +1,14 @@
 {
   "extName": {
     "message": "Lumo 用户脚本管理器",
-    "description": "扩展的显示名称。"
+    "description": "The display name of the extension."
   },
   "extDescription": {
     "message": "一个强大、好用的浏览器用户脚本管理器",
-    "description": "在扩展商店和扩展管理页面展示的描述。"
+    "description": "The description of the extension shown in browser extension stores (Chrome Web Store, Microsoft Edge Add-ons) and the extension management page."
   },
   "actionTitle": {
     "message": "打开 Lumo 用户脚本管理器",
-    "description": "鼠标悬停在工具栏图标上时显示的提示文字。"
+    "description": "Tooltip shown when hovering the extension's toolbar icon."
   }
 }

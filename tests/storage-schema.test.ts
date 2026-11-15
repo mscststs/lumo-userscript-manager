@@ -6,6 +6,7 @@ import {
 } from '@/lib/theme-registry';
 import { DEFAULT_FONT_SIZE } from '@/lib/font-size-registry';
 import { DEFAULT_LANGUAGE } from '@/lib/language';
+import { SHIPPED_LOCALES } from '@/i18n/locales';
 import { EXPORTABLE_KEYS, STORAGE_FIELDS } from '@/store/storage-schema';
 import type { UISettings } from '@/types';
 
@@ -48,7 +49,7 @@ describe('storage schema', () => {
 
   it('repairs values written by an unknown build or hand-edited config', () => {
     const raw = {
-      language: 'fr',
+      language: 'xx-YY',
       theme: 'solarized',
       fontSize: 99,
     } as unknown as UISettings;
@@ -79,11 +80,21 @@ describe('storage schema', () => {
         normalizeUI({ ...STORAGE_FIELDS.uiSettings.defaultValue, darkTheme }).darkTheme,
       ).toBe(darkTheme);
     }
-    for (const language of ['auto', 'en', 'zh'] as const) {
+    for (const language of ['auto', ...SHIPPED_LOCALES.map((locale) => locale.tag)] as const) {
       expect(
         normalizeUI({ ...STORAGE_FIELDS.uiSettings.defaultValue, language }).language,
       ).toBe(language);
     }
+    // Unknown values fall back to auto.
+    expect(
+      normalizeUI({ ...STORAGE_FIELDS.uiSettings.defaultValue, language: 'xx-YY' } as UISettings)
+        .language,
+    ).toBe('auto');
+    // Configs written before the locale registry stored bare `zh`.
+    expect(
+      normalizeUI({ ...STORAGE_FIELDS.uiSettings.defaultValue, language: 'zh' } as UISettings)
+        .language,
+    ).toBe('zh-CN');
     for (const fontSize of [12, 13, 14, 15, 16, 17, 18] as const) {
       expect(
         normalizeUI({ ...STORAGE_FIELDS.uiSettings.defaultValue, fontSize }).fontSize,

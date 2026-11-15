@@ -39,7 +39,7 @@ Lumo Userscripts
 > - Recycle bin, JSON/ZIP backup export and import
 > - Permission-aware update checks with automatic installation
 > - Popup controls, execution logs, runtime health and registration diagnostics
-> - Three palettes × five accents, adjustable UI scale, English and Chinese
+> - Three palettes × five accents, adjustable UI scale, and all 55 Chrome locales, with reviewed UI bundles
 >
 > Everything stays on your device. No telemetry, no account, no cloud sync.
 > Source code and issues: <https://github.com/mscststs/lumo-userscript-manager>

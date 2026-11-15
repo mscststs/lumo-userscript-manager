@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { motion, MotionConfig } from 'motion/react';
+import { motion } from 'motion/react';
 import {
   FileCode2,
   Info,
@@ -11,6 +11,8 @@ import {
   Settings,
 } from 'lucide-react';
 import { ThemeInit } from '@/lib/theme';
+import type { TranslationKey } from '@/i18n/keys';
+import { useDocumentTitle } from '@/lib/document-title';
 import { FontSizeInit } from '@/lib/font-size';
 import { sendBg, onLumoEvent } from '@/lib/messages';
 import { cn } from '@/lib/utils';
@@ -87,9 +89,18 @@ function useHashRoute() {
   return { route, navigate };
 }
 
+const ROUTE_TITLES: Record<RouteName, TranslationKey> = {
+  scripts: 'scripts.title',
+  editor: 'editor.title',
+  settings: 'settings.title',
+  appearance: 'options.appearance.title',
+  logs: 'logs.title',
+  about: 'options.about.title',
+};
+
 const NAV: {
   name: Exclude<RouteName, 'editor'>;
-  labelKey: string;
+  labelKey: TranslationKey;
   icon: ReactNode;
 }[] = [
   { name: 'scripts', labelKey: 'options.nav.scripts', icon: <FileCode2 className="h-4 w-4" /> },
@@ -131,6 +142,7 @@ function useUnreadErrors(): number {
 export default function App() {
   const { t } = useTranslation();
   const { route, navigate } = useHashRoute();
+  useDocumentTitle(ROUTE_TITLES[route.name]);
   const [collapsed, setCollapsed] = useState(false);
   const active = route.name === 'editor' ? 'scripts' : route.name;
   const unreadErrors = useUnreadErrors();
@@ -169,7 +181,7 @@ export default function App() {
   }, [navigate, route]);
 
   return (
-    <MotionConfig reducedMotion="user">
+    <>
       <TooltipProvider delayDuration={400}>
         <ToastProvider>
           {/* The window is the frame: the sidebar shares its colour and the page
@@ -246,7 +258,7 @@ export default function App() {
                                 : label
                             }
                             className={cn(
-                              'relative flex h-8 w-full items-center gap-2.5 rounded-control pl-3 text-sm',
+                              'relative flex h-8 w-full items-center gap-2.5 rounded-control ps-3 text-sm',
                               'transition-colors duration-150 ease-standard',
                               isActive
                                 ? 'font-medium text-foreground'
@@ -275,7 +287,7 @@ export default function App() {
                                 <span
                                   aria-hidden="true"
                                   className={cn(
-                                    'absolute -right-0.5 -top-0.5 h-1.5 w-1.5 rounded-full',
+                                    'absolute -end-0.5 -top-0.5 h-1.5 w-1.5 rounded-full',
                                     tone.dot,
                                     collapsed ? '' : 'md:hidden',
                                   )}
@@ -284,7 +296,7 @@ export default function App() {
                             </span>
                             <span
                               className={cn(
-                                'text-optical relative z-10 min-w-0 max-w-0 flex-1 truncate text-left opacity-0',
+                                'text-optical relative z-10 min-w-0 max-w-0 flex-1 truncate text-start opacity-0',
                                 'transition-[max-width,opacity] duration-200 ease-standard',
                                 !collapsed && 'md:max-w-48 md:opacity-100',
                               )}
@@ -318,7 +330,7 @@ export default function App() {
                   right edge. The rail width animates, so the button slides left
                   as the panel closes and *ends* centred — it never jumps to the
                   middle of the still-wide rail first. */}
-              <div className="hidden h-10 shrink-0 items-center justify-end pr-3.5 md:flex">
+              <div className="hidden h-10 shrink-0 items-center justify-end pe-3.5 md:flex">
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -329,9 +341,9 @@ export default function App() {
                       className="text-muted-foreground"
                     >
                       {collapsed ? (
-                        <PanelLeftOpen className="h-3.5 w-3.5" />
+                        <PanelLeftOpen className="h-3.5 w-3.5 rtl:-scale-x-100" />
                       ) : (
-                        <PanelLeftClose className="h-3.5 w-3.5" />
+                        <PanelLeftClose className="h-3.5 w-3.5 rtl:-scale-x-100" />
                       )}
                     </Button>
                   </TooltipTrigger>
@@ -345,7 +357,7 @@ export default function App() {
             {/* Each page owns its scrolling (see PageLayout): the panel itself
                 never scrolls, so its rounded corners and the page heading stay
                 put while the content moves underneath. */}
-            <main className="my-2 mr-2 min-h-0 min-w-0 flex-1 overflow-hidden rounded-card border border-border/70 bg-background shadow-panel">
+            <main className="my-2 me-2 min-h-0 min-w-0 flex-1 overflow-hidden rounded-card border border-border/70 bg-background shadow-panel">
               <div key={route.name} className="h-full">
                 {content}
               </div>
@@ -358,6 +370,6 @@ export default function App() {
           <AgentAccessDialog access={agentAccess} />
         </ToastProvider>
       </TooltipProvider>
-    </MotionConfig>
+    </>
   );
 }

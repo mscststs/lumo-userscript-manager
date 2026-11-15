@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useErrorText } from '@/lib/use-error-text';
 import { AnimatePresence, motion } from 'motion/react';
 import { Loader2, ShieldCheck } from 'lucide-react';
 import type { AgentAccess } from '@/store/useAgentAccess';
@@ -34,6 +35,7 @@ interface AgentAccessDialogProps {
  */
 export function AgentAccessDialog({ access }: AgentAccessDialogProps) {
   const { t } = useTranslation();
+  const errorText = useErrorText();
   const toast = useToast();
   const { settings, actionable, approve } = access;
   const [open, setOpen] = useState(false);
@@ -83,18 +85,16 @@ export function AgentAccessDialog({ access }: AgentAccessDialogProps) {
       await approve(currentId);
       toast({ title: t('settings.agent.approved'), variant: 'success' });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setBusy(false);
     }
   };
 
   const client = current?.name || t('settings.agent.unknownClient');
-  const scope = t(
-    settings?.allowWrites
-      ? 'settings.agent.requestDialog.scopeWrite'
-      : 'settings.agent.requestDialog.scopeRead',
-  );
+  const descriptionKey = settings?.allowWrites
+    ? ('settings.agent.requestDialog.readWrite' as const)
+    : ('settings.agent.requestDialog.read' as const);
 
   return (
     <Dialog open={open && Boolean(current)} onOpenChange={(next) => !next && defer()}>
@@ -118,7 +118,7 @@ export function AgentAccessDialog({ access }: AgentAccessDialogProps) {
               </div>
               {current && (
                 <DialogDescription className="mt-1">
-                  {t('settings.agent.requestDialog.description', { client, scope })}
+                  {t(descriptionKey, { client })}
                 </DialogDescription>
               )}
             </div>

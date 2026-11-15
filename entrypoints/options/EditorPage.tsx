@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useErrorText } from '@/lib/use-error-text';
+import { DIAGNOSTIC_KEYS, type Diagnostic } from '@/lib/diagnostics';
 import { ArrowLeft, Save } from 'lucide-react';
 import type { ScriptMetadata, ScriptVersion, StoredResource, UserScript } from '@/types';
 import { sendBg } from '@/lib/messages';
@@ -18,6 +20,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useToast } from '@/components/ui/toast';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import type { TranslationKey } from '@/i18n/keys';
 import { MetadataPanel } from './editor/MetadataPanel';
 import { ValuesPanel } from './editor/ValuesPanel';
 import { ResourcesPanel } from './editor/ResourcesPanel';
@@ -45,6 +48,13 @@ type Tab = 'code' | Panel;
 
 const PANEL_IDS: Panel[] = ['metadata', 'values', 'resources', 'info'];
 const TAB_IDS: Tab[] = ['code', ...PANEL_IDS];
+const TAB_KEYS: Record<Tab, TranslationKey> = {
+  code: 'editor.code',
+  metadata: 'editor.metadata',
+  values: 'editor.values',
+  resources: 'editor.resources',
+  info: 'editor.info',
+};
 
 function isTab(value: string | undefined): value is Tab {
   return TAB_IDS.includes(value as Tab);
@@ -87,6 +97,8 @@ function sameMetadata(a: ScriptMetadata, b: ScriptMetadata): boolean {
  */
 export function EditorPage({ uuid, initialPanel, onBack, onSaved }: EditorPageProps) {
   const { t } = useTranslation();
+  const errorText = useErrorText();
+  const diagnosticText = (item: Diagnostic) => t(DIAGNOSTIC_KEYS[item.code], item.params);
   const toast = useToast();
   const isNew = !uuid || uuid === 'new';
   const [code, setCode] = useState(() => newScriptTemplate());
@@ -136,7 +148,7 @@ export function EditorPage({ uuid, initialPanel, onBack, onSaved }: EditorPagePr
       setValues(detail.values);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setLoading(false);
     }
@@ -164,7 +176,7 @@ export function EditorPage({ uuid, initialPanel, onBack, onSaved }: EditorPagePr
     // against; a save here would silently create a duplicate script.
     if (loading || (!isNew && !script)) return;
     if (parsed.errors.length) {
-      setError(parsed.errors.join('\n'));
+      setError(parsed.errors.map(diagnosticText).join('\n'));
       return;
     }
     setSaving(true);
@@ -179,7 +191,7 @@ export function EditorPage({ uuid, initialPanel, onBack, onSaved }: EditorPagePr
       toast({ title: t('editor.saved'), variant: 'success' });
       onSaved(result.uuid);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setSaving(false);
     }
@@ -201,7 +213,7 @@ export function EditorPage({ uuid, initialPanel, onBack, onSaved }: EditorPagePr
       setSavedSelfMetadata(selfMetadata);
       toast({ title: t('editor.metadataSaved'), variant: 'success' });
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     } finally {
       setSaving(false);
     }
@@ -213,7 +225,7 @@ export function EditorPage({ uuid, initialPanel, onBack, onSaved }: EditorPagePr
       await sendBg('values:set', { uuid: script.uuid, key, value });
       setValues((prev) => ({ ...prev, [key]: value }));
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
     }
   };
 
@@ -282,7 +294,7 @@ export function EditorPage({ uuid, initialPanel, onBack, onSaved }: EditorPagePr
       onChange={setTab}
       items={TAB_IDS.map((item) => ({
         value: item,
-        label: t(item === 'code' ? 'editor.code' : `editor.${item}`),
+        label: t(TAB_KEYS[item]),
       }))}
     />
   );
@@ -335,9 +347,9 @@ export function EditorPage({ uuid, initialPanel, onBack, onSaved }: EditorPagePr
                   size="iconSm"
                   onClick={requestBack}
                   aria-label={t('editor.back')}
-                  className="-ml-1.5"
+                  className="-ms-1.5"
                 >
-                  <ArrowLeft className="h-4 w-4" />
+                  <ArrowLeft className="h-4 w-4 rtl:-scale-x-100" />
                 </Button>
                 <ScriptIcon src={iconUrl} size="md" dimmed={script ? !script.enabled : false} />
               </>
@@ -396,7 +408,7 @@ export function EditorPage({ uuid, initialPanel, onBack, onSaved }: EditorPagePr
           className="flex shrink-0 items-start gap-2 border-b border-destructive/30 bg-destructive/5 px-5 py-2 sm:px-7"
         >
           <p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-xs leading-relaxed text-destructive">
-            {error ?? parsed.errors.join('\n')}
+            {error ?? parsed.errors.map(diagnosticText).join('\n')}
           </p>
           <Button variant="ghost" size="xs" onClick={() => setError(null)}>
             {t('common.close')}

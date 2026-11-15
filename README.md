@@ -20,7 +20,7 @@ A Chromium MV3 userscript manager for Chrome and Edge, built with WXT, React 19 
 - Recycle bin, JSON/ZIP backup export and import
 - Update checks with permission-aware auto-update
 - Popup page controls, logs, runtime health and registration diagnostics
-- Three palettes (Paper / Graphite / Midnight) × five accents, adjustable UI scale, English and Chinese
+- Three palettes (Paper / Graphite / Midnight) × five accents, adjustable UI scale, English, Chinese and more
 
 ## Requirements
 
@@ -134,7 +134,7 @@ lib/
   background/     registration, host service, updates, tokens
   db/             IndexedDB layer
   theme*.ts       palettes, accents, first-paint contract
-i18n/             en / zh
+i18n/             locale registry, JSON bundles, manifest copy
 store/            chrome.storage settings
 types/            shared types
 ```

@@ -19,13 +19,13 @@ import {
   type ThemeDefinition,
 } from '@/lib/theme-registry';
 import { FONT_SIZE_OPTIONS } from '@/lib/font-size-registry';
-import { LANGUAGES } from '@/lib/language';
 import { cn } from '@/lib/utils';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageLayout } from '@/components/layout/PageLayout';
 import { SettingRow } from '@/components/settings/SettingRow';
 import { SettingsGroup } from '@/components/settings/SettingsGroup';
 import { Switch } from '@/components/ui/switch';
+import { LanguagePicker } from '@/components/ui/language-picker';
 import {
   Select,
   SelectContent,
@@ -204,25 +204,11 @@ export function AppearancePage() {
           htmlFor="appearance-language"
           description={t('options.appearance.languageHint')}
           control={
-            <Select
+            <LanguagePicker
               value={language}
-              onValueChange={(value) => void update({ language: value as UISettings['language'] })}
-            >
-              <SelectTrigger
-                id="appearance-language"
-                className="w-40"
-                aria-label={t('options.appearance.language')}
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {LANGUAGES.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {t(option.labelKey)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              onChange={(value) => void update({ language: value })}
+              className="w-48"
+            />
           }
         />
         <SettingRow
@@ -301,7 +287,7 @@ function ChoiceCard({
       aria-checked={active}
       onClick={onClick}
       className={cn(
-        'flex min-w-0 flex-col gap-1.5 rounded-card border p-1.5 text-left',
+        'flex min-w-0 flex-col gap-1.5 rounded-card border p-1.5 text-start',
         'transition-[border-color,background-color,box-shadow] duration-150 ease-standard',
         active
           ? 'border-primary/70 bg-card shadow-elev1'
@@ -345,34 +331,34 @@ function WindowPreview({
       className="absolute inset-0 block"
       style={{ background: swatch.frame, ...style }}
     >
-      <span className="absolute left-1.5 top-2 flex w-[22%] flex-col gap-1">
+      <span className="absolute start-1.5 top-2 flex w-[22%] flex-col gap-1">
         <span
           className="block h-2 w-full rounded-[2px] border"
           style={{ background: swatch.surface, borderColor: swatch.border }}
         />
         <span
-          className="ml-0.5 block h-1 w-3/4 rounded-full"
+          className="ms-0.5 block h-1 w-3/4 rounded-full"
           style={{ background: swatch.foreground, opacity: 0.22 }}
         />
         <span
-          className="ml-0.5 block h-1 w-2/3 rounded-full"
+          className="ms-0.5 block h-1 w-2/3 rounded-full"
           style={{ background: swatch.foreground, opacity: 0.22 }}
         />
       </span>
       <span
-        className="absolute bottom-1.5 left-[30%] right-1.5 top-1.5 rounded-[4px] border"
+        className="absolute bottom-1.5 start-[30%] end-1.5 top-1.5 rounded-[4px] border"
         style={{ background: swatch.background, borderColor: swatch.border }}
       >
         <span
-          className="absolute left-1.5 top-1.5 h-1 w-6 rounded-full"
+          className="absolute start-1.5 top-1.5 h-1 w-6 rounded-full"
           style={{ background: swatch.foreground, opacity: 0.75 }}
         />
         <span
-          className="absolute left-1.5 top-3.5 h-1 w-9 max-w-[80%] rounded-full"
+          className="absolute start-1.5 top-3.5 h-1 w-9 max-w-[80%] rounded-full"
           style={{ background: swatch.border }}
         />
         <span
-          className="absolute bottom-1.5 left-1.5 h-2.5 w-7 rounded-[2px]"
+          className="absolute bottom-1.5 start-1.5 h-2.5 w-7 rounded-[2px]"
           style={{ background: accent }}
         />
       </span>

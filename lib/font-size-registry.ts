@@ -1,4 +1,5 @@
 import type { FontSize } from '@/types';
+import type { TranslationKey } from '@/i18n/keys';
 
 /**
  * All recognized font-size presets, smallest to largest.
@@ -7,7 +8,7 @@ import type { FontSize } from '@/types';
  * suited to a sidebar: the 300–400px panel width means sub-12px is unreadable
  * and 18px+ wastes space.
  */
-export const FONT_SIZE_OPTIONS: { value: FontSize; labelKey: string }[] = [
+export const FONT_SIZE_OPTIONS: { value: FontSize; labelKey: TranslationKey }[] = [
   { value: 12, labelKey: 'options.appearance.fontSizeVerySmall' },
   { value: 13, labelKey: 'options.appearance.fontSizeSmall' },
   { value: 14, labelKey: 'options.appearance.fontSizeMedium' },

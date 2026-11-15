@@ -57,7 +57,7 @@ export function InfoPanel({ script, lineCount }: { script: UserScript; lineCount
           }
         />
         <InfoRow label={t('editor.lineCount')} value={String(lineCount)} mono />
-        <InfoRow label={t('editor.codeSize')} value={formatBytes(script.codeSize)} />
+        <InfoRow label={t('editor.codeSize')} value={formatBytes(script.codeSize, i18n.language)} />
         <InfoRow
           label={t('editor.lastUpdated')}
           value={formatDateTime(script.updatedAt, i18n.language)}
@@ -95,10 +95,11 @@ function InfoRow({
     <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 py-2.5">
       <dt className="shrink-0 text-xs text-muted-foreground">{label}</dt>
       <dd
+        dir="auto"
         className={
           mono
-            ? 'min-w-0 max-w-full break-all text-right font-mono text-2xs text-foreground'
-            : 'min-w-0 max-w-full break-words text-right text-xs text-foreground'
+            ? 'min-w-0 max-w-full break-all text-end font-mono text-2xs text-foreground'
+            : 'min-w-0 max-w-full break-words text-end text-xs text-foreground'
         }
       >
         {value}

@@ -87,6 +87,8 @@ import { handleProbe } from '@/lib/agent/probe';
 import { handleAuthorize } from '@/lib/agent/authorize';
 import { isAuthorizeRequest, isProbeRequest, MCP_PORT_NAME } from '@/lib/agent/protocol';
 import { ChromePortTransport } from '@/lib/agent/transport';
+import { AppError, serializeError } from '@/lib/errors';
+import { formatDiagnostics } from '@/lib/diagnostics';
 import { openOptionsTab } from '@/lib/options-tab';
 
 const INSTALL_RULE_ID = 1;
@@ -318,7 +320,7 @@ async function handleRuntimeMessage(
       broadcast('logs-changed');
       return true;
     default:
-      throw new Error(`Unknown message: ${type}`);
+      throw new AppError('background.unknownMessage', undefined, `Unknown message: ${type}`);
   }
 }
 
@@ -363,7 +365,12 @@ interface ImportBackupResult {
   imported: number;
   skipped: number;
   settingsImported: boolean;
-  failed: { name: string; message: string }[];
+  failed: {
+    name: string;
+    message: string;
+    code?: string;
+    params?: Record<string, unknown>;
+  }[];
 }
 
 async function backupStats(): Promise<BackupStats> {
@@ -399,13 +406,13 @@ async function importBackup(payload: Record<string, any>): Promise<ImportBackupR
 
   let imported = 0;
   let skipped = 0;
-  const failed: { name: string; message: string }[] = [];
+  const failed: ImportBackupResult['failed'] = [];
 
   for (const entry of data.scripts ?? []) {
     let label = entry?.script?.name ?? entry?.script?.uuid ?? 'Script';
     try {
       if (!entry?.script || typeof entry.code !== 'string') {
-        throw new Error('The backup entry has no script code.');
+        throw new AppError('script.codeMissing', undefined, 'The backup entry has no script code.');
       }
 
       // Parse before touching the database: the name and namespace decide
@@ -413,7 +420,9 @@ async function importBackup(payload: Record<string, any>): Promise<ImportBackupR
       // metadata block must be reported as one failure instead of aborting
       // the whole restore.
       const parsed = parseMetadata(entry.code);
-      if (parsed.errors.length) throw new Error(parsed.errors.join('\n'));
+      if (parsed.errors.length) {
+        throw new AppError('script.invalidMetadata', undefined, formatDiagnostics(parsed.errors));
+      }
       const name = parsed.metadata.name?.[0] ?? entry.script.name ?? '';
       const namespace = parsed.metadata.namespace?.[0] ?? entry.script.namespace ?? '';
       label = name || label;
@@ -463,9 +472,12 @@ async function importBackup(payload: Record<string, any>): Promise<ImportBackupR
       }
       imported += 1;
     } catch (error) {
+      const serialized = serializeError(error);
       failed.push({
         name: label,
-        message: error instanceof Error ? error.message : String(error),
+        message: serialized.message,
+        code: serialized.code,
+        params: serialized.params,
       });
     }
   }
@@ -495,12 +507,15 @@ export default defineBackground(() => {
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     void handleRuntimeMessage(message, sender).then(
       (result) => sendResponse({ ok: true, result }),
-      (error) =>
+      (error) => {
+        const serialized = serializeError(error);
         sendResponse({
           ok: false,
-          error: error instanceof Error ? error.message : String(error),
-          code: error instanceof HostError ? error.code : 'HOST_FAILED',
-        }),
+          error: serialized.message,
+          code: error instanceof HostError ? error.code : serialized.code,
+          params: serialized.params,
+        });
+      },
     );
     return true;
   });

@@ -1,0 +1,14 @@
+{
+  "extName": {
+    "message": "Lumo — gestor de scripts de usuario",
+    "description": "The display name of the extension."
+  },
+  "extDescription": {
+    "message": "Un gestor de scripts de usuario potente y cuidado para tu navegador",
+    "description": "The description of the extension shown in browser extension stores (Chrome Web Store, Microsoft Edge Add-ons) and the extension management page."
+  },
+  "actionTitle": {
+    "message": "Abrir Lumo — gestor de scripts de usuario",
+    "description": "Tooltip shown when hovering the extension's toolbar icon."
+  }
+}

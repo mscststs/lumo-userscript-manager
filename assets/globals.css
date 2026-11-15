@@ -25,7 +25,10 @@
      (applied to `<html>`) scales the whole UI without a single media query. */
   --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI Variable Text",
     "Segoe UI", system-ui, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei UI",
-    "Noto Sans CJK SC", "Source Han Sans SC", sans-serif;
+    "Noto Sans CJK SC", "Source Han Sans SC", "Noto Sans Arabic", "Geeza Pro",
+    "Noto Sans Hebrew", "Arial Hebrew", "Noto Sans Devanagari", "Noto Sans Bengali",
+    "Noto Sans Tamil", "Noto Sans Telugu", "Noto Sans Kannada", "Noto Sans Malayalam",
+    "Noto Sans Gujarati", "Noto Sans Gurmukhi", "Noto Sans Thai", sans-serif;
   --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Mono", Menlo, Consolas,
     "Liberation Mono", monospace;
 
@@ -358,6 +361,33 @@
     text-rendering: optimizeLegibility;
   }
 
+  /* Script-aware typography.
+     Arabic, Hebrew and Persian are cursive/connected scripts: letter-spacing
+     breaks the joins, so it must be neutralised on every size stop. CJK and
+     the Indic/Thai scripts need a little more vertical room than the Latin
+     ramp; the body line-height is inherited by most text, so this is a single
+     place to widen it without touching each component. */
+  :lang(ar),
+  :lang(fa),
+  :lang(he) {
+    letter-spacing: normal !important;
+  }
+
+  :lang(ar) body,
+  :lang(fa) body,
+  :lang(he) body,
+  :lang(hi) body,
+  :lang(bn) body,
+  :lang(gu) body,
+  :lang(kn) body,
+  :lang(ml) body,
+  :lang(mr) body,
+  :lang(ta) body,
+  :lang(te) body,
+  :lang(th) body {
+    line-height: 1.55;
+  }
+
   /* One focus treatment for the whole product.
      The previous build stripped outlines globally (`outline: none !important`),
      which left keyboard users with no pointer at all — a WCAG 2.4.7 failure.
@@ -581,6 +611,8 @@
 /* ─── Code (Shiki) ───────────────────────────────────────────────────────── */
 @layer components {
   .code-view .shiki {
+    direction: ltr;
+    text-align: left;
     margin: 0;
     font-size: inherit;
     font-family: var(--font-mono);
@@ -624,6 +656,10 @@
 .cm-editor {
   height: 100%;
   background-color: transparent;
+  /* Code is always LTR, even in an RTL document. Mirrored identifiers are a
+     readability bug, not a localisation feature. */
+  direction: ltr;
+  text-align: left;
 }
 
 .cm-editor .cm-scroller {
@@ -638,7 +674,7 @@
 
 .cm-editor .cm-gutters {
   background-color: transparent;
-  border-right: 1px solid var(--color-border);
+  border-inline-end: 1px solid var(--color-border);
   color: var(--color-muted-foreground);
 }
 

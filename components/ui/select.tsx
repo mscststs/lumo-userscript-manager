@@ -27,7 +27,7 @@ const SelectTrigger = React.forwardRef<
       'hover:border-muted-foreground/50',
       'disabled:cursor-not-allowed disabled:opacity-50',
       'data-[placeholder]:text-muted-foreground',
-      '[&>span]:min-w-0 [&>span]:flex-1 [&>span]:truncate [&>span]:text-left',
+      '[&>span]:min-w-0 [&>span]:flex-1 [&>span]:truncate [&>span]:text-start',
       className,
     )}
     {...props}
@@ -77,7 +77,7 @@ const SelectLabel = React.forwardRef<
   <SelectPrimitive.Label
     ref={ref}
     className={cn(
-      'py-1 pl-7 pr-2 text-2xs font-semibold uppercase tracking-wider text-muted-foreground',
+      'py-1 ps-7 pe-2 text-2xs font-semibold text-muted-foreground',
       className,
     )}
     {...props}
@@ -92,7 +92,7 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      'relative flex w-full cursor-default select-none items-center rounded-md py-1.5 pl-7 pr-2 text-sm text-foreground outline-none',
+      'relative flex w-full cursor-default select-none items-center rounded-md py-1.5 ps-7 pe-2 text-sm text-foreground outline-none',
       'data-[highlighted]:bg-accent data-[highlighted]:text-accent-foreground',
       'data-[state=checked]:font-medium',
       'data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
@@ -100,7 +100,7 @@ const SelectItem = React.forwardRef<
     )}
     {...props}
   >
-    <span className="absolute left-2 flex h-3.5 w-3.5 items-center justify-center text-primary">
+    <span className="absolute start-2 flex h-3.5 w-3.5 items-center justify-center text-primary">
       <SelectPrimitive.ItemIndicator>
         <Check className="h-3.5 w-3.5" />
       </SelectPrimitive.ItemIndicator>

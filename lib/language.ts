@@ -1,24 +1,16 @@
-import type { Language } from '@/types';
+import type { LanguagePreference } from '@/i18n/locales';
+import { normalizeLanguage as normalize } from '@/i18n/locales';
 
 /**
- * Language registry — the single source of truth for selectable UI languages.
+ * Compatibility surface for the language preference.
  *
- * Kept free of React, i18next and storage imports so the storage schema can
- * normalise a persisted value without pulling the whole i18n runtime into the
- * service worker.
+ * The registry itself lives in `i18n/locales.ts` so the background service
+ * worker, the picker, the manifest generator and i18next all read the same
+ * source. This module keeps the old import path working for callers that only
+ * need the default or a normalised value.
  */
-export const LANGUAGES: { value: Language; labelKey: string }[] = [
-  { value: 'auto', labelKey: 'options.appearance.languageAuto' },
-  { value: 'en', labelKey: 'options.appearance.languageEn' },
-  { value: 'zh', labelKey: 'options.appearance.languageZh' },
-];
+export const DEFAULT_LANGUAGE = 'auto' as const satisfies LanguagePreference;
 
-export const DEFAULT_LANGUAGE: Language = 'auto';
-
-const VALID = new Set<Language>(LANGUAGES.map((item) => item.value));
-
-export function normalizeLanguage(raw: unknown): Language {
-  return typeof raw === 'string' && VALID.has(raw as Language)
-    ? (raw as Language)
-    : DEFAULT_LANGUAGE;
+export function normalizeLanguage(raw: unknown): LanguagePreference {
+  return normalize(raw);
 }

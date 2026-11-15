@@ -105,7 +105,7 @@ export function ValuesPanel({
               {...props}
               value={key}
               onChange={(event) => setKey(event.target.value)}
-              placeholder="GM_setValue key"
+              placeholder={t('editor.valueKeyPlaceholder')}
               spellCheck={false}
               className="max-w-xs font-mono text-xs"
             />
