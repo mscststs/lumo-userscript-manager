@@ -229,6 +229,64 @@ export class ExtensionHarness {
     return evaluate<T>(this.extensionPage!, expression);
   }
 
+  /**
+   * Load another unpacked extension and return its id.
+   *
+   * Needed for anything that only happens *between* extensions
+   * (`onConnectExternal`, `onMessageExternal`): an extension can never be its
+   * own external sender, so a second pinned extension is the only real test.
+   */
+  async loadExtension(directory: string): Promise<string> {
+    const loaded = await this.browser!.send<{ id: string }>('Extensions.loadUnpacked', {
+      path: directory,
+    });
+    return loaded.id;
+  }
+
+  /** Open a page belonging to another loaded extension and attach CDP to it. */
+  async attachExtensionPage(extensionId: string, page: string): Promise<Cdp> {
+    const { targetId } = await this.browser!.send<{ targetId: string }>('Target.createTarget', {
+      url: `chrome-extension://${extensionId}/${page}`,
+    });
+    const target = await waitFor(async () => {
+      const targets = await this.targets();
+      return targets.find((item) => item.id === targetId);
+    }, 10_000);
+    const cdp = await Cdp.connect(target.webSocketDebuggerUrl!);
+    await cdp.send('Runtime.enable');
+    return cdp;
+  }
+
+  /** Console lines and exceptions from the extension's service worker. */
+  async watchServiceWorker(): Promise<{ lines: string[]; close: () => void }> {
+    const target = await waitFor(async () => {
+      const targets = await this.targets();
+      return targets.find(
+        (item) => item.type === 'service_worker' && item.url.includes(this.extId),
+      );
+    }, 10_000);
+    const cdp = await Cdp.connect(target.webSocketDebuggerUrl!);
+    await cdp.send('Runtime.enable');
+    await cdp.send('Log.enable');
+    const lines: string[] = [];
+    cdp.onMessage((message) => {
+      if (message.method === 'Runtime.consoleAPICalled') {
+        lines.push(
+          `${message.params.type}: ${message.params.args
+            .map((arg: { value?: unknown; description?: string }) => arg.value ?? arg.description)
+            .join(' ')}`,
+        );
+      }
+      if (message.method === 'Runtime.exceptionThrown') {
+        lines.push(`exception: ${message.params.exceptionDetails.text}`);
+      }
+      if (message.method === 'Log.entryAdded') {
+        lines.push(`log: ${message.params.entry.level} ${message.params.entry.text}`);
+      }
+    });
+    return { lines, close: () => cdp.close() };
+  }
+
   async installScript(code: string): Promise<string> {
     return this.extEval<string>(`(async()=>{
       const response = await chrome.runtime.sendMessage({type:'scripts:save',payload:{code:${JSON.stringify(code)}}});

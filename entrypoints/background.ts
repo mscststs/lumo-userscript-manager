@@ -87,6 +87,7 @@ import {
 import { handleProbe } from '@/lib/agent/probe';
 import { handleAuthorize } from '@/lib/agent/authorize';
 import { isAuthorizeRequest, isProbeRequest, MCP_PORT_NAME } from '@/lib/agent/protocol';
+import { createAgentMcpServer } from '@/lib/agent/mcp-server';
 import { ChromePortTransport } from '@/lib/agent/transport';
 import { AppError, serializeError } from '@/lib/errors';
 import { formatDiagnostics } from '@/lib/diagnostics';
@@ -497,11 +498,7 @@ async function importBackup(payload: Record<string, any>): Promise<ImportBackupR
   return { imported, skipped, settingsImported, failed };
 }
 
-export default defineBackground({
-  // ESM lets the large optional MCP SDK live in a shared chunk instead of
-  // being inlined into the service-worker cold-start bundle.
-  type: 'module',
-  main: () => {
+export default defineBackground(() => {
   chrome.runtime.onInstalled.addListener(() => {
     void bootstrapRuntime()
       .then(() => checkScriptUpdates())
@@ -567,9 +564,9 @@ export default defineBackground({
         await transport.close();
         return;
       }
-      // The MCP SDK and zod are large and only needed when a host actually
-      // opens a session; keep them out of the service worker's cold start.
-      const { createAgentMcpServer } = await import('@/lib/agent/mcp-server');
+      // Static import: `import()` is forbidden on ServiceWorkerGlobalScope by
+      // the HTML specification, so a lazily loaded MCP SDK would close every
+      // external session the moment a host opened one.
       const server = createAgentMcpServer(port.sender?.id, access.settings);
       transport.onclose = () => {
         void server.close().catch(() => undefined);
@@ -676,5 +673,4 @@ export default defineBackground({
   void bootstrapRuntime().catch((error) =>
     console.error('[Lumo Userscripts] Bootstrap failed:', error),
   );
-  },
 });
