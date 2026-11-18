@@ -460,6 +460,7 @@
       "notFound": "Script ikke fundet.",
       "codeMissing": "Scriptkode mangler.",
       "sourceRequired": "En script-URL eller kilde er påkrævet.",
+      "privateHost": "Denne URL peger på et privat netværk.",
       "tooLarge": "Script er større end 5 MB.",
       "duplicate": "Et script med navnet \"{{name}}\" findes allerede i \"{{namespace}}\".",
       "invalidMetadata": "Scriptmetadataene er ugyldige."

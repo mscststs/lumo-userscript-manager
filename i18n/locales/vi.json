@@ -460,6 +460,7 @@
       "notFound": "Không tìm thấy tập lệnh.",
       "codeMissing": "Mã tập lệnh bị thiếu.",
       "sourceRequired": "Cần có URL tập lệnh hoặc nguồn.",
+      "privateHost": "URL này trỏ tới một mạng riêng.",
       "tooLarge": "Tập lệnh lớn hơn 5 MB.",
       "duplicate": "Tập lệnh có tên “{{name}}” đã tồn tại trong “{{namespace}}”.",
       "invalidMetadata": "Siêu dữ liệu tập lệnh không hợp lệ."

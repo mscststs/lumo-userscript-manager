@@ -460,6 +460,7 @@
       "notFound": "Skripti ei leitud.",
       "codeMissing": "Skripti kood puudub.",
       "sourceRequired": "Vaja on skripti URL-i või allikat.",
+      "privateHost": "See URL osutab privaatvõrgule.",
       "tooLarge": "Skript on suurem kui 5 MB.",
       "duplicate": "Skript nimega „{{name}}” on nimeruumis „{{namespace}}” juba olemas.",
       "invalidMetadata": "Skripti metaandmed on kehtetud."

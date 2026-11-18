@@ -476,6 +476,7 @@
       "notFound": "Skriptas nerastas.",
       "codeMissing": "Trūksta skripto kodo.",
       "sourceRequired": "Būtinas skripto URL arba šaltinis.",
+      "privateHost": "Šis URL nurodo į privatų tinklą.",
       "tooLarge": "Skriptas didesnis nei 5 MB.",
       "duplicate": "Skriptas pavadinimu „{{name}}“ jau yra „{{namespace}}“.",
       "invalidMetadata": "Skripto metaduomenys neteisingi."

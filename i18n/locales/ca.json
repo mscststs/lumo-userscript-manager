@@ -468,6 +468,7 @@
       "notFound": "No s'ha trobat el script.",
       "codeMissing": "Falta el codi del script.",
       "sourceRequired": "Cal la URL d'un script o el codi font.",
+      "privateHost": "Aquest URL apunta a una xarxa privada.",
       "tooLarge": "El script és més gran que 5 MB.",
       "duplicate": "Un script anomenat \"{{name}}\" ja existeix a \"{{namespace}}\".",
       "invalidMetadata": "Les metadades de el script no són vàlides."

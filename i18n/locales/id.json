@@ -460,6 +460,7 @@
       "notFound": "Skrip tidak ditemukan.",
       "codeMissing": "Kode skrip tidak ada.",
       "sourceRequired": "URL skrip atau sumber diperlukan.",
+      "privateHost": "URL ini mengarah ke jaringan privat.",
       "tooLarge": "Skrip lebih besar dari 5 MB.",
       "duplicate": "Skrip bernama “{{name}}” sudah ada di “{{namespace}}”.",
       "invalidMetadata": "Metadata skrip tidak valid."

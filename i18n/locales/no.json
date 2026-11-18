@@ -460,6 +460,7 @@
       "notFound": "Finner ikke skriptet.",
       "codeMissing": "Skriptkode mangler.",
       "sourceRequired": "En skript-URL eller kilde kreves.",
+      "privateHost": "Denne URL-en peker på et privat nettverk.",
       "tooLarge": "Skriptet er større enn 5 MB.",
       "duplicate": "Et skript kalt «{{name}}» finnes allerede i «{{namespace}}».",
       "invalidMetadata": "Skriptmetadataene er ugyldige."

@@ -460,6 +460,7 @@
       "notFound": "スクリプトが見つかりません。",
       "codeMissing": "スクリプトのコードがありません。",
       "sourceRequired": "スクリプトの URL またはソースが必要です。",
+      "privateHost": "この URL はプライベートネットワークを指しています。",
       "tooLarge": "スクリプトが 5 MB を超えています。",
       "duplicate": "「{{namespace}}」に「{{name}}」という名前のスクリプトが既にあります。",
       "invalidMetadata": "スクリプトのメタデータが無効です。"

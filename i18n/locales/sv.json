@@ -460,6 +460,7 @@
       "notFound": "Skriptet hittades inte.",
       "codeMissing": "Skriptkod saknas.",
       "sourceRequired": "En skript-URL eller källa krävs.",
+      "privateHost": "Den här URL:en pekar på ett privat nätverk.",
       "tooLarge": "Skriptet är större än 5 MB.",
       "duplicate": "Ett skript med namnet \"{{name}}\" finns redan i \"{{namespace}}\".",
       "invalidMetadata": "Skriptets metadata är ogiltiga."

@@ -460,6 +460,7 @@
       "notFound": "Skript nicht gefunden.",
       "codeMissing": "Skriptcode fehlt.",
       "sourceRequired": "Skript-URL oder Quelle erforderlich.",
+      "privateHost": "Diese URL verweist auf ein privates Netzwerk.",
       "tooLarge": "Das Skript ist größer als 5 MB.",
       "duplicate": "Ein Skript namens „{{name}}“ existiert bereits in „{{namespace}}“.",
       "invalidMetadata": "Die Skript-Metadaten sind ungültig."

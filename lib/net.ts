@@ -12,8 +12,12 @@ import { AppError } from './errors';
  *   3. a wall-clock timeout;
  *   4. a hard byte cap enforced while streaming, before the body is buffered.
  *
- * Redirects are followed manually so a public URL cannot hop to a private one
- * after the initial validation.
+ * Redirects are followed by the browser (`redirect: 'follow'`). A manual
+ * redirect is not inspectable: the Fetch spec hands back an opaque-redirect
+ * filtered response (status 0, empty header list), so the `Location` header and
+ * the hop chain are invisible to us. Instead the landing URL reported by the
+ * response is validated, and a private landing is discarded before its body is
+ * buffered or executed.
  */
 
 export interface FetchLimitedOptions {
@@ -24,8 +28,6 @@ export interface FetchLimitedOptions {
   allowPrivate?: boolean;
   cache?: RequestCache;
   headers?: HeadersInit;
-  /** Maximum redirects; each hop is revalidated. */
-  maxRedirects?: number;
 }
 
 export interface LimitedResponse {
@@ -37,7 +39,6 @@ export interface LimitedResponse {
 }
 
 const DEFAULT_TIMEOUT_MS = 15_000;
-const DEFAULT_MAX_REDIRECTS = 5;
 
 export function parseRemoteUrl(raw: string, options: { allowPrivate?: boolean } = {}): URL {
   let url: URL;
@@ -55,12 +56,26 @@ export function parseRemoteUrl(raw: string, options: { allowPrivate?: boolean } 
   }
   if (!options.allowPrivate && isPrivateHost(url.hostname)) {
     throw new AppError(
-      'script.sourceRequired',
+      'script.privateHost',
       undefined,
       `Private-network URL is not allowed without explicit consent: ${url.hostname}`,
     );
   }
   return url;
+}
+
+/** Drop a response we are not going to read, so the request stops early. */
+async function discard(response: Response): Promise<void> {
+  await response.body?.cancel().catch(() => undefined);
+}
+
+/** `hostname` of an absolute URL string; empty when it cannot be parsed. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return '';
+  }
 }
 
 /**
@@ -143,54 +158,45 @@ export async function fetchLimited(
   rawUrl: string,
   options: FetchLimitedOptions,
 ): Promise<LimitedResponse> {
-  const maxRedirects = options.maxRedirects ?? DEFAULT_MAX_REDIRECTS;
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
-  let current = parseRemoteUrl(rawUrl, { allowPrivate: options.allowPrivate });
+  const requested = parseRemoteUrl(rawUrl, { allowPrivate: options.allowPrivate });
 
-  for (let redirect = 0; redirect <= maxRedirects; redirect += 1) {
-    const response = await fetch(current, {
-      method: 'GET',
-      credentials: options.credentials ?? 'omit',
-      redirect: 'manual',
-      cache: options.cache ?? 'no-cache',
-      headers: options.headers,
-      signal: AbortSignal.timeout(timeoutMs),
-    });
+  const response = await fetch(requested, {
+    method: 'GET',
+    credentials: options.credentials ?? 'omit',
+    redirect: 'follow',
+    cache: options.cache ?? 'no-cache',
+    headers: options.headers,
+    signal: AbortSignal.timeout(timeoutMs),
+  });
 
-    if (response.status >= 300 && response.status < 400) {
-      const location = response.headers.get('location');
-      if (!location) {
-        throw new AppError(
-          'update.httpError',
-          { status: response.status },
-          `Redirect without a Location header (${current.href}).`,
-        );
-      }
-      if (redirect === maxRedirects) {
-        throw new AppError('update.httpError', { status: response.status }, 'Too many redirects.');
-      }
-      const next = new URL(location, current);
-      current = parseRemoteUrl(next.href, { allowPrivate: options.allowPrivate });
-      continue;
-    }
+  // The browser followed every hop already; only the landing is observable.
+  const finalUrl = response.url || requested.href;
 
-    if (!response.ok) {
-      throw new AppError(
-        'update.httpError',
-        { status: response.status },
-        `HTTP ${response.status} for ${current.href}`,
-      );
-    }
-
-    const bytes = await readCapped(response, options.maxBytes);
-    return {
-      bytes,
-      text: new TextDecoder().decode(bytes),
-      contentType: response.headers.get('content-type') ?? '',
-      finalUrl: response.url || current.href,
-      status: response.status,
-    };
+  if (!options.allowPrivate && isPrivateHost(hostOf(finalUrl))) {
+    await discard(response);
+    throw new AppError(
+      'script.privateHost',
+      undefined,
+      `Redirected to a private address: ${finalUrl}`,
+    );
   }
 
-  throw new AppError('update.httpError', { status: 0 }, 'Too many redirects.');
+  if (!response.ok) {
+    await discard(response);
+    throw new AppError(
+      'update.httpError',
+      { status: response.status },
+      `HTTP ${response.status} for ${finalUrl}`,
+    );
+  }
+
+  const bytes = await readCapped(response, options.maxBytes);
+  return {
+    bytes,
+    text: new TextDecoder().decode(bytes),
+    contentType: response.headers.get('content-type') ?? '',
+    finalUrl,
+    status: response.status,
+  };
 }

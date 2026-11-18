@@ -492,6 +492,7 @@
       "notFound": "لم يُعثر على السكربت.",
       "codeMissing": "شيفرة السكربت مفقودة.",
       "sourceRequired": "مطلوب عنوان URL أو مصدر للسكربت.",
+      "privateHost": "يشير عنوان URL هذا إلى شبكة خاصة.",
       "tooLarge": "حجم السكربت أكبر من 5 MB.",
       "duplicate": "يوجد سكربت باسم «{{name}}» في «{{namespace}}» بالفعل.",
       "invalidMetadata": "بيانات السكربت الوصفية غير صالحة."

@@ -460,6 +460,7 @@
       "notFound": "ስክሪፕት አልተገኘም።",
       "codeMissing": "የስክሪፕት ኮድ ጠፍቷል።",
       "sourceRequired": "የስክሪፕት URL ወይም ምንጭ ያስፈልጋል።",
+      "privateHost": "ይህ URL ወደ የግል ኔትወርክ ይጠቁማል።",
       "tooLarge": "ስክሪፕቱ ከ5 ሜባ ይበልጣል።",
       "duplicate": "\"{{name}}\" የሚባል ስክሪፕት አስቀድሞ በ\"{{namespace}}\" አለ።",
       "invalidMetadata": "የስክሪፕት ዲበ ዳታ ልክ ያልሆነ ነው።"

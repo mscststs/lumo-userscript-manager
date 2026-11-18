@@ -460,6 +460,7 @@
       "notFound": "找不到腳本。",
       "codeMissing": "缺少腳本程式碼。",
       "sourceRequired": "請輸入腳本 URL 或原始碼。",
+      "privateHost": "此 URL 指向私人網路。",
       "tooLarge": "腳本超過 5 MB。",
       "duplicate": "命名空間「{{namespace}}」中已存在名為「{{name}}」的腳本。",
       "invalidMetadata": "腳本中繼資料無效。"

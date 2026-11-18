@@ -460,6 +460,7 @@
       "notFound": "Hati haikupatikana.",
       "codeMissing": "Msimbo wa hati haupo.",
       "sourceRequired": "URL ya hati au chanzo kinahitajika.",
+      "privateHost": "URL hii inaelekeza kwenye mtandao wa kibinafsi.",
       "tooLarge": "Hati ni kubwa kuliko MB 5.",
       "duplicate": "Hati inayoitwa \"{{name}}\" tayari ipo katika \"{{namespace}}\".",
       "invalidMetadata": "Metadata ya hati si sahihi."

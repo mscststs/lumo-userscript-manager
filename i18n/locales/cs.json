@@ -476,6 +476,7 @@
       "notFound": "Skript nenalezen.",
       "codeMissing": "Chybí kód skriptu.",
       "sourceRequired": "Je vyžadována URL skriptu nebo zdroj.",
+      "privateHost": "Tato URL vede do privátní sítě.",
       "tooLarge": "Skript je větší než 5 MB.",
       "duplicate": "Skript s názvem „{{name}}“ již v „{{namespace}}“ existuje.",
       "invalidMetadata": "Metadata skriptu jsou neplatná."

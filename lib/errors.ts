@@ -15,6 +15,7 @@ export type ErrorCode =
   | 'script.notFound'
   | 'script.codeMissing'
   | 'script.sourceRequired'
+  | 'script.privateHost'
   | 'script.tooLarge'
   | 'script.duplicate'
   | 'script.invalidMetadata'
@@ -43,6 +44,7 @@ export const ERROR_KEYS: Record<ErrorCode, TranslationKey> = {
   'script.notFound': 'errors.script.notFound',
   'script.codeMissing': 'errors.script.codeMissing',
   'script.sourceRequired': 'errors.script.sourceRequired',
+  'script.privateHost': 'errors.script.privateHost',
   'script.tooLarge': 'errors.script.tooLarge',
   'script.duplicate': 'errors.script.duplicate',
   'script.invalidMetadata': 'errors.script.invalidMetadata',

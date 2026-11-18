@@ -468,6 +468,7 @@
       "notFound": "Skripts nav atrasts.",
       "codeMissing": "Trūkst skripta koda.",
       "sourceRequired": "Nepieciešams skripta URL vai avots.",
+      "privateHost": "Šis URL norāda uz privāto tīklu.",
       "tooLarge": "Skripts ir lielāks par 5 MB.",
       "duplicate": "Skripts ar nosaukumu “{{name}}” jau pastāv mapē “{{namespace}}”.",
       "invalidMetadata": "Skripta metadati nav derīgi."

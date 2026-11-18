@@ -468,6 +468,7 @@
       "notFound": "Script non trovato.",
       "codeMissing": "Manca il codice dello script.",
       "sourceRequired": "Sono richiesti un URL o il codice sorgente dello script.",
+      "privateHost": "Questo URL punta a una rete privata.",
       "tooLarge": "Lo script è più grande di 5 MB.",
       "duplicate": "Uno script denominato “{{name}}” esiste già in “{{namespace}}”.",
       "invalidMetadata": "I metadati dello script non sono validi."

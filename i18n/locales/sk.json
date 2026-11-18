@@ -476,6 +476,7 @@
       "notFound": "Skript sa nenašiel.",
       "codeMissing": "Chýba kód skriptu.",
       "sourceRequired": "Vyžaduje sa URL skriptu alebo zdroj.",
+      "privateHost": "Táto URL ukazuje na privátnu sieť.",
       "tooLarge": "Skript je väčší ako 5 MB.",
       "duplicate": "Skript s názvom „{{name}}“ už v „{{namespace}}“ existuje.",
       "invalidMetadata": "Metadáta skriptu sú neplatné."

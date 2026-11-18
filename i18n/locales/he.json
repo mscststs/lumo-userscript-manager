@@ -468,6 +468,7 @@
       "notFound": "הסקריפט לא נמצא.",
       "codeMissing": "קוד הסקריפט חסר.",
       "sourceRequired": "נדרש URL או מקור לסקריפט.",
+      "privateHost": "כתובת ה-URL הזו מצביעה על רשת פרטית.",
       "tooLarge": "הסקריפט גדול מ-5 MB.",
       "duplicate": "כבר קיים סקריפט בשם „{{name}}” ב-„{{namespace}}”.",
       "invalidMetadata": "המטא-נתונים של הסקריפט אינם תקינים."

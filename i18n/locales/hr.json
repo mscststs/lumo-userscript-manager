@@ -468,6 +468,7 @@
       "notFound": "Skripta nije pronađena.",
       "codeMissing": "Nedostaje kod skripte.",
       "sourceRequired": "Potrebna je URL skripte ili izvor.",
+      "privateHost": "Ovaj URL upućuje na privatnu mrežu.",
       "tooLarge": "Skripta je veća od 5 MB.",
       "duplicate": "Skripta pod nazivom “{{name}}” već postoji u “{{namespace}}”.",
       "invalidMetadata": "Metapodaci skripte nisu valjani."

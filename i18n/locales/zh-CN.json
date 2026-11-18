@@ -460,6 +460,7 @@
       "notFound": "未找到脚本。",
       "codeMissing": "缺少脚本代码。",
       "sourceRequired": "请输入脚本 URL 或源码。",
+      "privateHost": "该 URL 指向私有网络。",
       "tooLarge": "脚本超过 5 MB。",
       "duplicate": "命名空间“{{namespace}}”中已存在名为“{{name}}”的脚本。",
       "invalidMetadata": "脚本元数据无效。"

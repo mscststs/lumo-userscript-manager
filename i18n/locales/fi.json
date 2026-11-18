@@ -460,6 +460,7 @@
       "notFound": "Skriptiä ei löydy.",
       "codeMissing": "Skriptikoodi puuttuu.",
       "sourceRequired": "Skriptin URL tai lähde vaaditaan.",
+      "privateHost": "Tämä URL viittaa yksityisverkkoon.",
       "tooLarge": "Komentosarja on suurempi kuin 5 Mt.",
       "duplicate": "Skripti nimeltä \"{{name}}\" on jo olemassa kansiossa \"{{namespace}}\".",
       "invalidMetadata": "Skriptin metatiedot ovat virheelliset."

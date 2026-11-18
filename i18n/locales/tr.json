@@ -460,6 +460,7 @@
       "notFound": "Betik bulunamadı.",
       "codeMissing": "Betik kodu eksik.",
       "sourceRequired": "Betik URL'si veya kaynağı gerekli.",
+      "privateHost": "Bu URL özel bir ağa işaret ediyor.",
       "tooLarge": "Betik 5 MB'tan büyük.",
       "duplicate": "“{{name}}” adlı bir betik “{{namespace}}” dosyasında zaten mevcut.",
       "invalidMetadata": "Betik meta verileri geçersiz."

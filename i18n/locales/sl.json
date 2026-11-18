@@ -476,6 +476,7 @@
       "notFound": "Skripta ni bilo mogoče najti.",
       "codeMissing": "Koda skripta manjka.",
       "sourceRequired": "Potrebna je URL skripta ali vir.",
+      "privateHost": "Ta URL kaže na zasebno omrežje.",
       "tooLarge": "Skript je večji od 5 MB.",
       "duplicate": "Skript z imenom »{{name}}« že obstaja v »{{namespace}}«.",
       "invalidMetadata": "Metapodatki skripta niso veljavni."

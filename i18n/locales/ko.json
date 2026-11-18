@@ -460,6 +460,7 @@
       "notFound": "스크립트를 찾을 수 없습니다.",
       "codeMissing": "스크립트 코드가 없습니다.",
       "sourceRequired": "스크립트 URL 또는 소스가 필요합니다.",
+      "privateHost": "이 URL은 사설 네트워크를 가리킵니다.",
       "tooLarge": "스크립트가 5MB를 초과합니다.",
       "duplicate": "‘{{namespace}}’에 ‘{{name}}’ 이름의 스크립트가 이미 있습니다.",
       "invalidMetadata": "스크립트 메타데이터가 올바르지 않습니다."

@@ -460,6 +460,7 @@
       "notFound": "A szkript nem található.",
       "codeMissing": "A szkript kódja hiányzik.",
       "sourceRequired": "Egy szkript URL-je vagy forrása szükséges.",
+      "privateHost": "Ez az URL egy privát hálózatra mutat.",
       "tooLarge": "A szkript nagyobb, mint 5 MB.",
       "duplicate": "A „{{name}}” nevű szkript már létezik a „{{namespace}}” névtérben.",
       "invalidMetadata": "A szkript metaadatai érvénytelenek."

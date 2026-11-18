@@ -476,6 +476,7 @@
       "notFound": "Nie znaleziono skryptu.",
       "codeMissing": "Brakuje kodu skryptu.",
       "sourceRequired": "Wymagany jest adres URL skryptu lub kod źródłowy.",
+      "privateHost": "Ten URL wskazuje na sieć prywatną.",
       "tooLarge": "Skrypt jest większy niż 5 MB.",
       "duplicate": "Skrypt o nazwie „{{name}}” już istnieje w „{{namespace}}”.",
       "invalidMetadata": "Metadane skryptu są nieprawidłowe."

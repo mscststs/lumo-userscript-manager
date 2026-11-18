@@ -468,6 +468,7 @@
       "notFound": "Scriptul nu a fost găsit.",
       "codeMissing": "Codul de script lipsește.",
       "sourceRequired": "Este necesar URL-ul unui script sau o sursă.",
+      "privateHost": "Acest URL indică o rețea privată.",
       "tooLarge": "Scriptul este mai mare de 5 MB.",
       "duplicate": "Un script numit „{{name}}” există deja în „{{namespace}}”.",
       "invalidMetadata": "Metadatele scriptului sunt nevalide."

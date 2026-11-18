@@ -460,6 +460,7 @@
       "notFound": "Script niet gevonden.",
       "codeMissing": "Scriptcode ontbreekt.",
       "sourceRequired": "Een script-URL of broncode is vereist.",
+      "privateHost": "Deze URL wijst naar een privénetwerk.",
       "tooLarge": "Script is groter dan 5 MB.",
       "duplicate": "Er bestaat al een script met de naam “{{name}}” in “{{namespace}}”.",
       "invalidMetadata": "De metagegevens van het script zijn ongeldig."
