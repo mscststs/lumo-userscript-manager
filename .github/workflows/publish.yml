@@ -112,11 +112,14 @@ jobs:
           node scripts/release/cws-publish.mjs "${args[@]}"
 
       # 留下本次实际提交的 zip，方便回溯「这个版本到底传了什么」。
+      # WXT 把产物写在 `.output/`：upload-artifact 默认丢弃隐藏目录，不加
+      # include-hidden-files 会「成功」但一个文件都没传（只留一条 warning）。
       - name: Upload package artifact
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: lumo-userscripts-chrome-webstore-${{ steps.version.outputs.value || github.run_number }}
           path: .output/*-chrome.zip
-          if-no-files-found: warn
+          if-no-files-found: error
+          include-hidden-files: true
           retention-days: 30
