@@ -2,7 +2,7 @@
   "name": "lumo-userscript-manager",
   "description": "A powerful, well-crafted userscript manager for your browser",
   "private": true,
-  "version": "1.0.4",
+  "version": "1.0.5",
   "license": "MIT",
   "author": "mscststs",
   "repository": {
