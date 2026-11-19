@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Check, ChevronRight, Copy, ExternalLink, Sparkles } from 'lucide-react';
+import { ChevronRight, ExternalLink, Sparkles } from 'lucide-react';
 import {
   LUMO_CHROME_STORE_URL,
   LUMO_EDGE_ADDONS_URL,
   LUMO_REPOSITORY_URL,
 } from '@/lib/lumo-agent';
 import { Button } from '@/components/ui/button';
+import { ExtensionIdValue } from '@/components/agent/ExtensionIdValue';
 import type { TranslationKey } from '@/i18n/keys';
 import {
   Dialog,
@@ -67,24 +68,6 @@ const STEP_KEYS: Record<(typeof STEPS)[number]['id'], { title: TranslationKey; d
 export function AgentIntro() {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  // Re-opening starts from a clean state; a leftover tick would claim an action
-  // the user did not just take.
-  useEffect(() => {
-    if (!open) setCopied(false);
-  }, [open]);
-
-  const copyId = async () => {
-    try {
-      await navigator.clipboard.writeText(chrome.runtime.id);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // A denied clipboard write is not worth a page-level error: the ID stays
-      // selectable right next to the button.
-    }
-  };
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -151,27 +134,14 @@ export function AgentIntro() {
                 )}
 
                 {step.id === 'id' && (
-                  <div className="mt-2 flex min-w-0 items-center gap-1.5">
-                    <code className="min-w-0 flex-1 select-all truncate rounded-control border border-border bg-muted/50 px-2 py-1 font-mono text-xs text-muted-foreground">
-                      {chrome.runtime.id}
-                    </code>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-7 w-7 shrink-0"
-                      onClick={() => void copyId()}
-                      aria-label={t('settings.agent.copyId')}
-                    >
-                      {copied ? (
-                        <Check className="h-3.5 w-3.5 text-success" />
-                      ) : (
-                        <Copy className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
-                    <span role="status" aria-live="polite" className="sr-only">
-                      {copied ? t('settings.agent.intro.copied') : ''}
-                    </span>
-                  </div>
+                  // Keyed on the dialog state: re-opening starts from a clean
+                  // state, so a leftover tick never claims an action the user
+                  // did not just take.
+                  <ExtensionIdValue
+                    key={open ? 'open' : 'closed'}
+                    variant="inline"
+                    className="mt-2"
+                  />
                 )}
               </div>
             </li>

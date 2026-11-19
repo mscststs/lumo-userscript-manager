@@ -4,8 +4,6 @@ import { useErrorText } from '@/lib/use-error-text';
 import { appErrorFromResponse } from '@/lib/errors';
 import type { TranslationKey } from '@/i18n/keys';
 import {
-  Check,
-  Copy,
   FileArchive,
   FileJson,
   Loader2,
@@ -26,6 +24,7 @@ import { storage } from '@/store/storage';
 import { useStorageWatch } from '@/store/useStorageWatch';
 import { useAgentAccess } from '@/store/useAgentAccess';
 import { AgentIntro } from '@/components/agent/AgentIntro';
+import { ExtensionIdValue } from '@/components/agent/ExtensionIdValue';
 import { sendBg, onLumoEvent } from '@/lib/messages';
 import type { BackupData } from '@/lib/backup';
 import { BackupError, parseBackupJson, summarizeBackup } from '@/lib/backup-format';
@@ -41,6 +40,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { EnumValue } from '@/components/ui/enum';
 import { Input } from '@/components/ui/input';
+import { Field } from '@/components/ui/field';
 import { Switch } from '@/components/ui/switch';
 import { SectionNav } from '@/components/layout/SectionNav';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -125,8 +125,11 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
   const agentWriteChain = useRef<Promise<void>>(Promise.resolve());
   const [agentName, setAgentName] = useState('');
   const [agentId, setAgentId] = useState('');
-  const agentIdInput = useRef<HTMLInputElement>(null);
-  const [copied, setCopied] = useState(false);
+  // Adding a client is its own surface: the allowlist group lists, the dialog
+  // creates. A draft survives a dismiss (a pasted 32-char ID is expensive to
+  // retype) but is cleared once the entry is accepted.
+  const [addOpen, setAddOpen] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
   const [audit, setAudit] = useState<AgentAuditEntry[]>([]);
   // Same queue the approval dialog renders; the inline list is the durable
   // entry point for users who turned automatic prompting off.
@@ -275,11 +278,11 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
     return agentWriteChain.current;
   };
 
-  const addAllowedId = () => {
+  const addAllowedId = (): boolean => {
     const id = agentId.trim();
     if (!isExtensionId(id)) {
-      setError(t('settings.agent.invalidId'));
-      return;
+      setAddError(t('settings.agent.invalidId'));
+      return false;
     }
     // The ID is the identity; the name is an optional label the user can supply
     // when the host has never identified itself. Re-adding an existing ID with a
@@ -293,6 +296,8 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
     });
     setAgentName('');
     setAgentId('');
+    setAddError(null);
+    return true;
   };
 
   const loadAudit = useCallback(async () => {
@@ -320,16 +325,6 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
   const dismissRequest = async (id: string) => {
     try {
       await agentAccess.dismiss(id);
-    } catch (e) {
-      setError(errorText(e));
-    }
-  };
-
-  const copyExtensionId = async () => {
-    try {
-      await navigator.clipboard.writeText(chrome.runtime.id);
-      setCopied(true);
-      window.setTimeout(() => setCopied(false), 1500);
     } catch (e) {
       setError(errorText(e));
     }
@@ -781,32 +776,15 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
                 )}
               </SettingsGroup>
 
-              <SettingsGroup title={t('settings.agent.identity')}>
-                <SettingRow
-                  label={t('settings.agent.extensionId')}
-                  description={t('settings.agent.extensionIdHint')}
-                  control={
-                    <div className="flex min-w-0 items-center gap-1.5">
-                      <code className="max-w-[22ch] truncate rounded-md border border-border bg-muted/50 px-2 py-1 font-mono text-2xs text-muted-foreground">
-                        {chrome.runtime.id}
-                      </code>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 shrink-0"
-                        onClick={() => void copyExtensionId()}
-                        aria-label={t('settings.agent.copyId')}
-                      >
-                        {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                      </Button>
-                    </div>
-                  }
-                />
-              </SettingsGroup>
-
               <SettingsGroup
                 title={t('settings.agent.allowed')}
                 description={t('settings.agent.allowedHint')}
+                action={
+                  <Button variant="outline" size="sm" onClick={() => setAddOpen(true)}>
+                    <Plus className="h-3.5 w-3.5" />
+                    {t('settings.agent.add')}
+                  </Button>
+                }
               >
                 {agent.allowedClients.length === 0 ? (
                   <p className="py-2.5 text-xs text-muted-foreground">
@@ -852,49 +830,98 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
                     </div>
                   ))
                 )}
-                <div className="flex flex-wrap items-center gap-2 py-2.5">
-                  <Input
-                    value={agentName}
-                    onChange={(event) => setAgentName(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key !== 'Enter' || isImeComposing(event)) return;
+              </SettingsGroup>
+
+              <Dialog
+                open={addOpen}
+                onOpenChange={(next) => {
+                  setAddOpen(next);
+                  if (!next) setAddError(null);
+                }}
+              >
+                <DialogContent className="sm:max-w-sm" closeLabel={t('common.close')}>
+                  <form
+                    className="flex min-w-0 flex-col gap-4"
+                    onSubmit={(event) => {
                       event.preventDefault();
-                      // The name is optional, the ID is not: Enter here submits
-                      // when an ID is already there, otherwise it moves on to the
-                      // field that is actually required.
-                      if (isExtensionId(agentId.trim())) addAllowedId();
-                      else agentIdInput.current?.focus();
+                      if (addAllowedId()) setAddOpen(false);
                     }}
-                    placeholder={t('settings.agent.namePlaceholder')}
-                    aria-label={t('settings.agent.namePlaceholder')}
-                    dir="auto"
-                    className="min-w-0 flex-1 basis-32 text-xs"
-                    maxLength={80}
-                  />
-                  <Input
-                    ref={agentIdInput}
-                    value={agentId}
-                    onChange={(event) => setAgentId(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key !== 'Enter' || isImeComposing(event)) return;
-                      event.preventDefault();
-                      addAllowedId();
-                    }}
-                    placeholder={t('settings.agent.idPlaceholder')}
-                    aria-label={t('settings.agent.idPlaceholder')}
-                    dir="ltr"
-                    className="min-w-0 flex-1 basis-52 font-mono text-xs"
-                    spellCheck={false}
-                  />
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={addAllowedId}
-                    disabled={!agentId.trim()}
                   >
-                    <Plus className="h-3.5 w-3.5" />
-                    {t('settings.agent.add')}
-                  </Button>
+                    <DialogHeader>
+                      <DialogTitle>{t('settings.agent.add')}</DialogTitle>
+                      <DialogDescription>{t('settings.agent.allowedHint')}</DialogDescription>
+                    </DialogHeader>
+
+                    {/* Enter during IME composition is a candidate selection,
+                        not a submit; the guard lives on the inputs so no extra
+                        interactive wrapper is needed. */}
+                    <div className="flex min-w-0 flex-col gap-3">
+                      <Field label={t('settings.agent.namePlaceholder')}>
+                        {(props) => (
+                          <Input
+                            {...props}
+                            value={agentName}
+                            onChange={(event) => setAgentName(event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter' && isImeComposing(event)) {
+                                event.preventDefault();
+                              }
+                            }}
+                            dir="auto"
+                            className="text-sm"
+                            maxLength={80}
+                          />
+                        )}
+                      </Field>
+                      <Field
+                        label={t('settings.agent.idPlaceholder')}
+                        required
+                        error={addError ?? undefined}
+                      >
+                        {(props) => (
+                          <Input
+                            {...props}
+                            value={agentId}
+                            onChange={(event) => {
+                              setAgentId(event.target.value);
+                              if (addError) setAddError(null);
+                            }}
+                            onKeyDown={(event) => {
+                              if (event.key === 'Enter' && isImeComposing(event)) {
+                                event.preventDefault();
+                              }
+                            }}
+                            dir="ltr"
+                            className="font-mono text-sm"
+                            spellCheck={false}
+                            autoFocus
+                          />
+                        )}
+                      </Field>
+                    </div>
+
+                    <DialogFooter>
+                      <Button type="button" variant="ghost" onClick={() => setAddOpen(false)}>
+                        {t('common.cancel')}
+                      </Button>
+                      <Button type="submit" disabled={!agentId.trim()}>
+                        <Plus className="h-3.5 w-3.5" />
+                        {t('settings.agent.add')}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+
+              <SettingsGroup title={t('settings.agent.identity')}>
+                <div className="py-3">
+                  <p className="text-sm font-medium leading-5 text-foreground">
+                    {t('settings.agent.extensionId')}
+                  </p>
+                  <p className="mt-0.5 max-w-[62ch] text-xs leading-relaxed text-muted-foreground text-pretty">
+                    {t('settings.agent.extensionIdHint')}
+                  </p>
+                  <ExtensionIdValue className="mt-2" />
                 </div>
               </SettingsGroup>
 
