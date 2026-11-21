@@ -268,6 +268,7 @@
     "title": "Nustatymai",
     "sections": {
       "general": "Bendri",
+      "compatibility": "Suderinamumas",
       "updates": "Atnaujinimai",
       "data": "Duomenys",
       "agent": "Agentas"
@@ -279,7 +280,8 @@
       "overview": "Apžvalga",
       "export": "Eksportuoti atsarginę kopiją",
       "restore": "Atkurti atsarginę kopiją",
-      "agent": "Agento prieiga"
+      "agent": "Agento prieiga",
+      "compatibility": "Scenarijų svetainės"
     },
     "runtime": "Runtime",
     "scriptsEnabled": "Įgalinti skripto įterpimą",
@@ -427,7 +429,9 @@
     },
     "saved": "Nustatymai išsaugoti.",
     "importAction_few": "Importuoti {{count}} skriptus",
-    "importAction_many": "Importuoti {{count}} skriptų"
+    "importAction_many": "Importuoti {{count}} skriptų",
+    "siteIntegration": "Svetainės aptikimas",
+    "siteIntegrationHint": "Rodyti įdiegtus scenarijus ir jų versijas „Greasy Fork“ svetainėje, kad diegimo mygtukas galėtų pasiūlyti atnaujinimą."
   },
   "logs": {
     "title": "Žurnalai",
@@ -496,7 +500,6 @@
       "disabled": "Agento galutinis taškas išjungtas.",
       "notAllowlisted": "Šio plėtinio leidimų sąraše nėra.",
       "writeDisabled": "Agento rašymas išjungtas.",
-      "rateLimited": "Per daug rašymo užklausų. Po minutės bandykite dar kartą.",
       "portClosed": "Agento ryšys uždarytas."
     },
     "database": {

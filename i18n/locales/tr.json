@@ -258,6 +258,7 @@
     "title": "Ayarlar",
     "sections": {
       "general": "Genel",
+      "compatibility": "Uyumluluk",
       "updates": "Güncellemeler",
       "data": "Veri",
       "agent": "Ajan"
@@ -269,7 +270,8 @@
       "overview": "Genel Bakış",
       "export": "Yedeği dışa aktar",
       "restore": "Yedeği geri yükle",
-      "agent": "Temsilci erişimi"
+      "agent": "Temsilci erişimi",
+      "compatibility": "Betik siteleri"
     },
     "runtime": "Runtime",
     "scriptsEnabled": "Betik eklemeyi etkinleştir",
@@ -413,7 +415,9 @@
       "activityEmpty": "Henüz aracı etkinliği yok.",
       "activityRefresh": "Etkinliği yenile"
     },
-    "saved": "Ayarlar kaydedildi."
+    "saved": "Ayarlar kaydedildi.",
+    "siteIntegration": "Site algılama",
+    "siteIntegrationHint": "Greasy Fork üzerinde yüklü betikleri ve sürümlerini göster; böylece yükle düğmesi güncelleme önerebilsin."
   },
   "logs": {
     "title": "Günlükler",
@@ -480,7 +484,6 @@
       "disabled": "Aracı uç noktası devre dışı bırakıldı.",
       "notAllowlisted": "Bu uzantı izin verilenler listesinde değil.",
       "writeDisabled": "Aracı yazmaları devre dışı bırakıldı.",
-      "rateLimited": "Çok fazla yazma çağrısı. Bir dakika sonra tekrar deneyin.",
       "portClosed": "Aracı bağlantısı kapatıldı."
     },
     "database": {

@@ -258,6 +258,7 @@
     "title": "Mipangilio",
     "sections": {
       "general": "Jumla",
+      "compatibility": "Upatanifu",
       "updates": "Sasisho",
       "data": "Data",
       "agent": "Wakala"
@@ -269,7 +270,8 @@
       "overview": "Muhtasari",
       "export": "Hamisha nakala rudufu",
       "restore": "Rejesha nakala rudufu",
-      "agent": "Ufikiaji wa wakala"
+      "agent": "Ufikiaji wa wakala",
+      "compatibility": "Tovuti za hati"
     },
     "runtime": "Runtime",
     "scriptsEnabled": "Washa sindano ya hati",
@@ -413,7 +415,9 @@
       "activityEmpty": "Bado hakuna shughuli ya wakala.",
       "activityRefresh": "Onyesha upya shughuli"
     },
-    "saved": "Mipangilio imehifadhiwa."
+    "saved": "Mipangilio imehifadhiwa.",
+    "siteIntegration": "Utambuzi wa tovuti",
+    "siteIntegrationHint": "Onyesha hati zilizosakinishwa na matoleo yao kwenye Greasy Fork ili kitufe cha kusakinisha kiweze kupendekeza sasisho."
   },
   "logs": {
     "title": "Kumbukumbu",
@@ -480,7 +484,6 @@
       "disabled": "Mwisho wa wakala umezimwa.",
       "notAllowlisted": "Kiendelezi hiki hakiko kwenye orodha ya wanaoruhusiwa.",
       "writeDisabled": "Maandishi ya wakala yamezimwa.",
-      "rateLimited": "Maombi mengi ya uandishi. Jaribu tena baada ya dakika moja.",
       "portClosed": "Muunganisho wa wakala umefungwa."
     },
     "database": {

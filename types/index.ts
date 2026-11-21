@@ -122,6 +122,11 @@ export interface UISettings {
   updateIntervalHours: number;
   /** Minimum level persisted to the script log. */
   logLevel: UserLogLevel;
+  /**
+   * Let script sites (Greasy Fork, Sleazy Fork) detect installed scripts and
+   * their versions. Off by default: it makes the manager observable to a page.
+   */
+  siteIntegration: boolean;
 }
 
 export * from './script';

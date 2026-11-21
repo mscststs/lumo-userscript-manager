@@ -263,6 +263,7 @@
     "title": "Configuració",
     "sections": {
       "general": "General",
+      "compatibility": "Compatibilitat",
       "updates": "Actualitzacions",
       "data": "Dades",
       "agent": "Agent"
@@ -274,7 +275,8 @@
       "overview": "Visió general",
       "export": "Exporta la còpia de seguretat",
       "restore": "Restaura la còpia de seguretat",
-      "agent": "Accés d'agent"
+      "agent": "Accés d'agent",
+      "compatibility": "Llocs de scripts"
     },
     "runtime": "Runtime",
     "scriptsEnabled": "Activa la injecció de scripts",
@@ -420,7 +422,9 @@
       "activityRefresh": "Actualitza l'activitat"
     },
     "saved": "S'ha desat la configuració.",
-    "importAction_many": "Importa {{count}} scripts"
+    "importAction_many": "Importa {{count}} scripts",
+    "siteIntegration": "Detecció de llocs",
+    "siteIntegrationHint": "Mostra els scripts instal·lats i llurs versions a Greasy Fork perquè el botó d'instal·lació pugui oferir una actualització."
   },
   "logs": {
     "title": "Registres",
@@ -488,7 +492,6 @@
       "disabled": "El punt final de l'agent està desactivat.",
       "notAllowlisted": "Aquesta extensió no es troba a la llista de permisos.",
       "writeDisabled": "Les escriptures de l'agent estan desactivades.",
-      "rateLimited": "Hi ha massa crides d'escriptura. Torna-ho a provar d'aquí a un minut.",
       "portClosed": "La connexió de l'agent està tancada."
     },
     "database": {

@@ -239,14 +239,21 @@ export async function moveScriptToTrash(uuid: string): Promise<void> {
   await putRecord('scripts', { ...script, removedAt: Date.now(), enabled: false, updatedAt: Date.now() });
 }
 
-export async function restoreScript(uuid: string): Promise<void> {
+/**
+ * Take a script out of the recycle bin.
+ *
+ * `enabled` is the state it comes back in. Restoring a script the user never
+ * reviewed is a restore, not an approval, so the caller can bring it back
+ * disabled and the review marker survives until the user enables it.
+ */
+export async function restoreScript(uuid: string, enabled = true): Promise<void> {
   const script = await getScript(uuid);
   if (!script) return;
   const { removedAt: _removedAt, ...rest } = script;
   await putRecord('scripts', {
     ...rest,
-    enabled: true,
-    pendingReview: undefined,
+    enabled,
+    ...(enabled ? { pendingReview: undefined } : {}),
     updatedAt: Date.now(),
   });
 }

@@ -258,6 +258,7 @@
     "title": "Einstellungen",
     "sections": {
       "general": "Allgemein",
+      "compatibility": "Kompatibilität",
       "updates": "Updates",
       "data": "Daten",
       "agent": "Agent"
@@ -269,7 +270,8 @@
       "overview": "Übersicht",
       "export": "Sicherung exportieren",
       "restore": "Sicherung wiederherstellen",
-      "agent": "Agent-Zugriff"
+      "agent": "Agent-Zugriff",
+      "compatibility": "Skript-Websites"
     },
     "runtime": "Laufzeit",
     "scriptsEnabled": "Skript-Injektion aktivieren",
@@ -413,7 +415,9 @@
       "activityEmpty": "Noch keine Agent-Aktivität.",
       "activityRefresh": "Aktivität aktualisieren"
     },
-    "saved": "Einstellungen gespeichert."
+    "saved": "Einstellungen gespeichert.",
+    "siteIntegration": "Website-Erkennung",
+    "siteIntegrationHint": "Installierte Skripte und ihre Versionen auf Greasy Fork anzeigen, damit die Schaltfläche „Installieren“ eine Aktualisierung anbieten kann."
   },
   "logs": {
     "title": "Protokolle",
@@ -480,7 +484,6 @@
       "disabled": "Der Agent-Endpunkt ist deaktiviert.",
       "notAllowlisted": "Diese Erweiterung steht nicht auf der Allowlist.",
       "writeDisabled": "Agent-Schreibzugriff ist deaktiviert.",
-      "rateLimited": "Zu viele Schreibaufrufe. Versuche es in einer Minute erneut.",
       "portClosed": "Die Agent-Verbindung ist geschlossen."
     },
     "database": {

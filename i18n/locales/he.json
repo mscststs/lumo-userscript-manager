@@ -263,6 +263,7 @@
     "title": "הגדרות",
     "sections": {
       "general": "כללי",
+      "compatibility": "תאימות",
       "updates": "עדכונים",
       "data": "נתונים",
       "agent": "סוכן"
@@ -274,7 +275,8 @@
       "overview": "סקירה",
       "export": "ייצוא גיבוי",
       "restore": "שחזור גיבוי",
-      "agent": "גישת הסוכן"
+      "agent": "גישת הסוכן",
+      "compatibility": "אתרי סקריפטים"
     },
     "runtime": "סביבת הרצה",
     "scriptsEnabled": "הפעלת הזרקת סקריפטים",
@@ -420,7 +422,9 @@
       "activityRefresh": "רענון פעילות"
     },
     "saved": "ההגדרות נשמרו.",
-    "importAction_two": "ייבוא שני סקריפטים"
+    "importAction_two": "ייבוא שני סקריפטים",
+    "siteIntegration": "זיהוי אתר",
+    "siteIntegrationHint": "הצג סקריפטים מותקנים והגרסאות שלהם ב-Greasy Fork כדי שכפתור ההתקנה יוכל להציע עדכון."
   },
   "logs": {
     "title": "יומנים",
@@ -488,7 +492,6 @@
       "disabled": "נקודת הקצה של הסוכן מושבתת.",
       "notAllowlisted": "התוספת הזו אינה ברשימת ההיתרים.",
       "writeDisabled": "כתיבות הסוכן מושבתות.",
-      "rateLimited": "יותר מדי קריאות כתיבה. נסה שוב בעוד דקה.",
       "portClosed": "חיבור הסוכן סגור."
     },
     "database": {

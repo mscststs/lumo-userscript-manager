@@ -28,6 +28,17 @@ All scripts, their source code, metadata and execution logs are stored locally o
 the user's device. Scripts run only on pages matched by rules the user
 configures. No script content is uploaded anywhere by the extension itself.
 
+## Script-Site Detection
+
+Script sites such as Greasy Fork and Sleazy Fork ask an installed userscript
+manager which version of one of their scripts is already installed, so the page
+can offer an update or a reinstall instead of a fresh install. When the user
+turns on **Settings → Compatibility → Site detection** (off by default), Lumo
+Userscripts answers that question with the script name/namespace and the
+installed version stored locally. The answer is written into the page itself; it
+is never sent to a server, and no other script, page or list of installed
+scripts is exposed.
+
 ## Local Storage
 
 Lumo Userscripts may store the following data **locally on the user's device**

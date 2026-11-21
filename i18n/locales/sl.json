@@ -268,6 +268,7 @@
     "title": "Nastavitve",
     "sections": {
       "general": "Splošno",
+      "compatibility": "Združljivost",
       "updates": "Posodobitve",
       "data": "Podatki",
       "agent": "Agent"
@@ -279,7 +280,8 @@
       "overview": "Pregled",
       "export": "Izvoz varnostne kopije",
       "restore": "Obnovi varnostno kopijo",
-      "agent": "Dostop agenta"
+      "agent": "Dostop agenta",
+      "compatibility": "Skriptna mesta"
     },
     "runtime": "Runtime",
     "scriptsEnabled": "Omogoči vstavljanje skripta",
@@ -427,7 +429,9 @@
     },
     "saved": "Nastavitve shranjene.",
     "importAction_few": "Uvozite {{count}} skripte",
-    "importAction_two": "Uvozite {{count}} skripte"
+    "importAction_two": "Uvozite {{count}} skripte",
+    "siteIntegration": "Zaznavanje mesta",
+    "siteIntegrationHint": "Prikaži nameščene skripte in njihove različice na Greasy Fork, da lahko gumb za namestitev ponudi posodobitev."
   },
   "logs": {
     "title": "Dnevniki",
@@ -496,7 +500,6 @@
       "disabled": "Končna točka agenta je onemogočena.",
       "notAllowlisted": "Ta razširitev ni na seznamu dovoljenih.",
       "writeDisabled": "Agentsko pisanje je onemogočeno.",
-      "rateLimited": "Preveč klicev za pisanje. Poskusite znova čez minuto.",
       "portClosed": "Povezava agenta je zaprta."
     },
     "database": {

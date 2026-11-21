@@ -263,6 +263,7 @@
     "title": "Ajustes",
     "sections": {
       "general": "General",
+      "compatibility": "Compatibilidad",
       "updates": "Actualizaciones",
       "data": "Datos",
       "agent": "Agente"
@@ -274,7 +275,8 @@
       "overview": "Resumen",
       "export": "Exportar copia",
       "restore": "Restaurar copia",
-      "agent": "Acceso del agente"
+      "agent": "Acceso del agente",
+      "compatibility": "Sitios de scripts"
     },
     "runtime": "Ejecución",
     "scriptsEnabled": "Activar la inyección de scripts",
@@ -420,7 +422,9 @@
       "activityRefresh": "Actualizar actividad"
     },
     "saved": "Ajustes guardados.",
-    "importAction_many": "Importar {{count}} scripts"
+    "importAction_many": "Importar {{count}} scripts",
+    "siteIntegration": "Detección de sitios",
+    "siteIntegrationHint": "Mostrar los scripts instalados y sus versiones en Greasy Fork para que el botón de instalación pueda ofrecer una actualización."
   },
   "logs": {
     "title": "Registros",
@@ -488,7 +492,6 @@
       "disabled": "El endpoint del agente está desactivado.",
       "notAllowlisted": "Esta extensión no está en la lista de permitidas.",
       "writeDisabled": "Las escrituras del agente están desactivadas.",
-      "rateLimited": "Demasiadas llamadas de escritura. Inténtalo de nuevo en un minuto.",
       "portClosed": "La conexión del agente está cerrada."
     },
     "database": {

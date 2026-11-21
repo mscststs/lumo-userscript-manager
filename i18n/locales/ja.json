@@ -258,6 +258,7 @@
     "title": "設定",
     "sections": {
       "general": "一般",
+      "compatibility": "互換性",
       "updates": "更新",
       "data": "データ",
       "agent": "エージェント"
@@ -269,7 +270,8 @@
       "overview": "概要",
       "export": "バックアップを書き出す",
       "restore": "バックアップを復元",
-      "agent": "エージェントアクセス"
+      "agent": "エージェントアクセス",
+      "compatibility": "スクリプトサイト"
     },
     "runtime": "実行時",
     "scriptsEnabled": "スクリプト注入を有効化",
@@ -413,7 +415,9 @@
       "activityEmpty": "エージェント活動はまだありません。",
       "activityRefresh": "活動を更新"
     },
-    "saved": "設定を保存しました。"
+    "saved": "設定を保存しました。",
+    "siteIntegration": "サイト検出",
+    "siteIntegrationHint": "Greasy Fork にインストール済みのスクリプトとそのバージョンを表示し、インストールボタンで更新を案内できるようにします。"
   },
   "logs": {
     "title": "ログ",
@@ -480,7 +484,6 @@
       "disabled": "エージェントエンドポイントが無効です。",
       "notAllowlisted": "この拡張機能は許可リストにありません。",
       "writeDisabled": "エージェントの書き込みが無効です。",
-      "rateLimited": "書き込み呼び出しが多すぎます。1 分後に再試行してください。",
       "portClosed": "エージェント接続が閉じています。"
     },
     "database": {

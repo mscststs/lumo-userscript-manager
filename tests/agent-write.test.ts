@@ -27,9 +27,6 @@ vi.mock('@/lib/background/registry', () => ({
 
 const { createAgentMcpServer } = await import('@/lib/agent/mcp-server');
 const { clearStore, getScript, listAgentAudit } = await import('@/lib/db');
-const { resetWriteLimit, consumeWrite, WRITE_LIMIT, WRITE_WINDOW_MS } = await import(
-  '@/lib/agent/rate-limit'
-);
 
 const WRITE_REVIEW: AgentSettings = {
   enabled: true,
@@ -115,7 +112,6 @@ beforeEach(async () => {
       // Store may not exist before the first open.
     }
   }
-  resetWriteLimit();
 
   vi.stubGlobal('chrome', {
     runtime: {
@@ -189,10 +185,41 @@ describe('agent write tools', () => {
     expect(payload.script.pendingReview).toBeUndefined();
   });
 
-  it('clears pendingReview when the user/agent enables the script', async () => {
+  it('refuses to enable a script that still awaits review', async () => {
     const client = await connect(WRITE_REVIEW);
     const created = payloadOf(
       await client.callTool({ name: 'create', arguments: { code: codeFor('EnableMe') } }),
+    );
+
+    const result = await client.callTool({
+      name: 'set_enabled',
+      arguments: { ids: [created.script.id], enabled: true },
+    });
+    expect(result.isError).toBe(true);
+    expect(payloadOf(result).code).toBe('REVIEW_REQUIRED');
+
+    const stored = await getScript(created.script.id);
+    expect(stored?.enabled).toBe(false);
+    expect(stored?.pendingReview).toBe(true);
+  });
+
+  it('allows disabling a script that still awaits review', async () => {
+    const client = await connect(WRITE_REVIEW);
+    const created = payloadOf(
+      await client.callTool({ name: 'create', arguments: { code: codeFor('KeepDisabled') } }),
+    );
+
+    const result = await client.callTool({
+      name: 'set_enabled',
+      arguments: { ids: [created.script.id], enabled: false },
+    });
+    expect(result.isError).toBeFalsy();
+  });
+
+  it('enables scripts normally when review is off', async () => {
+    const client = await connect(WRITE_AUTO);
+    const created = payloadOf(
+      await client.callTool({ name: 'create', arguments: { code: codeFor('AutoEnable') } }),
     );
 
     const result = await client.callTool({
@@ -203,7 +230,78 @@ describe('agent write tools', () => {
 
     const stored = await getScript(created.script.id);
     expect(stored?.enabled).toBe(true);
-    expect(stored?.pendingReview).toBeUndefined();
+  });
+
+  it('returns the complete source from get without asking for it', async () => {
+    const client = await connect(WRITE_REVIEW);
+    const code = codeFor('FullSource');
+    const created = payloadOf(
+      await client.callTool({ name: 'create', arguments: { code } }),
+    );
+
+    const fetched = payloadOf(
+      await client.callTool({ name: 'get', arguments: { id: created.script.id } }),
+    );
+    expect(fetched.found).toBe(true);
+    expect(fetched.script.code).toBe(code);
+    expect(fetched.script.codeChars).toBe(code.length);
+    expect(fetched.script.codeTruncated).toBe(false);
+    expect(fetched.script.match).toEqual(['https://example.com/*']);
+  });
+
+  it('pages the source only when the caller asks for a window', async () => {
+    const client = await connect(WRITE_REVIEW);
+    const code = codeFor('Paged');
+    const created = payloadOf(
+      await client.callTool({ name: 'create', arguments: { code } }),
+    );
+
+    const first = payloadOf(
+      await client.callTool({
+        name: 'get',
+        arguments: { id: created.script.id, codeLength: 20 },
+      }),
+    );
+    expect(first.script.code).toBe(code.slice(0, 20));
+    expect(first.script.codeOffset).toBe(0);
+    expect(first.script.codeLength).toBe(20);
+    expect(first.script.codeTruncated).toBe(true);
+    expect(first.script.nextOffset).toBe(20);
+
+    const rest = payloadOf(
+      await client.callTool({
+        name: 'get',
+        arguments: { id: created.script.id, codeOffset: first.script.nextOffset },
+      }),
+    );
+    expect(first.script.code + rest.script.code).toBe(code);
+    expect(rest.script.codeTruncated).toBe(false);
+  });
+
+  it('refuses to guess between scripts that share a name', async () => {
+    const client = await connect(WRITE_AUTO);
+    const first = payloadOf(
+      await client.callTool({
+        name: 'create',
+        arguments: { code: codeFor('Twin').replace('@namespace test', '@namespace one') },
+      }),
+    );
+    await client.callTool({
+      name: 'create',
+      arguments: { code: codeFor('Twin').replace('@namespace test', '@namespace two') },
+    });
+
+    const ambiguous = await client.callTool({ name: 'get', arguments: { name: 'Twin' } });
+    expect(ambiguous.isError).toBe(true);
+    const payload = payloadOf(ambiguous);
+    expect(payload.code).toBe('AMBIGUOUS');
+    expect(payload.candidates).toHaveLength(2);
+
+    const exact = payloadOf(
+      await client.callTool({ name: 'get', arguments: { name: 'Twin', namespace: 'one' } }),
+    );
+    expect(exact.found).toBe(true);
+    expect(exact.script.id).toBe(first.script.id);
   });
 
   it('rejects an update whose expectedCodeHash is stale', async () => {
@@ -233,10 +331,7 @@ describe('agent write tools', () => {
       await client.callTool({ name: 'create', arguments: { code: codeFor('Stable') } }),
     );
     const fetched = payloadOf(
-      await client.callTool({
-        name: 'get',
-        arguments: { id: created.script.id, includeCode: true },
-      }),
+      await client.callTool({ name: 'get', arguments: { id: created.script.id } }),
     );
 
     const result = await client.callTool({
@@ -250,32 +345,72 @@ describe('agent write tools', () => {
     expect(result.isError).toBeFalsy();
   });
 
-  it('edits code with anchored replacements', async () => {
+  it('writes the whole source back through update', async () => {
+    const client = await connect(WRITE_AUTO);
+    const created = payloadOf(
+      await client.callTool({ name: 'create', arguments: { code: codeFor('Rewritten') } }),
+    );
+    const fetched = payloadOf(
+      await client.callTool({ name: 'get', arguments: { id: created.script.id } }),
+    );
+
+    const next = fetched.script.code.replace("console.log('Rewritten');", "console.log('rewritten');");
+    const result = await client.callTool({
+      name: 'update',
+      arguments: { id: created.script.id, code: next },
+    });
+    expect(result.isError).toBeFalsy();
+
+    const after = payloadOf(
+      await client.callTool({ name: 'get', arguments: { id: created.script.id } }),
+    );
+    expect(after.script.code).toContain("console.log('rewritten');");
+    expect(after.script.codeHash).not.toBe(fetched.script.codeHash);
+  });
+
+  it('rejects an update that would break the metadata block', async () => {
+    const client = await connect(WRITE_AUTO);
+    const created = payloadOf(
+      await client.callTool({ name: 'create', arguments: { code: codeFor('BrokenMeta') } }),
+    );
+
+    const result = await client.callTool({
+      name: 'update',
+      arguments: {
+        id: created.script.id,
+        code: codeFor('BrokenMeta').replace('// @name BrokenMeta\n', ''),
+      },
+    });
+    expect(result.isError).toBe(true);
+    expect(payloadOf(result).code).toBe('INVALID_CODE');
+
+    const fetched = payloadOf(
+      await client.callTool({ name: 'get', arguments: { id: created.script.id } }),
+    );
+    expect(fetched.script.code).toContain('// @name BrokenMeta');
+  });
+
+  it('applies anchored edits without resending the source', async () => {
     const client = await connect(WRITE_AUTO);
     const created = payloadOf(
       await client.callTool({ name: 'create', arguments: { code: codeFor('Editable') } }),
     );
 
     const result = await client.callTool({
-      name: 'edit',
+      name: 'update',
       arguments: {
         id: created.script.id,
         expectedCodeHash: created.script.codeHash,
         edits: [
-          {
-            oldText: "console.log('Editable');",
-            newText: "console.log('edited');",
-          },
+          { oldText: "console.log('Editable');", newText: "console.log('edited');" },
         ],
       },
     });
     expect(result.isError).toBeFalsy();
+    expect(payloadOf(result).applied).toEqual([{ strategy: 'exact', line: 7 }]);
 
     const fetched = payloadOf(
-      await client.callTool({
-        name: 'get',
-        arguments: { id: created.script.id, includeCode: true },
-      }),
+      await client.callTool({ name: 'get', arguments: { id: created.script.id } }),
     );
     expect(fetched.script.code).toContain("console.log('edited');");
     expect(fetched.script.code).not.toContain("console.log('Editable');");
@@ -292,7 +427,7 @@ describe('agent write tools', () => {
     );
 
     const result = await client.callTool({
-      name: 'edit',
+      name: 'update',
       arguments: {
         id: created.script.id,
         edits: [{ oldText: "console.log('same');", newText: "console.log('once');" }],
@@ -302,22 +437,19 @@ describe('agent write tools', () => {
     expect(payloadOf(result).code).toBe('EDIT_FAILED');
 
     const fetched = payloadOf(
-      await client.callTool({
-        name: 'get',
-        arguments: { id: created.script.id, includeCode: true },
-      }),
+      await client.callTool({ name: 'get', arguments: { id: created.script.id } }),
     );
     expect(fetched.script.code).toContain("console.log('same');");
   });
 
-  it('applies a batch atomically', async () => {
+  it('applies an edit batch atomically', async () => {
     const client = await connect(WRITE_AUTO);
     const created = payloadOf(
       await client.callTool({ name: 'create', arguments: { code: codeFor('Atomic') } }),
     );
 
     const result = await client.callTool({
-      name: 'edit',
+      name: 'update',
       arguments: {
         id: created.script.id,
         edits: [
@@ -332,48 +464,42 @@ describe('agent write tools', () => {
     expect(payload.index).toBe(1);
 
     const fetched = payloadOf(
-      await client.callTool({
-        name: 'get',
-        arguments: { id: created.script.id, includeCode: true },
-      }),
+      await client.callTool({ name: 'get', arguments: { id: created.script.id } }),
     );
     expect(fetched.script.code).toContain("console.log('Atomic');");
     expect(fetched.script.code).not.toContain("console.log('first');");
   });
 
-  it('rejects an edit that would break the metadata block', async () => {
+  it('rejects edits that would break the metadata block', async () => {
     const client = await connect(WRITE_AUTO);
     const created = payloadOf(
-      await client.callTool({ name: 'create', arguments: { code: codeFor('BrokenMeta') } }),
+      await client.callTool({ name: 'create', arguments: { code: codeFor('EditMeta') } }),
     );
 
     const result = await client.callTool({
-      name: 'edit',
+      name: 'update',
       arguments: {
         id: created.script.id,
-        edits: [{ oldText: '// @name BrokenMeta', newText: '// removed' }],
+        edits: [{ oldText: '// @name EditMeta', newText: '// removed' }],
       },
     });
     expect(result.isError).toBe(true);
     expect(payloadOf(result).code).toBe('INVALID_CODE');
 
     const fetched = payloadOf(
-      await client.callTool({
-        name: 'get',
-        arguments: { id: created.script.id, includeCode: true },
-      }),
+      await client.callTool({ name: 'get', arguments: { id: created.script.id } }),
     );
-    expect(fetched.script.code).toContain('// @name BrokenMeta');
+    expect(fetched.script.code).toContain('// @name EditMeta');
   });
 
-  it('rejects an edit whose expectedCodeHash is stale', async () => {
+  it('rejects edits whose expectedCodeHash is stale', async () => {
     const client = await connect(WRITE_AUTO);
     const created = payloadOf(
       await client.callTool({ name: 'create', arguments: { code: codeFor('EditConflict') } }),
     );
 
     const result = await client.callTool({
-      name: 'edit',
+      name: 'update',
       arguments: {
         id: created.script.id,
         expectedCodeHash: 'stale-hash',
@@ -382,6 +508,253 @@ describe('agent write tools', () => {
     });
     expect(result.isError).toBe(true);
     expect(payloadOf(result).code).toBe('CONFLICT');
+  });
+
+  it('requires exactly one of code and edits', async () => {
+    const client = await connect(WRITE_AUTO);
+    const created = payloadOf(
+      await client.callTool({ name: 'create', arguments: { code: codeFor('Neither') } }),
+    );
+
+    const neither = await client.callTool({ name: 'update', arguments: { id: created.script.id } });
+    expect(neither.isError).toBe(true);
+    expect(payloadOf(neither).code).toBe('INVALID_INPUT');
+
+    const both = await client.callTool({
+      name: 'update',
+      arguments: {
+        id: created.script.id,
+        code: codeFor('Neither'),
+        edits: [{ oldText: 'x', newText: 'y' }],
+      },
+    });
+    expect(both.isError).toBe(true);
+    expect(payloadOf(both).code).toBe('INVALID_INPUT');
+  });
+
+  it('parks an update as disabled pending review when review is on', async () => {
+    const client = await connect(WRITE_AUTO);
+    const created = payloadOf(
+      await client.callTool({ name: 'create', arguments: { code: codeFor('Reviewed') } }),
+    );
+    expect(created.script.enabled).toBe(true);
+
+    // The user turns review on mid-session; the policy is re-read per call, so
+    // the next edit must not run the agent's code unchecked.
+    await chrome.storage.local.set({ agentSettings: WRITE_REVIEW });
+    const result = payloadOf(
+      await client.callTool({
+        name: 'update',
+        arguments: {
+          id: created.script.id,
+          edits: [{ oldText: "console.log('Reviewed');", newText: "console.log('pending');" }],
+        },
+      }),
+    );
+
+    expect(result.reviewRequired).toBe(true);
+    expect(result.script.enabled).toBe(false);
+    expect(result.script.pendingReview).toBe(true);
+    expect(result.effectiveOnNextLoad).toBe(false);
+
+    const stored = await getScript(created.script.id);
+    expect(stored?.enabled).toBe(false);
+    expect(stored?.pendingReview).toBe(true);
+  });
+
+  it('refuses to edit a script that is in the recycle bin', async () => {
+    const client = await connect(WRITE_AUTO);
+    const created = payloadOf(
+      await client.callTool({ name: 'create', arguments: { code: codeFor('Trashed') } }),
+    );
+    await client.callTool({ name: 'delete', arguments: { id: created.script.id } });
+
+    const result = await client.callTool({
+      name: 'update',
+      arguments: { id: created.script.id, code: codeFor('Trashed') },
+    });
+    expect(result.isError).toBe(true);
+    expect(payloadOf(result).code).toBe('REMOVED');
+
+    const stored = await getScript(created.script.id);
+    expect(stored?.removedAt).toBeTruthy();
+  });
+
+  it('restores a trashed script', async () => {
+    const client = await connect(WRITE_AUTO);
+    const created = payloadOf(
+      await client.callTool({ name: 'create', arguments: { code: codeFor('BringBack') } }),
+    );
+    await client.callTool({ name: 'delete', arguments: { id: created.script.id } });
+
+    const result = await client.callTool({ name: 'restore', arguments: { id: created.script.id } });
+    expect(result.isError).toBeFalsy();
+    expect(payloadOf(result).restored).toBe(true);
+
+    const stored = await getScript(created.script.id);
+    expect(stored?.removedAt).toBeUndefined();
+    expect(stored?.enabled).toBe(true);
+  });
+
+  it('restores a trashed pending script disabled, not approved', async () => {
+    const client = await connect(WRITE_REVIEW);
+    const created = payloadOf(
+      await client.callTool({ name: 'create', arguments: { code: codeFor('ReviewedTrash') } }),
+    );
+    await client.callTool({ name: 'delete', arguments: { id: created.script.id } });
+
+    const result = payloadOf(
+      await client.callTool({ name: 'restore', arguments: { id: created.script.id } }),
+    );
+    expect(result.restored).toBe(true);
+    expect(result.reviewRequired).toBe(true);
+    expect(result.effectiveOnNextLoad).toBe(false);
+
+    const stored = await getScript(created.script.id);
+    expect(stored?.removedAt).toBeUndefined();
+    expect(stored?.enabled).toBe(false);
+    expect(stored?.pendingReview).toBe(true);
+
+    // The agent still cannot approve it by switching it on.
+    const enabling = await client.callTool({
+      name: 'set_enabled',
+      arguments: { ids: [created.script.id], enabled: true },
+    });
+    expect(enabling.isError).toBe(true);
+    expect(payloadOf(enabling).code).toBe('REVIEW_REQUIRED');
+  });
+
+  it('reports a duplicate name as a machine-readable failure', async () => {
+    const client = await connect(WRITE_AUTO);
+    const code = codeFor('Duplicate');
+    await client.callTool({ name: 'create', arguments: { code } });
+
+    const result = await client.callTool({ name: 'create', arguments: { code } });
+    expect(result.isError).toBe(true);
+    const payload = payloadOf(result);
+    expect(payload.code).toBe('script.duplicate');
+    expect(typeof payload.message).toBe('string');
+  });
+
+  it('refuses to replace an installed script without its codeHash', async () => {
+    const client = await connect(WRITE_AUTO);
+    const created = payloadOf(
+      await client.callTool({ name: 'create', arguments: { code: codeFor('FromUrl') } }),
+    );
+    vi.stubGlobal(
+      'fetch',
+      async () => new Response(codeFor('FromUrl').replace('1.0.0', '2.0.0'), { status: 200 }),
+    );
+
+    const conflict = await client.callTool({
+      name: 'install',
+      arguments: { url: 'https://example.com/from-url.user.js' },
+    });
+    expect(conflict.isError).toBe(true);
+    const payload = payloadOf(conflict);
+    expect(payload.code).toBe('CONFLICT');
+    expect(payload.existing.id).toBe(created.script.id);
+
+    const replaced = payloadOf(
+      await client.callTool({
+        name: 'install',
+        arguments: {
+          url: 'https://example.com/from-url.user.js',
+          replaceCodeHash: payload.existing.codeHash,
+        },
+      }),
+    );
+    expect(replaced.ok).toBe(true);
+    expect(replaced.updated).toBe(true);
+
+    const stored = await getScript(created.script.id);
+    expect(stored?.version).toBe('2.0.0');
+  });
+
+  it('refuses a replaceCodeHash that matches no installed script', async () => {
+    const client = await connect(WRITE_AUTO);
+    vi.stubGlobal(
+      'fetch',
+      async () => new Response(codeFor('FreshInstall'), { status: 200 }),
+    );
+
+    const result = await client.callTool({
+      name: 'install',
+      arguments: {
+        url: 'https://example.com/fresh.user.js',
+        replaceCodeHash: 'a'.repeat(64),
+      },
+    });
+    expect(result.isError).toBe(true);
+    expect(payloadOf(result).code).toBe('NOT_FOUND');
+
+    const payload = payloadOf(
+      await client.callTool({
+        name: 'install',
+        arguments: { url: 'https://example.com/fresh.user.js' },
+      }),
+    );
+    expect(payload.ok).toBe(true);
+    expect(payload.updated).toBe(false);
+  });
+
+  it('parks an install as disabled pending review when review is on', async () => {
+    const client = await connect(WRITE_REVIEW);
+    vi.stubGlobal(
+      'fetch',
+      async () => new Response(codeFor('InstalledReview'), { status: 200 }),
+    );
+
+    const payload = payloadOf(
+      await client.callTool({
+        name: 'install',
+        arguments: { url: 'https://example.com/reviewed.user.js' },
+      }),
+    );
+    expect(payload.reviewRequired).toBe(true);
+    expect(payload.script.enabled).toBe(false);
+    expect(payload.script.pendingReview).toBe(true);
+  });
+
+  it('lists with review filters and pages through the index', async () => {
+    const client = await connect(WRITE_REVIEW);
+    for (const name of ['First', 'Second', 'Third']) {
+      await client.callTool({ name: 'create', arguments: { code: codeFor(name) } });
+    }
+
+    const firstPage = payloadOf(
+      await client.callTool({ name: 'list', arguments: { limit: 2 } }),
+    );
+    expect(firstPage.total).toBe(3);
+    expect(firstPage.returned).toBe(2);
+    expect(firstPage.nextOffset).toBe(2);
+
+    const secondPage = payloadOf(
+      await client.callTool({ name: 'list', arguments: { offset: 2 } }),
+    );
+    expect(secondPage.returned).toBe(1);
+    expect(secondPage.nextOffset).toBeUndefined();
+
+    const pending = payloadOf(
+      await client.callTool({ name: 'list', arguments: { pendingReview: true } }),
+    );
+    expect(pending.total).toBe(3);
+
+    const reviewed = payloadOf(
+      await client.callTool({ name: 'list', arguments: { pendingReview: false } }),
+    );
+    expect(reviewed.total).toBe(0);
+  });
+
+  it('reports runtime counts from diagnostics without a target', async () => {
+    const client = await connect(WRITE_REVIEW);
+    await client.callTool({ name: 'create', arguments: { code: codeFor('Counted') } });
+
+    const payload = payloadOf(await client.callTool({ name: 'diagnostics', arguments: {} }));
+    expect(payload.runtime.userScriptsAvailable).toBe(true);
+    expect(payload.counts.total).toBe(1);
+    expect(payload.counts.pendingReview).toBe(1);
+    expect(payload.errors).toEqual([]);
   });
 
   it('moves a script to the trash instead of purging it', async () => {
@@ -408,15 +781,5 @@ describe('agent write tools', () => {
     const audit = await listAgentAudit(10);
     expect(audit.some((entry) => entry.tool === 'create' && entry.result === 'ok')).toBe(true);
     expect(audit.every((entry) => entry.argsHash.length === 64)).toBe(true);
-  });
-
-  it('rate-limits write calls', () => {
-    for (let index = 0; index < WRITE_LIMIT; index += 1) {
-      expect(consumeWrite('sender')).toBe(true);
-    }
-    expect(consumeWrite('sender')).toBe(false);
-    // A different sender has its own bucket.
-    expect(consumeWrite('other')).toBe(true);
-    expect(WRITE_WINDOW_MS).toBe(60_000);
   });
 });

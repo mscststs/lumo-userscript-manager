@@ -258,6 +258,7 @@
     "title": "Inställningar",
     "sections": {
       "general": "Allmän",
+      "compatibility": "Kompatibilitet",
       "updates": "Uppdateringar",
       "data": "Data",
       "agent": "Agent"
@@ -269,7 +270,8 @@
       "overview": "Översikt",
       "export": "Exportera säkerhetskopia",
       "restore": "Återställ säkerhetskopia",
-      "agent": "Agentåtkomst"
+      "agent": "Agentåtkomst",
+      "compatibility": "Skriptwebbplatser"
     },
     "runtime": "Runtime",
     "scriptsEnabled": "Aktivera skriptinjektion",
@@ -413,7 +415,9 @@
       "activityEmpty": "Ingen agentaktivitet än.",
       "activityRefresh": "Uppdatera aktivitet"
     },
-    "saved": "Inställningar sparade."
+    "saved": "Inställningar sparade.",
+    "siteIntegration": "Webbplatsidentifiering",
+    "siteIntegrationHint": "Visa installerade skript och deras versioner på Greasy Fork så att installationsknappen kan erbjuda en uppdatering."
   },
   "logs": {
     "title": "Loggar",
@@ -480,7 +484,6 @@
       "disabled": "Agentens slutpunkt är inaktiverad.",
       "notAllowlisted": "Det här tillägget finns inte på godkännandelistan.",
       "writeDisabled": "Agentskrivningar är inaktiverade.",
-      "rateLimited": "För många skrivanrop. Försök igen om en minut.",
       "portClosed": "Agentanslutningen är stängd."
     },
     "database": {

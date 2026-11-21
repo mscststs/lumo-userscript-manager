@@ -129,11 +129,11 @@ afterEach(() => {
   delete (globalThis as Record<string, unknown>).chrome;
 });
 
-function handshake(clientId = 'main:1', nonce = 'nonce-1'): FakePort {
+function handshake(clientId = 'main:1', nonce = 'nonce-1', kind = 'main'): FakePort {
   const port = createPort();
   fakeWindow.dispatch('message', {
     source: fakeWindow,
-    data: { __lumo: BRIDGE_HELLO, nonce, clientId, kind: 'main' },
+    data: { __lumo: BRIDGE_HELLO, nonce, clientId, kind },
     ports: [port],
   });
   return port;
@@ -250,6 +250,59 @@ describe('startContentBridge', () => {
 
     expect(port.posted).toHaveLength(0);
     expect(port.closed).toBe(false);
+  });
+
+  it('forwards a site probe from the page channel and stamps the page URL', async () => {
+    startContentBridge();
+    const port = handshake('page:1', 'nonce-page', 'page');
+
+    port.onmessage?.({
+      data: {
+        __lumo: 'lumo:bridge-rpc',
+        id: 'r-page',
+        type: 'site:lookup',
+        payload: { name: 'Example', namespace: 'ns' },
+      },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(sentMessages).toContainEqual({
+      type: 'site:lookup',
+      payload: expect.objectContaining({
+        name: 'Example',
+        namespace: 'ns',
+        __pageUrl: 'https://example.test/page',
+        __world: 'MAIN',
+      }),
+    });
+    expect(port.posted).toContainEqual(
+      expect.objectContaining({ __lumo: 'lumo:bridge-result', id: 'r-page' }),
+    );
+  });
+
+  it('refuses a site probe from an engine channel', async () => {
+    startContentBridge();
+    const port = handshake('main:1', 'nonce-1', 'main');
+
+    port.onmessage?.({
+      data: {
+        __lumo: 'lumo:bridge-rpc',
+        id: 'r-engine',
+        type: 'site:lookup',
+        payload: { name: 'Example', namespace: 'ns' },
+      },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Engines have no business asking what else this browser has installed.
+    expect(sentMessages).toHaveLength(0);
+    expect(port.posted).toContainEqual(
+      expect.objectContaining({
+        __lumo: 'lumo:bridge-result',
+        id: 'r-engine',
+        code: 'BAD_REQUEST',
+      }),
+    );
   });
 
   it('accepts a reconnect from an engine that already holds a slot', () => {

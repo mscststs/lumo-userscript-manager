@@ -101,6 +101,9 @@ export const DEFAULT_UI_SETTINGS: UISettings = {
   autoUpdate: true,
   updateIntervalHours: 6,
   logLevel: 'info',
+  // Opt-in, not opt-out: until the user asks for it, script sites must not be
+  // able to enumerate what this browser has installed.
+  siteIntegration: false,
 };
 
 export const DEFAULT_AGENT_SETTINGS: AgentSettings = {
@@ -266,6 +269,9 @@ export const STORAGE_FIELDS: { [K in StorageKey]: StorageFieldDef<K> } = {
         typeof raw?.logLevel === 'string' && LOG_LEVELS.has(raw.logLevel)
           ? raw.logLevel
           : DEFAULT_UI_SETTINGS.logLevel,
+      // Added after 1.0: an absent value means "off", which is also the
+      // privacy-safe reading of a hand-edited config.
+      siteIntegration: raw?.siteIntegration === true,
     }),
   },
 };

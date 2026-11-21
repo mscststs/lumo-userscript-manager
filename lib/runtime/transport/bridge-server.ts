@@ -15,6 +15,16 @@ import { observePageLifecycle } from '../lifecycle';
 
 const MAX_CLIENTS = 8;
 const BACKGROUND_PORT_NAME = 'lumo:bridge';
+
+/**
+ * Requests that only the page-world site channel may send.
+ *
+ * A site probe is about *other* scripts, so an engine channel has no business
+ * forwarding one. The worker still re-checks the opt-in and the page host; this
+ * is the transport-level layer of the same rule.
+ */
+const PAGE_ONLY_RPC_TYPES = new Set(['site:lookup']);
+
 const RETRY_MIN_MS = 500;
 const RETRY_MAX_MS = 30_000;
 
@@ -174,6 +184,15 @@ export function startContentBridge(): void {
       });
       return;
     }
+    if (PAGE_ONLY_RPC_TYPES.has(message.type) && record.kind !== 'page') {
+      postToClient(record, {
+        __lumo: BRIDGE_RESULT,
+        id: message.id,
+        error: `Bridge request is reserved for the page channel: ${message.type}`,
+        code: 'BAD_REQUEST',
+      });
+      return;
+    }
 
     const response = await sendToBackground(message.type, {
       ...message.payload,
@@ -182,8 +201,9 @@ export function startContentBridge(): void {
       __pageUrl: location.href,
       // The world is asserted by the channel that delivered the request, not
       // by the payload's own claims. It lets the worker reject a USER_SCRIPT
-      // token replayed over the MAIN channel (and vice versa).
-      __world: record.kind === 'main' ? 'MAIN' : 'USER_SCRIPT',
+      // token replayed over the MAIN channel (and vice versa). Only the
+      // sandbox engine lives in USER_SCRIPT; site-integration shares MAIN.
+      __world: record.kind === 'userscript' ? 'USER_SCRIPT' : 'MAIN',
     });
     const result: BridgeResult = response.ok
       ? { __lumo: BRIDGE_RESULT, id: message.id, result: response.result }

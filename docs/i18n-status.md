@@ -4,6 +4,10 @@ All 55 Chrome locales are `ready`: each bundle has been read key by key against 
 
 The 12 core locales were authored and reviewed by hand. The other 40 bundles were generated as drafts, then read line by line against the English source and corrected. Native-speaker review is still recommended before a major locale-specific marketing push.
 
+> The four `settings.*` keys added for site compatibility are machine-authored
+> outside English and still need a line-by-line pass; every other key in each
+> bundle has been reviewed as described above.
+
 | Tag | Status | Notes |
 | --- | --- | --- |
 | `ar` | ready | hand-authored |

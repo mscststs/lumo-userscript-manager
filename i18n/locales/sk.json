@@ -268,6 +268,7 @@
     "title": "Nastavenia",
     "sections": {
       "general": "Všeobecné",
+      "compatibility": "Kompatibilita",
       "updates": "Aktualizácie",
       "data": "Údaje",
       "agent": "Agent"
@@ -279,7 +280,8 @@
       "overview": "Prehľad",
       "export": "Exportovať zálohu",
       "restore": "Obnoviť zálohu",
-      "agent": "Prístup agenta"
+      "agent": "Prístup agenta",
+      "compatibility": "Skriptové weby"
     },
     "runtime": "Runtime",
     "scriptsEnabled": "Povoliť vkladanie skriptov",
@@ -427,7 +429,9 @@
     },
     "saved": "Nastavenia boli uložené.",
     "importAction_few": "Importujte {{count}} skripty",
-    "importAction_many": "Importujte {{count}} skripty"
+    "importAction_many": "Importujte {{count}} skripty",
+    "siteIntegration": "Rozpoznanie webu",
+    "siteIntegrationHint": "Zobrazovať nainštalované skripty a ich verzie na Greasy Fork, aby tlačidlo inštalácie mohlo ponúknuť aktualizáciu."
   },
   "logs": {
     "title": "Denníky",
@@ -496,7 +500,6 @@
       "disabled": "Koncový bod agenta je zakázaný.",
       "notAllowlisted": "Toto rozšírenie nie je na zozname povolených.",
       "writeDisabled": "Zápisy agenta sú zakázané.",
-      "rateLimited": "Príliš veľa volaní zápisu. Skúste to znova o minútu.",
       "portClosed": "Spojenie s agentom je zatvorené."
     },
     "database": {

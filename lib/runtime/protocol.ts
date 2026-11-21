@@ -23,8 +23,14 @@ export const BRIDGE_RESULT = 'lumo:bridge-result';
 export const BRIDGE_EVENT = 'lumo:bridge-event';
 export const BRIDGE_RESUME = 'lumo:bridge-resume';
 
-/** Engine identity used only for diagnostics and multi-client bookkeeping. */
-export type BridgeClientKind = 'main' | 'userscript';
+/**
+ * Channel identity, used for diagnostics and multi-client bookkeeping.
+ *
+ * `page` is not an engine: it is the site-integration page script, which answers
+ * script-site probes through the same bridge instead of opening a second
+ * transport. Only `userscript` is treated as the sandboxed world by the worker.
+ */
+export type BridgeClientKind = 'main' | 'userscript' | 'page';
 
 export interface BridgeHello {
   __lumo: typeof BRIDGE_HELLO;
@@ -104,6 +110,8 @@ export const HOST_RPC_TYPES = new Set([
   'host:log',
   'host:menu:register',
   'host:menu:unregister',
+  // Read-only version probe used by the site-integration page script.
+  'site:lookup',
 ]);
 
 export type RuntimeEventName =
@@ -133,6 +141,13 @@ declare global {
   var __LUMO_HOST_QUEUE__: RuntimeScriptPayload[] | undefined;
 }
 
+/** Every kind the bridge accepts; mirrors `BridgeClientKind` at runtime. */
+const BRIDGE_CLIENT_KINDS: ReadonlySet<string> = new Set<BridgeClientKind>([
+  'main',
+  'userscript',
+  'page',
+]);
+
 /** Narrow helpers so callers never trust a partially-shaped message. */
 export function isBridgeHello(value: unknown): value is BridgeHello {
   const data = value as Partial<BridgeHello> | null;
@@ -140,7 +155,8 @@ export function isBridgeHello(value: unknown): value is BridgeHello {
     data &&
       data.__lumo === BRIDGE_HELLO &&
       typeof data.nonce === 'string' &&
-      (data.kind === 'main' || data.kind === 'userscript'),
+      typeof data.kind === 'string' &&
+      BRIDGE_CLIENT_KINDS.has(data.kind),
   );
 }
 

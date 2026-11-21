@@ -258,6 +258,7 @@
     "title": "Settings",
     "sections": {
       "general": "General",
+      "compatibility": "Compatibility",
       "updates": "Updates",
       "data": "Data",
       "agent": "Agent"
@@ -269,7 +270,8 @@
       "overview": "Overview",
       "export": "Export backup",
       "restore": "Restore backup",
-      "agent": "Agent access"
+      "agent": "Agent access",
+      "compatibility": "Script sites"
     },
     "runtime": "Runtime",
     "scriptsEnabled": "Enable script injection",
@@ -413,7 +415,9 @@
       "activityEmpty": "No agent activity yet.",
       "activityRefresh": "Refresh activity"
     },
-    "saved": "Settings saved."
+    "saved": "Settings saved.",
+    "siteIntegration": "Site detection",
+    "siteIntegrationHint": "Show installed scripts and their versions on Greasy Fork, so its install button can offer an update."
   },
   "logs": {
     "title": "Logs",
@@ -480,7 +484,6 @@
       "disabled": "The agent endpoint is disabled.",
       "notAllowlisted": "This extension is not on the allowlist.",
       "writeDisabled": "Agent writes are disabled.",
-      "rateLimited": "Too many write calls. Try again in a minute.",
       "portClosed": "The agent connection is closed."
     },
     "database": {

@@ -303,7 +303,7 @@ describe('agent probe contract', () => {
 });
 
 describe('agent MCP server', () => {
-  it('speaks standard MCP: initialize instructions + tools/list', async () => {
+  it('speaks standard MCP: tools/list without server instructions', async () => {
     const [serverTransport, clientTransport] = transportPair();
     const server = createAgentMcpServer(HOST_ID, READ_SETTINGS);
     await server.connect(serverTransport);
@@ -311,7 +311,9 @@ describe('agent MCP server', () => {
     const client = new Client({ name: 'contract-test', version: '1.0.0' });
     await client.connect(clientTransport);
 
-    expect(client.getInstructions()).toContain('read-only');
+    // Nothing is sent at `initialize`: the host never reads this field, so the
+    // contract lives in the tool descriptions and in the failure payloads.
+    expect(client.getInstructions()).toBeFalsy();
     const { tools } = await client.listTools();
     expect(tools.map((tool) => tool.name)).toEqual(['list', 'get', 'diagnostics']);
     expect(tools.every((tool) => tool.annotations?.readOnlyHint === true)).toBe(true);
@@ -334,12 +336,11 @@ describe('agent MCP server', () => {
       'diagnostics',
       'set_enabled',
       'create',
-      'edit',
       'update',
       'install',
       'delete',
+      'restore',
     ]);
-    expect(client.getInstructions()).toContain('create, edit, enable/disable');
 
     await client.close();
     await server.close();
@@ -363,9 +364,11 @@ describe('agent MCP server', () => {
       name: 'get',
       arguments: {},
     });
-    expect(result.isError).toBeFalsy();
+    // The selector is the contract point, so the round trip can be asserted
+    // without an IndexedDB: an empty reference is refused before any lookup.
+    expect(result.isError).toBe(true);
     const content = result.content as Array<{ text?: string }>;
-    expect(JSON.parse(content[0]?.text ?? '{}').found).toBe(false);
+    expect(JSON.parse(content[0]?.text ?? '{}').code).toBe('INVALID_INPUT');
 
     await client.close();
     await server.close();

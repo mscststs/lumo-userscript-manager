@@ -258,6 +258,7 @@
     "title": "Mga setting",
     "sections": {
       "general": "Pangkalahatan",
+      "compatibility": "Pagkakatugma",
       "updates": "Mga update",
       "data": "Data",
       "agent": "Ahente"
@@ -269,7 +270,8 @@
       "overview": "Pangkalahatang-ideya",
       "export": "I-export ang backup",
       "restore": "Ibalik ang backup",
-      "agent": "Access sa ahente"
+      "agent": "Access sa ahente",
+      "compatibility": "Mga script site"
     },
     "runtime": "Runtime",
     "scriptsEnabled": "Paganahin ang script injection",
@@ -413,7 +415,9 @@
       "activityEmpty": "Wala pang aktibidad ng ahente.",
       "activityRefresh": "I-refresh ang aktibidad"
     },
-    "saved": "Na-save ang mga setting."
+    "saved": "Na-save ang mga setting.",
+    "siteIntegration": "Pag-detect ng site",
+    "siteIntegrationHint": "Ipakita ang mga naka-install na script at ang kanilang bersyon sa Greasy Fork para makapag-alok ng update ang install button."
   },
   "logs": {
     "title": "Mga log",
@@ -480,7 +484,6 @@
       "disabled": "Naka-disable ang endpoint ng ahente.",
       "notAllowlisted": "Wala sa allowlist ang extension na ito.",
       "writeDisabled": "Naka-disable ang pagsusulat ng ahente.",
-      "rateLimited": "Masyadong maraming tawag sa pagsulat. Subukan muli sa isang minuto.",
       "portClosed": "Ang koneksyon ng ahente ay sarado."
     },
     "database": {

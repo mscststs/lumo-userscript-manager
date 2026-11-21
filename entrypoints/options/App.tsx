@@ -44,7 +44,7 @@ import {
 } from './routes';
 
 type RouteName = 'scripts' | 'editor' | 'settings' | 'appearance' | 'logs' | 'about';
-type SettingsSection = 'general' | 'updates' | 'data' | 'agent';
+type SettingsSection = 'general' | 'compatibility' | 'updates' | 'data' | 'agent';
 
 interface Route {
   name: RouteName;
@@ -54,7 +54,13 @@ interface Route {
   section?: SettingsSection;
 }
 
-const SETTINGS_SECTIONS: SettingsSection[] = ['general', 'updates', 'data', 'agent'];
+const SETTINGS_SECTIONS: SettingsSection[] = [
+  'general',
+  'compatibility',
+  'updates',
+  'data',
+  'agent',
+];
 
 function parseHash(): Route {
   const hash = window.location.hash.replace(/^#\/?/, '');

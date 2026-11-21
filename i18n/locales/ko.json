@@ -258,6 +258,7 @@
     "title": "설정",
     "sections": {
       "general": "일반",
+      "compatibility": "호환성",
       "updates": "업데이트",
       "data": "데이터",
       "agent": "에이전트"
@@ -269,7 +270,8 @@
       "overview": "개요",
       "export": "백업 내보내기",
       "restore": "백업 복원",
-      "agent": "에이전트 접근"
+      "agent": "에이전트 접근",
+      "compatibility": "스크립트 사이트"
     },
     "runtime": "실행 환경",
     "scriptsEnabled": "스크립트 주입 사용",
@@ -413,7 +415,9 @@
       "activityEmpty": "아직 에이전트 활동이 없습니다.",
       "activityRefresh": "활동 새로고침"
     },
-    "saved": "설정을 저장했습니다."
+    "saved": "설정을 저장했습니다.",
+    "siteIntegration": "사이트 감지",
+    "siteIntegrationHint": "Greasy Fork에 설치된 스크립트와 버전을 표시하여 설치 버튼이 업데이트를 제안할 수 있게 합니다."
   },
   "logs": {
     "title": "로그",
@@ -480,7 +484,6 @@
       "disabled": "에이전트 엔드포인트가 꺼져 있습니다.",
       "notAllowlisted": "이 확장 프로그램은 허용 목록에 없습니다.",
       "writeDisabled": "에이전트 쓰기가 꺼져 있습니다.",
-      "rateLimited": "쓰기 호출이 너무 많습니다. 1분 후 다시 시도하세요.",
       "portClosed": "에이전트 연결이 닫혔습니다."
     },
     "database": {

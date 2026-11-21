@@ -258,6 +258,7 @@
     "title": "Pengaturan",
     "sections": {
       "general": "Umum",
+      "compatibility": "Kompatibilitas",
       "updates": "Pembaruan",
       "data": "Data",
       "agent": "Agen"
@@ -269,7 +270,8 @@
       "overview": "Ringkasan",
       "export": "Ekspor cadangan",
       "restore": "Pulihkan cadangan",
-      "agent": "Akses agen"
+      "agent": "Akses agen",
+      "compatibility": "Situs skrip"
     },
     "runtime": "Runtime",
     "scriptsEnabled": "Aktifkan injeksi skrip",
@@ -413,7 +415,9 @@
       "activityEmpty": "Belum ada aktivitas agen.",
       "activityRefresh": "Segarkan aktivitas"
     },
-    "saved": "Pengaturan disimpan."
+    "saved": "Pengaturan disimpan.",
+    "siteIntegration": "Deteksi situs",
+    "siteIntegrationHint": "Tampilkan skrip terpasang dan versinya di Greasy Fork agar tombol pasang dapat menawarkan pembaruan."
   },
   "logs": {
     "title": "Log",
@@ -480,7 +484,6 @@
       "disabled": "Titik akhir agen dinonaktifkan.",
       "notAllowlisted": "Ekstensi ini tidak ada dalam daftar yang diizinkan.",
       "writeDisabled": "Penulisan agen dinonaktifkan.",
-      "rateLimited": "Terlalu banyak permintaan tulis. Coba lagi sebentar lagi.",
       "portClosed": "Koneksi agen ditutup."
     },
     "database": {

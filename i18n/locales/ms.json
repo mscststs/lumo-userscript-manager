@@ -258,6 +258,7 @@
     "title": "Tetapan",
     "sections": {
       "general": "Umum",
+      "compatibility": "Keserasian",
       "updates": "Kemas kini",
       "data": "Data",
       "agent": "Ejen"
@@ -269,7 +270,8 @@
       "overview": "Gambaran keseluruhan",
       "export": "Eksport sandaran",
       "restore": "Pulihkan sandaran",
-      "agent": "Akses ejen"
+      "agent": "Akses ejen",
+      "compatibility": "Tapak skrip"
     },
     "runtime": "Runtime",
     "scriptsEnabled": "Dayakan suntikan skrip",
@@ -413,7 +415,9 @@
       "activityEmpty": "Tiada aktiviti ejen lagi.",
       "activityRefresh": "Segarkan aktiviti"
     },
-    "saved": "Tetapan disimpan."
+    "saved": "Tetapan disimpan.",
+    "siteIntegration": "Pengesanan tapak",
+    "siteIntegrationHint": "Tunjukkan skrip yang dipasang dan versinya di Greasy Fork supaya butang pasang boleh menawarkan kemas kini."
   },
   "logs": {
     "title": "Log",
@@ -480,7 +484,6 @@
       "disabled": "Titik akhir ejen dilumpuhkan.",
       "notAllowlisted": "Sambungan ini tiada dalam senarai yang dibenarkan.",
       "writeDisabled": "Tulisan ejen dilumpuhkan.",
-      "rateLimited": "Terlalu banyak panggilan tulis. Cuba lagi dalam satu minit.",
       "portClosed": "Sambungan ejen ditutup."
     },
     "database": {

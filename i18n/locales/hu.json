@@ -258,6 +258,7 @@
     "title": "Beállítások",
     "sections": {
       "general": "Általános",
+      "compatibility": "Kompatibilitás",
       "updates": "Frissítések",
       "data": "Adat",
       "agent": "Ügynök"
@@ -269,7 +270,8 @@
       "overview": "Áttekintés",
       "export": "Biztonsági másolat exportálása",
       "restore": "Biztonsági másolat visszaállítása",
-      "agent": "Ügynök hozzáférés"
+      "agent": "Ügynök hozzáférés",
+      "compatibility": "Szkriptoldalak"
     },
     "runtime": "Runtime",
     "scriptsEnabled": "Szkriptinjektálás engedélyezése",
@@ -413,7 +415,9 @@
       "activityEmpty": "Még nincs ügynöki tevékenység.",
       "activityRefresh": "Tevékenység frissítése"
     },
-    "saved": "A beállítások mentve."
+    "saved": "A beállítások mentve.",
+    "siteIntegration": "Webhelyfelismerés",
+    "siteIntegrationHint": "Telepített szkriptek és verzióik megjelenítése a Greasy Forkon, hogy a telepítés gomb frissítést ajánlhasson fel."
   },
   "logs": {
     "title": "Naplók",
@@ -480,7 +484,6 @@
       "disabled": "Az ügynök végpontja le van tiltva.",
       "notAllowlisted": "Ez a bővítmény nem szerepel az engedélyezési listán.",
       "writeDisabled": "Az ügynök írása le van tiltva.",
-      "rateLimited": "Túl sok írási hívás. Próbálja újra egy perc múlva.",
       "portClosed": "Az ügynöki kapcsolat megszakadt."
     },
     "database": {

@@ -258,6 +258,7 @@
     "title": "Innstillinger",
     "sections": {
       "general": "General",
+      "compatibility": "Kompatibilitet",
       "updates": "Oppdateringer",
       "data": "Data",
       "agent": "Agent"
@@ -269,7 +270,8 @@
       "overview": "Oversikt",
       "export": "Eksporter sikkerhetskopi",
       "restore": "Gjenopprett sikkerhetskopi",
-      "agent": "Agenttilgang"
+      "agent": "Agenttilgang",
+      "compatibility": "Skriptnettsteder"
     },
     "runtime": "Kjøretid",
     "scriptsEnabled": "Aktiver skriptinjeksjon",
@@ -413,7 +415,9 @@
       "activityEmpty": "Ingen agentaktivitet ennå.",
       "activityRefresh": "Oppdater aktivitet"
     },
-    "saved": "Innstillinger lagret."
+    "saved": "Innstillinger lagret.",
+    "siteIntegration": "Nettstedsregistrering",
+    "siteIntegrationHint": "Vis installerte skript og versjonene deres på Greasy Fork, slik at installasjonsknappen kan tilby en oppdatering."
   },
   "logs": {
     "title": "Logger",
@@ -480,7 +484,6 @@
       "disabled": "Agentendepunktet er deaktivert.",
       "notAllowlisted": "Denne utvidelsen er ikke på godkjenningslisten.",
       "writeDisabled": "Agentskriving er deaktivert.",
-      "rateLimited": "For mange skriveanrop. Prøv igjen om et minutt.",
       "portClosed": "Agentforbindelsen er stengt."
     },
     "database": {

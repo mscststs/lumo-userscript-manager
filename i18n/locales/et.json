@@ -258,6 +258,7 @@
     "title": "Seaded",
     "sections": {
       "general": "Üldine",
+      "compatibility": "Ühilduvus",
       "updates": "Värskendused",
       "data": "Andmed",
       "agent": "Agent"
@@ -269,7 +270,8 @@
       "overview": "Ülevaade",
       "export": "Ekspordi varukoopia",
       "restore": "Taasta varukoopia",
-      "agent": "Agendi juurdepääs"
+      "agent": "Agendi juurdepääs",
+      "compatibility": "Skriptide saidid"
     },
     "runtime": "Runtime",
     "scriptsEnabled": "Luba skripti süstimine",
@@ -413,7 +415,9 @@
       "activityEmpty": "Agentide tegevust veel pole.",
       "activityRefresh": "Värskenda tegevust"
     },
-    "saved": "Seaded salvestatud."
+    "saved": "Seaded salvestatud.",
+    "siteIntegration": "Saidi tuvastamine",
+    "siteIntegrationHint": "Kuva Greasy Forkis installitud skriptid ja nende versioonid, et paigaldusnupp saaks pakkuda uuendust."
   },
   "logs": {
     "title": "Logid",
@@ -480,7 +484,6 @@
       "disabled": "Agendi lõpp-punkt on keelatud.",
       "notAllowlisted": "Seda laiendust pole lubatud loendis.",
       "writeDisabled": "Agendi kirjutamine on keelatud.",
-      "rateLimited": "Liiga palju kirjutuskutseid. Proovi minuti pärast uuesti.",
       "portClosed": "Agendiühendus on suletud."
     },
     "database": {

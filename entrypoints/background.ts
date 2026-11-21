@@ -92,6 +92,7 @@ import { ChromePortTransport } from '@/lib/agent/transport';
 import { AppError, serializeError } from '@/lib/errors';
 import { formatDiagnostics } from '@/lib/diagnostics';
 import { openOptionsTab } from '@/lib/options-tab';
+import { lookupInstalledScript } from '@/lib/background/site-lookup';
 
 const INSTALL_RULE_ID = 1;
 
@@ -202,6 +203,14 @@ async function handleRuntimeMessage(
     case 'options:open':
       await openOptionsTab(String(payload.hash ?? ''));
       return true;
+    case 'site:lookup':
+      // The bridge stamps the page URL on the envelope; the payload is only
+      // used for the name/namespace the site displayed.
+      return lookupInstalledScript({
+        name: payload.name,
+        namespace: payload.namespace,
+        pageUrl: payload.__pageUrl,
+      });
     case 'popup:getData': {
       const data = await getPopupData(Number(payload.tabId ?? -1), payload.url);
       const availability = await checkUserScriptsAvailable();

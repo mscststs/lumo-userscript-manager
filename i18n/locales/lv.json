@@ -263,6 +263,7 @@
     "title": "Iestatījumi",
     "sections": {
       "general": "Vispārīgi",
+      "compatibility": "Saderība",
       "updates": "Atjauninājumi",
       "data": "Dati",
       "agent": "Aģents"
@@ -274,7 +275,8 @@
       "overview": "Pārskats",
       "export": "Eksportēt dublējumu",
       "restore": "Atjaunot dublējumu",
-      "agent": "Aģenta piekļuve"
+      "agent": "Aģenta piekļuve",
+      "compatibility": "Skriptu vietnes"
     },
     "runtime": "Runtime",
     "scriptsEnabled": "Iespējot skripta injekciju",
@@ -420,7 +422,9 @@
       "activityRefresh": "Atsvaidzināt darbību"
     },
     "saved": "Iestatījumi saglabāti.",
-    "importAction_zero": "Importējiet {{count}} skriptus"
+    "importAction_zero": "Importējiet {{count}} skriptus",
+    "siteIntegration": "Vietnes noteikšana",
+    "siteIntegrationHint": "Rādīt instalētos skriptus un to versijas Greasy Fork, lai instalēšanas poga varētu piedāvāt atjauninājumu."
   },
   "logs": {
     "title": "Žurnāli",
@@ -488,7 +492,6 @@
       "disabled": "Aģenta galapunkts ir atspējots.",
       "notAllowlisted": "Šis paplašinājums nav atļauts.",
       "writeDisabled": "Aģenta rakstīšana ir atspējota.",
-      "rateLimited": "Pārāk daudz rakstīšanas pieprasījumu. Pēc minūtes mēģiniet vēlreiz.",
       "portClosed": "Aģenta savienojums ir slēgts."
     },
     "database": {

@@ -268,6 +268,7 @@
     "title": "Ustawienia",
     "sections": {
       "general": "Ogólne",
+      "compatibility": "Zgodność",
       "updates": "Aktualizacje",
       "data": "Dane",
       "agent": "Agent"
@@ -279,7 +280,8 @@
       "overview": "Przegląd",
       "export": "Eksportuj kopię zapasową",
       "restore": "Przywróć kopię zapasową",
-      "agent": "Dostęp agenta"
+      "agent": "Dostęp agenta",
+      "compatibility": "Witryny skryptów"
     },
     "runtime": "Runtime",
     "scriptsEnabled": "Włącz wstrzykiwanie skryptu",
@@ -427,7 +429,9 @@
     },
     "saved": "Ustawienia zostały zapisane.",
     "importAction_few": "Zaimportuj {{count}} skrypty",
-    "importAction_many": "Zaimportuj {{count}} skryptów"
+    "importAction_many": "Zaimportuj {{count}} skryptów",
+    "siteIntegration": "Wykrywanie witryny",
+    "siteIntegrationHint": "Pokazuj zainstalowane skrypty i ich wersje w Greasy Fork, aby przycisk instalacji mógł zaproponować aktualizację."
   },
   "logs": {
     "title": "Dzienniki",
@@ -496,7 +500,6 @@
       "disabled": "Punkt końcowy agenta jest wyłączony.",
       "notAllowlisted": "To rozszerzenie nie znajduje się na liście dozwolonych.",
       "writeDisabled": "Zapisy agentów są wyłączone.",
-      "rateLimited": "Zbyt wiele wywołań zapisu. Spróbuj ponownie za minutę.",
       "portClosed": "Połączenie agenta zostało zamknięte."
     },
     "database": {

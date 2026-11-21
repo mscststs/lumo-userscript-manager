@@ -38,7 +38,19 @@ describe('storage schema', () => {
       autoUpdate: true,
       updateIntervalHours: 6,
       logLevel: 'info',
+      siteIntegration: false,
     });
+  });
+
+  it('keeps site detection off unless a config opts in explicitly', () => {
+    const defaults = STORAGE_FIELDS.uiSettings.defaultValue;
+    expect(normalizeUI(defaults).siteIntegration).toBe(false);
+    expect(normalizeUI({ ...defaults, siteIntegration: true }).siteIntegration).toBe(true);
+    // A truthy non-boolean from a hand-edited config must not switch it on.
+    expect(
+      normalizeUI({ ...defaults, siteIntegration: 'yes' } as unknown as UISettings)
+        .siteIntegration,
+    ).toBe(false);
   });
 
   it('defaults the toolbar badge on, and keeps an explicit opt-out', () => {

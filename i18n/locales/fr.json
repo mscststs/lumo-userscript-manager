@@ -263,6 +263,7 @@
     "title": "Paramètres",
     "sections": {
       "general": "Général",
+      "compatibility": "Compatibilité",
       "updates": "Mises à jour",
       "data": "Données",
       "agent": "Agent"
@@ -274,7 +275,8 @@
       "overview": "Aperçu",
       "export": "Exporter une sauvegarde",
       "restore": "Restaurer une sauvegarde",
-      "agent": "Accès de l’agent"
+      "agent": "Accès de l’agent",
+      "compatibility": "Sites de scripts"
     },
     "runtime": "Exécution",
     "scriptsEnabled": "Activer l’injection de scripts",
@@ -420,7 +422,9 @@
       "activityRefresh": "Actualiser l’activité"
     },
     "saved": "Paramètres enregistrés.",
-    "importAction_many": "Importer {{count}} scripts"
+    "importAction_many": "Importer {{count}} scripts",
+    "siteIntegration": "Détection du site",
+    "siteIntegrationHint": "Afficher les scripts installés et leurs versions sur Greasy Fork afin que le bouton d'installation puisse proposer une mise à jour."
   },
   "logs": {
     "title": "Journaux",
@@ -488,7 +492,6 @@
       "disabled": "Le point de terminaison de l’agent est désactivé.",
       "notAllowlisted": "Cette extension n’est pas dans la liste d’autorisation.",
       "writeDisabled": "Les écritures de l’agent sont désactivées.",
-      "rateLimited": "Trop d’appels d’écriture. Réessayez dans une minute.",
       "portClosed": "La connexion de l’agent est fermée."
     },
     "database": {

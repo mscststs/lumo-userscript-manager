@@ -258,6 +258,7 @@
     "title": "ቅንብሮች",
     "sections": {
       "general": "አጠቃላይ",
+      "compatibility": "ተኳኋኝነት",
       "updates": "ዝማኔዎች",
       "data": "ውሂብ",
       "agent": "ወኪል"
@@ -269,7 +270,8 @@
       "overview": "አጠቃላይ እይታ",
       "export": "ምትኬን ወደ ውጪ ላክ",
       "restore": "ምትኬን ወደነበረበት መልስ",
-      "agent": "የወኪል መዳረሻ"
+      "agent": "የወኪል መዳረሻ",
+      "compatibility": "የስክሪፕት ጣቢያዎች"
     },
     "runtime": "Runtime",
     "scriptsEnabled": "የስክሪፕት መርፌን አንቃ",
@@ -413,7 +415,9 @@
       "activityEmpty": "እስካሁን ምንም የወኪል እንቅስቃሴ የለም።",
       "activityRefresh": "እንቅስቃሴን አድስ"
     },
-    "saved": "ቅንብሮች ተቀምጠዋል።"
+    "saved": "ቅንብሮች ተቀምጠዋል።",
+    "siteIntegration": "የጣቢያ ማወቂያ",
+    "siteIntegrationHint": "በGreasy Fork ላይ የተጫኑ ስክሪፕቶችን እና ስሪቶቻቸውን አሳይ፣ የመጫኛ አዝራሩ ዝመና እንዲያቀርብ።"
   },
   "logs": {
     "title": "መዝገቦች",
@@ -480,7 +484,6 @@
       "disabled": "የወኪሉ የመጨረሻ ነጥብ ተሰናክሏል።",
       "notAllowlisted": "ይህ ቅጥያ በተፈቀደ ዝርዝር ውስጥ የለም።",
       "writeDisabled": "ወኪል ጽሁፎች ተሰናክለዋል።",
-      "rateLimited": "በጣም ብዙ የጽሁፍ ጥሪዎች። ከአንድ ደቂቃ በኋላ እንደገና ይሞክሩ።",
       "portClosed": "የወኪሉ ግንኙነት ተዘግቷል።"
     },
     "database": {

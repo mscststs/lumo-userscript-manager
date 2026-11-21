@@ -278,6 +278,7 @@
     "title": "الإعدادات",
     "sections": {
       "general": "عام",
+      "compatibility": "التوافق",
       "updates": "التحديثات",
       "data": "البيانات",
       "agent": "الوكيل"
@@ -289,7 +290,8 @@
       "overview": "نظرة عامة",
       "export": "تصدير نسخة احتياطية",
       "restore": "استعادة نسخة احتياطية",
-      "agent": "وصول الوكيل"
+      "agent": "وصول الوكيل",
+      "compatibility": "مواقع النصوص"
     },
     "runtime": "وقت التشغيل",
     "scriptsEnabled": "تمكين حقن السكربتات",
@@ -441,7 +443,9 @@
     "importAction_two": "استيراد {{count}} سكربتين",
     "importAction_few": "استيراد {{count}} سكربتات",
     "importAction_many": "استيراد {{count}} سكربتًا",
-    "importAction_other": "استيراد {{count}} سكربت"
+    "importAction_other": "استيراد {{count}} سكربت",
+    "siteIntegration": "كشف الموقع",
+    "siteIntegrationHint": "اعرض النصوص المثبَّتة وإصداراتها على Greasy Fork حتى يتمكن زر التثبيت من عرض التحديث."
   },
   "logs": {
     "title": "السجلات",
@@ -512,7 +516,6 @@
       "disabled": "نقطة نهاية الوكيل معطّلة.",
       "notAllowlisted": "هذه الإضافة ليست في قائمة السماح.",
       "writeDisabled": "كتابات الوكيل معطّلة.",
-      "rateLimited": "عدد كبير جدًا من طلبات الكتابة. حاول بعد دقيقة.",
       "portClosed": "اتصال الوكيل مغلق."
     },
     "database": {

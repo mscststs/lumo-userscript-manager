@@ -258,6 +258,7 @@
     "title": "設定",
     "sections": {
       "general": "一般",
+      "compatibility": "相容性",
       "updates": "更新",
       "data": "資料",
       "agent": "智慧代理"
@@ -269,7 +270,8 @@
       "overview": "資料概覽",
       "export": "匯出備份",
       "restore": "還原備份",
-      "agent": "代理存取"
+      "agent": "代理存取",
+      "compatibility": "腳本網站"
     },
     "runtime": "執行階段",
     "scriptsEnabled": "啟用腳本注入",
@@ -413,7 +415,9 @@
       "activityEmpty": "尚無代理操作。",
       "activityRefresh": "重新整理操作記錄"
     },
-    "saved": "設定已儲存。"
+    "saved": "設定已儲存。",
+    "siteIntegration": "網站識別",
+    "siteIntegrationHint": "在 Greasy Fork 上顯示已安裝腳本及其版本，讓安裝按鈕可以提示更新。"
   },
   "logs": {
     "title": "日誌",
@@ -480,7 +484,6 @@
       "disabled": "智慧代理端點已停用。",
       "notAllowlisted": "此擴充功能不在允許清單中。",
       "writeDisabled": "智慧代理寫入已停用。",
-      "rateLimited": "寫入呼叫過多，請稍後再試。",
       "portClosed": "智慧代理連線已關閉。"
     },
     "database": {

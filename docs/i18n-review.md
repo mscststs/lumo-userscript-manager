@@ -3,6 +3,13 @@
 `ready` means the locale has been read key by key against `en.json`, corrected, and passed `i18n:check`.
 `draft` means it is a machine draft or otherwise not yet reviewed; the app falls back to English for that locale.
 
+> **Pending review.** Four keys were added for site compatibility
+> (`settings.sections.compatibility`, `settings.groups.compatibility`,
+> `settings.siteIntegration`, `settings.siteIntegrationHint`). Their non-English
+> values are currently machine-authored and have not been read line by line.
+> `Reviewed keys` below still records 434 — the count from the last full review;
+> it becomes 440 once the four new keys are reviewed in a locale.
+
 | Locale | Status | Reviewed keys | Corrections | Notes |
 | --- | --- | ---: | ---: | --- |
 | `ar` | ready | 434 | — | hand-authored |

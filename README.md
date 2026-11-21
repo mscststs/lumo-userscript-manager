@@ -19,6 +19,8 @@ A Chromium MV3 userscript manager for Chrome and Edge, built with WXT, React 19 
 - CodeMirror 6 editor with metadata validation, overrides, values editor and resource viewer
 - Recycle bin, JSON/ZIP backup export and import
 - Update checks with permission-aware auto-update
+- Optional site compatibility: Greasy Fork and Sleazy Fork can show whether a
+  script is installed and offer the right update or reinstall button
 - Popup page controls, logs, runtime health and registration diagnostics
 - Three palettes (Paper / Graphite / Midnight) × five accents, adjustable UI scale, English, Chinese and more
 
@@ -127,10 +129,13 @@ entrypoints/
   popup/          per-page controls
   options/        scripts, editor, logs, settings, appearance, about
   install/        install confirmation (DNR redirect target)
+  site-external   page-world script-site probe (MAIN world, opt-in)
+  site-state      opt-in publisher for the probe (ISOLATED world)
 components/       ui primitives, editor, layout, settings
 lib/
   script/         metadata parser, URL rules, launcher compiler
   runtime/        engines, GM API, bridge transport
+  site-integration/  script-site probe contract, exposure and opt-in channel
   background/     registration, host service, updates, tokens
   db/             IndexedDB layer
   theme*.ts       palettes, accents, first-paint contract

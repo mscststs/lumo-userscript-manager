@@ -27,7 +27,6 @@ export type ErrorCode =
   | 'agent.disabled'
   | 'agent.notAllowlisted'
   | 'agent.writeDisabled'
-  | 'agent.rateLimited'
   | 'agent.portClosed'
   | 'database.openFailed'
   | 'database.requestFailed'
@@ -56,7 +55,6 @@ export const ERROR_KEYS: Record<ErrorCode, TranslationKey> = {
   'agent.disabled': 'errors.agent.disabled',
   'agent.notAllowlisted': 'errors.agent.notAllowlisted',
   'agent.writeDisabled': 'errors.agent.writeDisabled',
-  'agent.rateLimited': 'errors.agent.rateLimited',
   'agent.portClosed': 'errors.agent.portClosed',
   'database.openFailed': 'errors.database.openFailed',
   'database.requestFailed': 'errors.database.requestFailed',

@@ -258,6 +258,7 @@
     "title": "Asetukset",
     "sections": {
       "general": "Yleiset",
+      "compatibility": "Yhteensopivuus",
       "updates": "Päivitykset",
       "data": "Data",
       "agent": "Agentti"
@@ -269,7 +270,8 @@
       "overview": "Yleiskatsaus",
       "export": "Vie varmuuskopio",
       "restore": "Palauta varmuuskopio",
-      "agent": "Agentin pääsy"
+      "agent": "Agentin pääsy",
+      "compatibility": "Skriptisivustot"
     },
     "runtime": "Runtime",
     "scriptsEnabled": "Ota skriptin lisäys käyttöön",
@@ -413,7 +415,9 @@
       "activityEmpty": "Ei agenttitoimintaa vielä.",
       "activityRefresh": "Päivitä toiminta"
     },
-    "saved": "Asetukset tallennettu."
+    "saved": "Asetukset tallennettu.",
+    "siteIntegration": "Sivuston tunnistus",
+    "siteIntegrationHint": "Näytä asennetut skriptit ja niiden versiot Greasy Forkissa, jotta asennuspainike voi tarjota päivitystä."
   },
   "logs": {
     "title": "Lokit",
@@ -480,7 +484,6 @@
       "disabled": "Agentin päätepiste on poistettu käytöstä.",
       "notAllowlisted": "Tämä laajennus ei ole sallittujen luettelossa.",
       "writeDisabled": "Agenttikirjoitukset on poistettu käytöstä.",
-      "rateLimited": "Liian monta kirjoituskutsua. Yritä uudelleen hetken kuluttua.",
       "portClosed": "Agenttiyhteys on suljettu."
     },
     "database": {

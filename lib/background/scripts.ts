@@ -358,8 +358,11 @@ export async function removeScript(uuid: string): Promise<void> {
   broadcast('scripts-changed');
 }
 
-export async function restoreDeletedScript(uuid: string): Promise<void> {
-  await restoreScript(uuid);
+export async function restoreDeletedScript(
+  uuid: string,
+  options: { enabled?: boolean } = {},
+): Promise<void> {
+  await restoreScript(uuid, options.enabled ?? true);
   await requestRegistration();
   broadcast('scripts-changed');
 }

@@ -58,7 +58,7 @@ import { isExtensionId } from '@/lib/agent/protocol';
 import { removeAllowedClient, upsertAllowedClient } from '@/lib/agent/allowlist';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-export type SettingsSection = 'general' | 'updates' | 'data' | 'agent';
+export type SettingsSection = 'general' | 'compatibility' | 'updates' | 'data' | 'agent';
 
 const RUN_AT = RUN_AT_OPTIONS.filter((option) => DEFAULT_RUN_AT_VALUES.includes(option.value));
 const INJECT_INTO = INJECT_INTO_OPTIONS;
@@ -438,6 +438,10 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
         onChange={onNavigate}
         items={[
           { value: 'general', label: t('settings.sections.general') },
+          // Compatibility sits next to the behaviour it modifies: both answer
+          // "how should the manager behave in the browser", unlike updates or
+          // data which are about the store itself.
+          { value: 'compatibility', label: t('settings.sections.compatibility') },
           { value: 'updates', label: t('settings.sections.updates') },
           { value: 'data', label: t('settings.sections.data') },
           { value: 'agent', label: t('settings.sections.agent') },
@@ -644,6 +648,22 @@ export function SettingsPage({ section, onNavigate }: SettingsPageProps) {
             />
           </SettingsGroup>
         </>
+      )}
+
+      {section === 'compatibility' && (
+        <SettingsGroup title={t('settings.groups.compatibility')}>
+          <SettingRow
+            label={t('settings.siteIntegration')}
+            description={t('settings.siteIntegrationHint')}
+            control={
+              <Switch
+                checked={settings.siteIntegration}
+                onCheckedChange={(checked) => void update({ siteIntegration: checked })}
+                aria-label={t('settings.siteIntegration')}
+              />
+            }
+          />
+        </SettingsGroup>
       )}
 
       {section === 'updates' && (

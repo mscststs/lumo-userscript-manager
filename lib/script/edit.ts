@@ -184,7 +184,7 @@ export function replaceOnce(source: string, edit: ReplaceEdit): ReplaceResult {
     ok: false,
     occurrences: 0,
     error:
-      'oldText was not found in the script. Call get with includeCode first and copy the exact ' +
+      'oldText was not found in the script. Call get first and copy the exact ' +
       'text you want to replace, including indentation. Do not guess or reconstruct it from memory.',
   };
 }

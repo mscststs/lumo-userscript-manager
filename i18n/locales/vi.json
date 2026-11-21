@@ -258,6 +258,7 @@
     "title": "Cài đặt",
     "sections": {
       "general": "Chung",
+      "compatibility": "Tương thích",
       "updates": "Cập nhật",
       "data": "Dữ liệu",
       "agent": "Tác nhân"
@@ -269,7 +270,8 @@
       "overview": "Tổng quan",
       "export": "Xuất bản sao lưu",
       "restore": "Khôi phục bản sao lưu",
-      "agent": "Quyền truy cập của đại lý"
+      "agent": "Quyền truy cập của đại lý",
+      "compatibility": "Trang script"
     },
     "runtime": "Runtime",
     "scriptsEnabled": "Bật tính năng chèn tập lệnh",
@@ -413,7 +415,9 @@
       "activityEmpty": "Chưa có hoạt động đại lý nào.",
       "activityRefresh": "Làm mới hoạt động"
     },
-    "saved": "Đã lưu cài đặt."
+    "saved": "Đã lưu cài đặt.",
+    "siteIntegration": "Nhận diện trang",
+    "siteIntegrationHint": "Hiển thị script đã cài và phiên bản của chúng trên Greasy Fork để nút cài đặt có thể đề xuất cập nhật."
   },
   "logs": {
     "title": "Nhật ký",
@@ -480,7 +484,6 @@
       "disabled": "Điểm cuối của đại lý bị vô hiệu hóa.",
       "notAllowlisted": "Tiện ích mở rộng này không có trong danh sách cho phép.",
       "writeDisabled": "Tác nhân viết bị vô hiệu hóa.",
-      "rateLimited": "Quá nhiều yêu cầu ghi. Hãy thử lại sau một phút.",
       "portClosed": "Kết nối đại lý đã đóng."
     },
     "database": {

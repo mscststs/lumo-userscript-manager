@@ -258,6 +258,7 @@
     "title": "Instellingen",
     "sections": {
       "general": "Algemeen",
+      "compatibility": "Compatibiliteit",
       "updates": "Updates",
       "data": "Gegevens",
       "agent": "Agent"
@@ -269,7 +270,8 @@
       "overview": "Overzicht",
       "export": "Back-up exporteren",
       "restore": "Back-up herstellen",
-      "agent": "Agenttoegang"
+      "agent": "Agenttoegang",
+      "compatibility": "Scriptsites"
     },
     "runtime": "Runtime",
     "scriptsEnabled": "Scriptinjectie inschakelen",
@@ -413,7 +415,9 @@
       "activityEmpty": "Nog geen agentactiviteit.",
       "activityRefresh": "Activiteit vernieuwen"
     },
-    "saved": "Instellingen opgeslagen."
+    "saved": "Instellingen opgeslagen.",
+    "siteIntegration": "Sitedetectie",
+    "siteIntegrationHint": "Toon geïnstalleerde scripts en hun versies op Greasy Fork, zodat de installatieknop een update kan aanbieden."
   },
   "logs": {
     "title": "Logboeken",
@@ -480,7 +484,6 @@
       "disabled": "Het agenteindpunt is uitgeschakeld.",
       "notAllowlisted": "Deze extensie staat niet op de toelatingslijst.",
       "writeDisabled": "Agentschrijfbewerkingen zijn uitgeschakeld.",
-      "rateLimited": "Te veel schrijfoproepen. Probeer het over een minuut opnieuw.",
       "portClosed": "De agentverbinding is gesloten."
     },
     "database": {

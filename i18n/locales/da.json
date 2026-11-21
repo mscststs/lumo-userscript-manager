@@ -258,6 +258,7 @@
     "title": "Indstillinger",
     "sections": {
       "general": "Generel",
+      "compatibility": "Kompatibilitet",
       "updates": "Opdateringer",
       "data": "Data",
       "agent": "Agent"
@@ -269,7 +270,8 @@
       "overview": "Oversigt",
       "export": "Eksporter backup",
       "restore": "Gendan backup",
-      "agent": "Agentadgang"
+      "agent": "Agentadgang",
+      "compatibility": "Scriptwebsteder"
     },
     "runtime": "Runtime",
     "scriptsEnabled": "Aktiver script-injektion",
@@ -413,7 +415,9 @@
       "activityEmpty": "Endnu ingen agentaktivitet.",
       "activityRefresh": "Opdater aktivitet"
     },
-    "saved": "Indstillinger gemt."
+    "saved": "Indstillinger gemt.",
+    "siteIntegration": "Registrering af websted",
+    "siteIntegrationHint": "Vis installerede scripts og deres versioner på Greasy Fork, så installationsknappen kan tilbyde en opdatering."
   },
   "logs": {
     "title": "Logs",
@@ -480,7 +484,6 @@
       "disabled": "Agentslutpunktet er deaktiveret.",
       "notAllowlisted": "Denne udvidelse er ikke på tilladelseslisten.",
       "writeDisabled": "Agentskrivning er deaktiveret.",
-      "rateLimited": "For mange skriveopkald. Prøv igen om et minut.",
       "portClosed": "Agentforbindelsen er lukket."
     },
     "database": {

@@ -263,6 +263,7 @@
     "title": "Setări",
     "sections": {
       "general": "General",
+      "compatibility": "Compatibilitate",
       "updates": "Actualizări",
       "data": "Date",
       "agent": "Agent"
@@ -274,7 +275,8 @@
       "overview": "Prezentare generală",
       "export": "Exportă backup",
       "restore": "Restaurează backupul",
-      "agent": "Acces agent"
+      "agent": "Acces agent",
+      "compatibility": "Site-uri de scripturi"
     },
     "runtime": "Runtime",
     "scriptsEnabled": "Activează injecția de script",
@@ -420,7 +422,9 @@
       "activityRefresh": "Reîmprospătează activitatea"
     },
     "saved": "Setările au fost salvate.",
-    "importAction_few": "Importați scripturi {{count}}"
+    "importAction_few": "Importați scripturi {{count}}",
+    "siteIntegration": "Detectarea site-ului",
+    "siteIntegrationHint": "Afișează scripturile instalate și versiunile lor pe Greasy Fork, ca butonul de instalare să poată oferi o actualizare."
   },
   "logs": {
     "title": "Jurnale",
@@ -488,7 +492,6 @@
       "disabled": "Punctul final al agentului este dezactivat.",
       "notAllowlisted": "Această extensie nu este pe lista permisă.",
       "writeDisabled": "Scrierile agentului sunt dezactivate.",
-      "rateLimited": "Prea multe apeluri de scriere. Încercați din nou peste un minut.",
       "portClosed": "Conexiunea agentului este închisă."
     },
     "database": {
