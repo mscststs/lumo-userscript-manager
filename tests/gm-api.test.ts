@@ -137,6 +137,32 @@ describe('GM API scoping', () => {
     expect(transport.unregisterMenuCommand.mock.calls.length).toBe(calls);
   });
 
+  it('forwards redirect and drops callback-only options from GM_xmlhttpRequest', async () => {
+    const { api, transport } = makeContext(['GM_xmlhttpRequest']);
+    const onload = vi.fn();
+    api.GM.GM_xmlhttpRequest({
+      method: 'POST',
+      url: 'https://api.example.com/x',
+      headers: { 'x-a': '1' },
+      redirect: 'error',
+      context: { tag: 1 },
+      onload,
+    });
+    await vi.waitFor(() => expect(transport.call).toHaveBeenCalledTimes(1));
+    const call = transport.call.mock.calls[0];
+    expect(call).toBeDefined();
+    const [name, args] = call!;
+    expect(name).toBe('GM_xmlhttpRequest');
+    expect(args[0]).toMatchObject({
+      method: 'POST',
+      url: 'https://api.example.com/x',
+      headers: { 'x-a': '1' },
+      redirect: 'error',
+    });    // Functions cannot cross the bridge; they stay on the page side.
+    expect(args[0]).not.toHaveProperty('onload');
+    expect(args[0]).not.toHaveProperty('context');
+  });
+
   it('passes the log level and labels through GM_log', () => {
     const { api, transport } = makeContext(['GM_log']);
     api.GM.GM_log('message', 'warn', 'label');

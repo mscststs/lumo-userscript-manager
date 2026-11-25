@@ -77,6 +77,7 @@ function serializeXhrOptions(options: Record<string, unknown>): Record<string, u
     'responseType',
     'overrideMimeType',
     'anonymous',
+    'redirect',
     'user',
     'password',
   ];

@@ -3,6 +3,7 @@ import { getScript } from '@/lib/db';
 import { mergeMetadata } from '@/lib/script/metadata';
 import { sendToHost } from './host-ports';
 import { recordLog } from './logs';
+import { prepareXhrRequest } from './xhr-header-rules';
 
 export interface GmRequestContext {
   tabId: number;
@@ -68,6 +69,12 @@ function requireConnect(
   }
 }
 
+/** `redirect` is a documented GM_xhr option; fetch only knows these three. */
+function normalizeRedirect(value: unknown): RequestRedirect {
+  // `manual` hands back an opaque response (status 0), matching Tampermonkey.
+  return value === 'error' || value === 'manual' ? value : 'follow';
+}
+
 function base64FromBuffer(buffer: ArrayBufferLike): string {
   const bytes = new Uint8Array(buffer);
   let binary = '';
@@ -94,17 +101,26 @@ async function handleXhr(
   const timer = timeout ? setTimeout(() => controller.abort('timeout'), timeout) : null;
 
   try {
-    const response = await fetch(url, {
-      method: String(options.method ?? 'GET'),
-      headers: options.headers ?? undefined,
-      body:
-        options.data && typeof options.data === 'object'
-          ? JSON.stringify(options.data)
-          : (options.data ?? undefined),
-      credentials: options.anonymous ? 'omit' : 'include',
-      redirect: 'follow',
-      signal: controller.signal,
-    });
+    // Fetch drops User-Agent/Referer/Origin and stamps the extension origin on
+    // cross-origin POSTs, which some WAFs answer with 403/412. Move those
+    // headers onto a DNR rule scoped to this extension before sending.
+    const lease = await prepareXhrRequest(url, options.headers);
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: String(options.method ?? 'GET'),
+        headers: lease.headers,
+        body:
+          options.data && typeof options.data === 'object'
+            ? JSON.stringify(options.data)
+            : (options.data ?? undefined),
+        credentials: options.anonymous ? 'omit' : 'include',
+        redirect: normalizeRedirect(options.redirect),
+        signal: controller.signal,
+      });
+    } finally {
+      lease.release();
+    }
     const headers: Record<string, string> = {};
     response.headers.forEach((value, key) => {
       headers[key] = value;
@@ -167,7 +183,8 @@ async function handleXhr(
     if (controller.signal.reason === 'timeout') {
       throw new Error('GM_xmlhttpRequest timeout');
     }
-    throw error;
+    if (error instanceof Error) throw error;
+    throw new Error(`GM_xmlhttpRequest failed: ${String(error)}`);
   } finally {
     if (timer) clearTimeout(timer);
     xhrControllers.delete(requestId);

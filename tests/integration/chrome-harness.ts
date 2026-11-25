@@ -95,6 +95,11 @@ export class Cdp {
   }
 }
 
+export interface EchoRequest {
+  method: string;
+  headers: Record<string, string | string[] | undefined>;
+}
+
 export interface TargetInfo {
   id: string;
   type: string;
@@ -121,6 +126,8 @@ export class ExtensionHarness {
   extId = '';
   pageUrl = '';
   pageConsole: string[] = [];
+  /** Requests the fixture served for `/echo`, in arrival order. */
+  echoRequests: EchoRequest[] = [];
 
   constructor(private readonly options: HarnessOptions = {}) {}
 
@@ -165,6 +172,15 @@ export class ExtensionHarness {
     await this.openExtensionPage();
 
     this.fixture = createServer((request, response) => {
+      if (request.url?.startsWith('/echo')) {
+        // GM_xmlhttpRequest header repair needs to see the headers Chrome
+        // actually put on the wire, including the ones DNR rewrote.
+        this.echoRequests.push({ method: request.method ?? '', headers: request.headers });
+        response.setHeader('content-type', 'application/json; charset=utf-8');
+        response.setHeader('cache-control', 'no-store');
+        response.end(JSON.stringify({ method: request.method, headers: request.headers }));
+        return;
+      }
       if (request.url?.startsWith('/require.js')) {
         response.setHeader('content-type', 'text/javascript; charset=utf-8');
         response.end('window.__lumoRequireLoaded = (window.__lumoRequireLoaded || 0) + 1;');
@@ -344,6 +360,12 @@ export class ExtensionHarness {
     await this.extEval(
       `chrome.runtime.sendMessage({type:'menus:invoke',payload:{tabId:${tabId},frameId:0,uuid:${JSON.stringify(uuid)},id:${JSON.stringify(id)}}})`,
     );
+  }
+
+  /** Wait until the fixture saw `count` `/echo` requests. */
+  async waitForEcho(count: number, timeoutMs = 20_000): Promise<EchoRequest[]> {
+    await waitFor(async () => (this.echoRequests.length >= count ? this.echoRequests : false), timeoutMs);
+    return this.echoRequests;
   }
 
   async openPage(): Promise<void> {

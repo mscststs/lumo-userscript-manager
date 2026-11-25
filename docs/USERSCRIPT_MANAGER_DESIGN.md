@@ -104,7 +104,7 @@ Service Worker（唯一数据/权限中心）
 - GM 对象只存在于脚本的 `with` 作用域内，不挂到 `window`；页面任意代码无法直接调用。
 - **运行时令牌**：每次注册派生一个 HMAC 令牌，绑定脚本 `uuid` 与 world。background 校验令牌，并从 content script sender 推导 tab/frame，脚本之间不能互调 GM API。
 - 值存储按 `storageName`（缺省为 uuid）分区，支持多脚本共享；变更通过事件广播。
-- 网络：`GM_xmlhttpRequest` 在 SW 中执行，先校验 `@connect` 允许列表；需要受限头时使用 DNR session rule。`GM_cookie` 走 `chrome.cookies`，`GM_download` 走 `chrome.downloads`。
+- 网络：`GM_xmlhttpRequest` 在 SW 中执行，先校验 `@connect` 允许列表。`fetch()` 会自动附加 `Origin: chrome-extension://<id>` 并丢弃 `User-Agent`/`Referer`/`Origin`，部分 WAF（如 B 站）会直接返回 412，因此 `lib/background/xhr-header-rules.ts` 为每个目标主机维护一条 DNR session rule：`initiatorDomains` 限定为本扩展、`requestDomains` 限定目标主机，默认移除 `Origin`/`Referer`，脚本显式传入时改为 `set`，`User-Agent` 同样走 DNR（fetch 无法设置）。一条规则只能承载一种头策略，所以同一主机上策略不同的请求以「租约」串行：前一个响应返回后才替换规则，同策略请求仍并发；主机上限 100，空闲主机按 LRU 回收，SW 重启时从 `getSessionRules()` 认领；DNR 不可用时降级为旧行为。`GM_cookie` 走 `chrome.cookies`，`GM_download` 走 `chrome.downloads`。`redirect` 选项透传给 `fetch()`。
 - 菜单命令经由 host 注册并在 popup 中列出。注册按 `(脚本, 命令 id)` 跨帧合并：同一条命令在 top 与 iframe 里各注册一次，popup 只显示一行，调用时依次投向 top 帧与注册过该命令的其它帧（`lib/background/menus.ts`）。命令 id 取 `options.id` 或标题，因此跨帧稳定。事件端口在 SW 被回收后重连并重放注册。
 
 ## 6. 安装与更新
