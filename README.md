@@ -110,10 +110,12 @@ It reads three more repository secrets:
 | --- | --- |
 | `EDGE_API_KEY` | Partner Center → Microsoft Edge → **Publish API** → API keys |
 | `EDGE_CLIENT_ID` | Same page, the Client ID shown next to the keys |
-| `EDGE_PRODUCT_ID` | Partner Center → Microsoft Edge → **Overview** → Product ID (a GUID). Falls back to `EDGE_CRX_ID` |
+| `EDGE_PRODUCT_ID` | Partner Center → Microsoft Edge → **Overview** → Product ID (a GUID) |
 
 `EDGE_PRODUCT_ID` must be the Partner Center product GUID. The 32-character id
-in the store URL is the extension id; passing it makes every call return 404.
+in the store URL is the extension id, not the product id: the script reads
+`EDGE_CRX_ID` only as a fallback and refuses it, because the endpoint accepts
+nothing but a GUID.
 
 Edge has no read-only status endpoint, so the manual `status` mode degrades to
 the local package check there. `skip_upload` still applies: it re-submits the
