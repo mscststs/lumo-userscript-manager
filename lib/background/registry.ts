@@ -17,6 +17,7 @@ import {
   resolveMetadataUrls,
 } from '@/lib/script/metadata';
 import { compileUrlRules, toRegistrationPatterns } from '@/lib/script/url-rules';
+import { effectiveGrants } from '@/lib/script/grants';
 import { compileLauncher } from '@/lib/script/compile';
 import { createRuntimeToken } from '@/lib/background/runtime-token';
 import { getRequireCssSources, getRequireSources } from './resources';
@@ -153,13 +154,8 @@ async function buildPlannedScript(
   );
   const rules = compileUrlRules(effective);
   const patterns = toRegistrationPatterns(rules);
-  let grant = effective.grant?.length ? [...effective.grant] : ['none'];
+  const grant = effectiveGrants(effective);
   const contextMenu = getMeta(effective, 'run-at') === 'context-menu';
-  if (contextMenu && grant.includes('none')) {
-    grant = ['GM_registerMenuCommand'];
-  } else if (contextMenu && !grant.includes('GM_registerMenuCommand')) {
-    grant.push('GM_registerMenuCommand');
-  }
   const runAt = resolveRunAt(effective, settings.defaultRunAt);
   const resolved = resolveInjectInto(
     effective,

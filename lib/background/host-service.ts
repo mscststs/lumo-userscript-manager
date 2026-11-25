@@ -9,7 +9,13 @@ import { getResources, getScript } from '@/lib/db';
 import { mergeMetadata } from '@/lib/script/metadata';
 import { compileUrlRules, urlMatches } from '@/lib/script/url-rules';
 import { resourcesForRuntime } from '@/lib/background/resources';
-import { getValuesForScript, setValueForScript, deleteValueForScript } from '@/lib/background/values';
+import {
+  deleteValueForScript,
+  getValuesForScript,
+  setValueForScript,
+  setValuesForScript,
+} from '@/lib/background/values';
+import { effectiveGrants, hasWriteGrant, isApiGranted } from '@/lib/script/grants';
 import { recordLog } from '@/lib/background/logs';
 import { registerMenuCommand, unregisterMenuCommand } from '@/lib/background/menus';
 import { handleGmApi } from '@/lib/background/gm';
@@ -63,6 +69,15 @@ export function createHostContext(
     world: rawWorld === 'MAIN' || rawWorld === 'USER_SCRIPT' ? rawWorld : undefined,
     documentId: sender?.documentId,
   };
+}
+
+function requireWriteGrant(script: UserScript): void {
+  const grants = effectiveGrants(
+    mergeMetadata(script.metadata, script.selfMetadata) as ScriptMetadata,
+  );
+  if (!hasWriteGrant(grants)) {
+    throw new HostError('This script has no value-write grant.', 'NOT_GRANTED');
+  }
 }
 
 async function requireActiveScript(uuid: string): Promise<UserScript> {
@@ -126,22 +141,43 @@ export async function handleHostRequest(
     }
     case 'host:gm': {
       await requireToken(payload, ctx.uuid, ctx);
-      await requireMatchingScript(ctx);
+      const script = await requireMatchingScript(ctx);
       const api = String(payload.api ?? '');
       if (!api) throw new HostError('Missing GM API name.', 'BAD_REQUEST');
+      // Defense in depth: the page only receives granted APIs, but the worker
+      // must not run an ungranted API even if a page forges a call.
+      const grants = effectiveGrants(
+        mergeMetadata(script.metadata, script.selfMetadata) as ScriptMetadata,
+      );
+      if (!isApiGranted(api, grants)) {
+        throw new HostError(`${api} is not granted by this script.`, 'NOT_GRANTED');
+      }
       return handleGmApi(api, (payload.args as unknown[]) ?? [], ctx);
     }
     case 'host:value:set': {
       await requireToken(payload, ctx.uuid, ctx);
-      await requireMatchingScript(ctx);
+      const script = await requireMatchingScript(ctx);
+      requireWriteGrant(script);
       await setValueForScript(ctx.uuid, String(payload.key ?? ''), payload.value, {
         originUuid: ctx.uuid,
       });
       return undefined;
     }
+    case 'host:value:setMany': {
+      await requireToken(payload, ctx.uuid, ctx);
+      const script = await requireMatchingScript(ctx);
+      requireWriteGrant(script);
+      const entries = (payload.entries ?? {}) as Record<string, unknown>;
+      if (!entries || typeof entries !== 'object' || Array.isArray(entries)) {
+        throw new HostError('entries must be an object.', 'BAD_REQUEST');
+      }
+      await setValuesForScript(ctx.uuid, entries, { originUuid: ctx.uuid });
+      return undefined;
+    }
     case 'host:value:delete': {
       await requireToken(payload, ctx.uuid, ctx);
-      await requireMatchingScript(ctx);
+      const script = await requireMatchingScript(ctx);
+      requireWriteGrant(script);
       await deleteValueForScript(ctx.uuid, String(payload.key ?? ''), {
         originUuid: ctx.uuid,
       });

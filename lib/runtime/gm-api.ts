@@ -1,4 +1,5 @@
 import type { RuntimeResource, ScriptMetadata } from '@/types';
+import { encodeXhrBody } from './xhr-body';
 
 export type GMCallback<T = unknown> = (result: T) => void;
 export type GMValueChangeListener = (
@@ -52,9 +53,15 @@ export interface GmApiHandle {
   handleMenuCommand: (id: string) => void;
   emitNotificationClick: (id: string, event?: Record<string, unknown>) => void;
   emitNotificationClose: (id: string, byUser?: boolean) => void;
-  emitXhrProgress: (requestId: string, loaded: number, total: number) => void;
+  emitXhrState: (requestId: string, payload: Record<string, unknown>) => void;
+  emitXhrProgress: (requestId: string, loaded: number, total: number, upload?: boolean) => void;
   emitDownloadProgress: (requestId: string, loaded: number, total: number) => void;
-  emitDownloadResult: (requestId: string, result: Record<string, unknown>, error?: string) => void;
+  emitDownloadResult: (
+    requestId: string,
+    result: Record<string, unknown>,
+    error?: string,
+    errorKind?: string,
+  ) => void;
   emitOpenTabClosed: (tabId: number) => void;
   dispose: () => void;
 }
@@ -72,12 +79,14 @@ function serializeXhrOptions(options: Record<string, unknown>): Record<string, u
     'method',
     'url',
     'headers',
-    'data',
     'timeout',
     'responseType',
     'overrideMimeType',
     'anonymous',
     'redirect',
+    'nocache',
+    'revalidate',
+    'binary',
     'user',
     'password',
   ];
@@ -95,31 +104,77 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
   return bytes.buffer;
 }
 
+const PARSEABLE_XML = new Set([
+  'application/xhtml+xml',
+  'application/xml',
+  'image/svg+xml',
+  'text/html',
+  'text/xml',
+]);
+
+function parseDocument(text: unknown, contentType: string): Document | null {
+  if (typeof text !== 'string') return null;
+  const type = contentType.toLowerCase();
+  const html = type.includes('html');
+  if (!html && !PARSEABLE_XML.has(type)) return null;
+  try {
+    return new DOMParser().parseFromString(text, html ? 'text/html' : 'application/xml');
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Turn the offscreen result into the object GM callbacks receive.
+ *
+ * The offscreen document already ran a native XHR, so the only work left is
+ * decoding the transport representation (base64 / serialized document) and
+ * exposing `response`, `responseText` and `responseXML` with XHR semantics.
+ */
 function normalizeXhrResult(result: any, responseType: string): any {
-  if (!result) return result;
-  if (responseType === 'document' && typeof result.responseText === 'string') {
-    try {
-      const contentType = String(result.contentType ?? '');
-      const type = contentType.includes('html') ? 'text/html' : 'application/xml';
-      return { ...result, response: new DOMParser().parseFromString(result.responseText, type) };
-    } catch {
-      return result;
-    }
-  }
-  if (!result.responseBase64) return result;
-  const buffer = base64ToArrayBuffer(result.responseBase64);
-  if (responseType === 'arraybuffer') {
-    const { responseBase64: _ignored, ...rest } = result;
-    return { ...rest, response: buffer };
-  }
-  if (responseType === 'blob') {
-    const { responseBase64: _ignored, ...rest } = result;
+  if (!result || typeof result !== 'object') {
     return {
-      ...rest,
-      response: new Blob([buffer], { type: String(result.contentType ?? 'application/octet-stream') }),
+      readyState: 4,
+      status: 0,
+      statusText: '',
+      responseHeaders: '',
+      finalUrl: '',
+      responseType,
+      error: 'The request produced no response.',
+      errorKind: 'network',
     };
   }
-  return result;
+  const payload: Record<string, any> = {
+    ...result,
+    readyState: Number(result.readyState ?? 4),
+    responseType,
+  };
+  const contentType = String(result.contentType ?? '');
+  if (result.responseBase64) {
+    const buffer = base64ToArrayBuffer(String(result.responseBase64));
+    if (responseType === 'arraybuffer') payload.response = buffer;
+    else if (responseType === 'blob') {
+      payload.response = new Blob([buffer], { type: contentType || 'application/octet-stream' });
+    }
+  } else if (responseType === 'arraybuffer') {
+    payload.response = new ArrayBuffer(0);
+  } else if (responseType === 'blob') {
+    payload.response = new Blob([], { type: contentType || 'application/octet-stream' });
+  } else if (responseType === 'json') {
+    payload.response = Object.prototype.hasOwnProperty.call(result, 'json') ? result.json : null;
+  } else if (responseType === 'document') {
+    payload.response = parseDocument(result.documentText ?? result.responseText, contentType);
+  } else {
+    payload.response = typeof result.responseText === 'string' ? result.responseText : null;
+  }
+  payload.responseXML =
+    responseType === 'document'
+      ? payload.response
+      : parseDocument(result.documentText ?? result.responseText, contentType);
+  delete payload.documentText;
+  delete payload.json;
+  delete payload.responseBase64;
+  return payload;
 }
 
 export function createGmApi(options: GmApiOptions): GmApiHandle {
@@ -135,6 +190,8 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
     }
   >();
   const xhrProgressCallbacks = new Map<string, (event: Record<string, unknown>) => void>();
+  const xhrUploadCallbacks = new Map<string, (event: Record<string, unknown>) => void>();
+  const xhrStateCallbacks = new Map<string, (payload: Record<string, unknown>) => void>();
   const downloadCallbacks = new Map<
     string,
     {
@@ -142,6 +199,7 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
       onerror?: (result: Record<string, unknown>) => void;
       onprogress?: (result: Record<string, unknown>) => void;
       onabort?: () => void;
+      ontimeout?: (result: Record<string, unknown>) => void;
     }
   >();
   const downloadResolvers = new Map<
@@ -157,9 +215,15 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
   const resourcesInfo = metaList(meta, 'resource')
     .map((item) => {
       const match = item.trim().match(/^(\S+)\s+(.+)$/);
-      return match ? { name: match[1]!, url: match[2]!.trim() } : null;
+      if (!match) return null;
+      const contentType = resources[match[1]!]?.contentType;
+      return {
+        name: match[1]!,
+        url: match[2]!.trim(),
+        ...(contentType ? { mimetype: contentType } : {}),
+      };
     })
-    .filter((item): item is { name: string; url: string } => item !== null);
+    .filter((item): item is { name: string; url: string; mimetype?: string } => item !== null);
   const scriptInfo = {
     name: metaFirst(meta, 'name') ?? '',
     namespace: metaFirst(meta, 'namespace') ?? '',
@@ -188,7 +252,7 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
     supportURL: metaFirst(meta, 'supporturl'),
     source: metaFirst(meta, 'source'),
     antifeature: metaList(meta, 'antifeature'),
-    lastModified: Date.now(),
+    lastModified: Number(metaFirst(meta, 'lastmodified')) || Date.now(),
   };
 
   const userAgent = pageWindow.navigator.userAgent;
@@ -200,8 +264,10 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
   const GM_info: Record<string, any> = {
     scriptHandler: 'Lumo Userscripts',
     version: handlerVersion,
-    scriptWillUpdate: true,
-    sandboxMode: options.sandboxMode,
+    scriptWillUpdate: Boolean(
+      metaFirst(meta, 'updateurl') || metaFirst(meta, 'downloadurl'),
+    ),
+    sandboxMode: options.sandboxMode === 'raw' ? 'raw' : 'js',
     script: scriptInfo,
     scriptMetaStr: metaStr,
     userAgent,
@@ -234,9 +300,10 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
     const callbacks = notificationCallbacks.get(id);
     if (!callbacks) return;
     try {
+      // Tampermonkey keeps the handler for the notification's whole lifetime.
       callbacks.onclick?.(event);
-    } finally {
-      callbacks.onclick = undefined;
+    } catch (error) {
+      transport.log('error', [`GM_notification onclick failed: ${String(error)}`]);
     }
   };
 
@@ -265,6 +332,7 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
     requestId: string,
     result: Record<string, unknown>,
     error?: string,
+    errorKind?: string,
   ) => {
     const callbacks = downloadCallbacks.get(requestId);
     const resolver = downloadResolvers.get(requestId);
@@ -279,7 +347,9 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
     downloadCallbacks.delete(requestId);
     try {
       if (error) {
-        callbacks.onerror?.(result);
+        const payload = { ...result, error, ...(errorKind ? { errorKind } : {}) };
+        if (errorKind === 'timeout') callbacks.ontimeout?.(payload);
+        else callbacks.onerror?.(payload);
         resolver?.reject(new Error(error));
       } else {
         callbacks.onload?.(result);
@@ -302,8 +372,15 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
     }
   };
 
-  const emitXhrProgress = (requestId: string, loaded: number, total: number) => {
-    const callback = xhrProgressCallbacks.get(requestId);
+  const emitXhrProgress = (
+    requestId: string,
+    loaded: number,
+    total: number,
+    upload = false,
+  ) => {
+    const callback = upload
+      ? xhrUploadCallbacks.get(requestId)
+      : xhrProgressCallbacks.get(requestId);
     if (!callback) return;
     try {
       callback({
@@ -314,6 +391,26 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
       });
     } catch (error) {
       transport.log('error', [`GM_xmlhttpRequest onprogress failed: ${String(error)}`]);
+    }
+  };
+
+  const emitXhrState = (requestId: string, payload: Record<string, unknown>) => {
+    const callback = xhrStateCallbacks.get(requestId);
+    if (!callback) return;
+    try {
+      callback(payload);
+    } catch (error) {
+      transport.log('error', [`GM_xmlhttpRequest onreadystatechange failed: ${String(error)}`]);
+    }
+  };
+
+  /** Scripts may mutate what they read; the cache must stay authoritative. */
+  const copyValue = <T,>(value: T): T => {
+    if (value === null || typeof value !== 'object') return value;
+    try {
+      return structuredClone(value);
+    } catch {
+      return value;
     }
   };
 
@@ -336,6 +433,25 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
 
   const deleteValue = (key: string) => setValue(key, undefined);
 
+  /**
+   * Batch API: one round trip, one listener call per key, same local-first
+   * semantics as `GM_setValue` (Tampermonkey fires listeners synchronously).
+   */
+  const setValues = (entries: Record<string, unknown>) => {
+    const normalized: Record<string, unknown> = {};
+    for (const [rawKey, value] of Object.entries(entries ?? {})) {
+      const key = String(rawKey);
+      const oldValue = values[key];
+      if (value === undefined) delete values[key];
+      else values[key] = value;
+      normalized[key] = value;
+      emitValueChanged(key, oldValue, value, false);
+    }
+    void transport
+      .call('GM_setValues', [normalized])
+      .catch((error) => transport.log('error', [`GM_setValues failed: ${String(error)}`]));
+  };
+
   const GM: Record<string, any> = Object.create(null);
   const GM4: Record<string, any> = Object.create(null);
   GM.GM = GM4;
@@ -351,7 +467,7 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
   GM.GM_info = GM_info;
   GM4.info = GM_info;
   define('GM_getValue', (key: string, fallback?: unknown) =>
-    Object.prototype.hasOwnProperty.call(values, key) ? values[key] : fallback,
+    Object.prototype.hasOwnProperty.call(values, key) ? copyValue(values[key]) : fallback,
   );
   define('GM_setValue', (key: string, value: unknown) => setValue(String(key), value));
   define('GM_deleteValue', (key: string) => deleteValue(String(key)));
@@ -360,24 +476,22 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
     if (Array.isArray(keysOrDefaults)) {
       const result: Record<string, unknown> = {};
       for (const key of keysOrDefaults) {
-        if (Object.prototype.hasOwnProperty.call(values, key)) result[key] = values[key];
+        if (Object.prototype.hasOwnProperty.call(values, key)) result[key] = copyValue(values[key]);
       }
       return result;
     }
     if (keysOrDefaults && typeof keysOrDefaults === 'object') {
       const result: Record<string, unknown> = { ...keysOrDefaults };
       for (const key of Object.keys(keysOrDefaults)) {
-        if (Object.prototype.hasOwnProperty.call(values, key)) result[key] = values[key];
+        if (Object.prototype.hasOwnProperty.call(values, key)) result[key] = copyValue(values[key]);
       }
       return result;
     }
-    return { ...values };
+    return copyValue({ ...values });
   });
-  define('GM_setValues', (obj: Record<string, unknown>) => {
-    for (const [key, value] of Object.entries(obj ?? {})) setValue(key, value);
-  });
+  define('GM_setValues', (obj: Record<string, unknown>) => setValues(obj ?? {}));
   define('GM_deleteValues', (keys: string[]) => {
-    for (const key of keys ?? []) deleteValue(String(key));
+    setValues(Object.fromEntries((keys ?? []).map((key) => [String(key), undefined])));
   });
   define('GM_addValueChangeListener', (key: string, fn: GMValueChangeListener) => {
     const id = ++listenerId;
@@ -422,10 +536,19 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
       else element.setAttribute(key, String(value));
     }
     (parent ?? document.head ?? document.documentElement).appendChild(element);
+    // Thenable so `await GM_addElement(...)` resolves to the element, matching
+    // Tampermonkey and Violentmonkey.
+    Object.defineProperty(element, 'then', {
+      value: (resolve: (value: Element) => unknown) => resolve(element),
+      configurable: true,
+    });
     return element;
   });
   define('GM_getResourceText', (name: string) => resources[name]?.content ?? null);
+  const resourceUrls = new Map<string, string>();
   define('GM_getResourceURL', (name: string) => {
+    const cached = resourceUrls.get(name);
+    if (cached) return cached;
     const resource = resources[name];
     if (!resource) return null;
     if (resource.base64) {
@@ -434,48 +557,49 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
       for (let i = 0; i < byteCharacters.length; i += 1) {
         bytes[i] = byteCharacters.charCodeAt(i);
       }
-      return URL.createObjectURL(new Blob([bytes], { type: resource.contentType }));
+      const url = URL.createObjectURL(new Blob([bytes], { type: resource.contentType }));
+      resourceUrls.set(name, url);
+      return url;
     }
-    return URL.createObjectURL(new Blob([resource.content], { type: resource.contentType }));
+    const url = URL.createObjectURL(new Blob([resource.content], { type: resource.contentType }));
+    resourceUrls.set(name, url);
+    return url;
   });
-  define('GM_registerMenuCommand', async (
+  define('GM_registerMenuCommand', (
     title: string,
     fn: () => void,
     options?: Record<string, unknown> | string,
   ) => {
     const opts = typeof options === 'string' ? { accessKey: options } : options;
-    // The command id must be stable across frames: the same script registers
-    // the command in every matching frame and the background merges those
-    // registrations into one row (`lib/background/menus.ts`). A per-frame
-    // counter would produce identical ids only by luck, and a title-keyed id
-    // is what Violentmonkey uses too (`options.id || text`).
+    // Stable across frames: the same script registers the command in every
+    // matching frame and the background merges those registrations into one row
+    // (`lib/background/menus.ts`). `options.id || title` matches Violentmonkey.
     const custom = opts?.id;
-    const id = custom !== undefined && custom !== null && String(custom) !== ''
-      ? String(custom)
-      : String(title);
+    const id =
+      custom !== undefined && custom !== null && String(custom) !== '' ? String(custom) : String(title);
     menuCallbacks.set(id, fn);
     menuRegistrations.set(id, { title: String(title), options: opts });
-    try {
-      await transport.registerMenuCommand(id, String(title), opts);
-    } catch (error) {
+    void transport.registerMenuCommand(id, String(title), opts).catch((error) => {
       menuCallbacks.delete(id);
       menuRegistrations.delete(id);
-      throw error;
-    }
+      transport.log('error', [`GM_registerMenuCommand failed: ${String(error)}`]);
+    });
     return id;
   });
-  define('GM_unregisterMenuCommand', async (id: string | number) => {
+  define('GM_unregisterMenuCommand', (id: string | number) => {
     const raw = String(id);
-    // Scripts that predate `options.id` pass the title back in, so accept both
-    // spellings instead of silently doing nothing.
+    // Scripts that predate `options.id` pass the title back in.
     const key = menuCallbacks.has(raw)
       ? raw
       : [...menuRegistrations].find(([, item]) => item.title === raw)?.[0];
     if (key === undefined) return;
     menuCallbacks.delete(key);
     menuRegistrations.delete(key);
-    await transport.unregisterMenuCommand(key);
+    void transport.unregisterMenuCommand(key).catch((error) => {
+      transport.log('error', [`GM_unregisterMenuCommand failed: ${String(error)}`]);
+    });
   });
+
   define('GM_notification', (
     details: Record<string, any> | string,
     title?: string | (() => void),
@@ -553,6 +677,7 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
       onerror: typeof opts.onerror === 'function' ? opts.onerror : undefined,
       onprogress: typeof opts.onprogress === 'function' ? opts.onprogress : undefined,
       onabort: typeof opts.onabort === 'function' ? opts.onabort : undefined,
+      ontimeout: typeof opts.ontimeout === 'function' ? opts.ontimeout : undefined,
     });
     let settled = false;
     let resolveResult: ((value: unknown) => void) | undefined;
@@ -672,8 +797,15 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
   const makeXhr = (details: Record<string, any>, awaitResult: boolean) => {
     const requestId = `lumo-xhr-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     const serializable = serializeXhrOptions(details);
+    const responseType = String(details.responseType ?? '');
     if (typeof details.onprogress === 'function') {
       xhrProgressCallbacks.set(requestId, details.onprogress);
+    }
+    if (typeof details.upload?.onprogress === 'function') {
+      xhrUploadCallbacks.set(requestId, details.upload.onprogress);
+    }
+    if (typeof details.onreadystatechange === 'function') {
+      xhrStateCallbacks.set(requestId, details.onreadystatechange);
     }
     let resolveResult: ((value: unknown) => void) | undefined;
     let rejectResult: ((reason?: unknown) => void) | undefined;
@@ -684,20 +816,36 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
         })
       : undefined;
     let settled = false;
-    const finish = (normalized: any) => {
+    let dispatched = false;
+
+    const basePayload = (overrides: Record<string, unknown> = {}) => ({
+      readyState: 4,
+      status: 0,
+      statusText: '',
+      responseHeaders: '',
+      finalUrl: '',
+      contentType: '',
+      responseType,
+      ...(details.context !== undefined ? { context: details.context } : {}),
+      ...overrides,
+    });
+    const cleanup = () => {
+      xhrProgressCallbacks.delete(requestId);
+      xhrUploadCallbacks.delete(requestId);
+      xhrStateCallbacks.delete(requestId);
+    };
+    const finish = (payload: any) => {
       if (settled) return;
       settled = true;
-      xhrProgressCallbacks.delete(requestId);
-      if (normalized && typeof normalized === 'object' && details.context !== undefined) {
-        normalized.context = details.context;
-      }
+      cleanup();
+      const normalized: Record<string, any> =
+        payload && typeof payload === 'object' ? payload : basePayload({ error: String(payload ?? '') });
+      if (details.context !== undefined) normalized.context = details.context;
       details.onreadystatechange?.(normalized);
-      if (normalized?.error) {
-        if (String(normalized.error).toLowerCase().includes('timeout')) {
-          details.ontimeout?.(normalized);
-        } else {
-          details.onerror?.(normalized);
-        }
+      if (normalized.error) {
+        if (normalized.errorKind === 'timeout') details.ontimeout?.(normalized);
+        else if (normalized.errorKind === 'abort') details.onabort?.(normalized);
+        else details.onerror?.(normalized);
         rejectResult?.(new Error(String(normalized.error)));
       } else {
         details.onload?.(normalized);
@@ -705,30 +853,43 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
       }
       details.onloadend?.(normalized);
     };
-    try {
-      details.onloadstart?.({});
-    } catch (error) {
-      transport.log('error', [`GM_xmlhttpRequest onloadstart failed: ${String(error)}`]);
-    }
-    void transport
-      .call('GM_xmlhttpRequest', [{ ...serializable, requestId }])
-      .then((result: any) => {
-        finish(normalizeXhrResult(result, String(serializable.responseType ?? 'text')));
-      })
-      .catch((error) => {
-        finish({ error: String(error) });
-      });
     const handle = {
       abort: () => {
         if (settled) return;
         settled = true;
-        xhrProgressCallbacks.delete(requestId);
-        details.onabort?.({});
-        details.onloadend?.({ error: 'GM_xmlhttpRequest aborted' });
+        cleanup();
+        const payload = basePayload({ error: 'GM_xmlhttpRequest aborted', errorKind: 'abort' });
+        details.onreadystatechange?.(payload);
+        details.onabort?.(payload);
+        details.onloadend?.(payload);
         rejectResult?.(new Error('GM_xmlhttpRequest aborted'));
-        void transport.call('GM_xmlhttpRequestAbort', [requestId]).catch(() => undefined);
+        if (dispatched) {
+          void transport.call('GM_xmlhttpRequestAbort', [requestId]).catch(() => undefined);
+        }
       },
     };
+
+    details.onloadstart?.(basePayload({ readyState: 1 }));
+    void (async () => {
+      try {
+        const body = await encodeXhrBody(details.data);
+        if (settled) return;
+        dispatched = true;
+        const request = {
+          ...serializable,
+          dataBase64: body.base64,
+          dataContentType: body.contentType,
+          requestId,
+        };
+        const result = await transport.call('GM_xmlhttpRequest', [request]);
+        if (settled) return;
+        finish(normalizeXhrResult(result, responseType));
+      } catch (error) {
+        if (settled) return;
+        finish(basePayload({ error: String(error), errorKind: 'network' }));
+      }
+    })();
+
     return awaitResult ? Object.assign(promise!, handle) : handle;
   };
   GM.GM_xmlhttpRequest = (details: Record<string, any>) => makeXhr(details, false);
@@ -857,21 +1018,19 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
     });
   };
 
+  // Expose exactly the spelling the script asked for: `@grant GM_xmlhttpRequest`
+  // must not also hand out `GM.xmlHttpRequest` (Tampermonkey does not).
   for (const name of allowed) {
-    if (name === 'none') continue;
+    if (name === 'none' || name === 'GM_info' || name === 'GM.info') continue;
     const target = GM_ALIASES[name] ?? name;
     const fn = GM[target];
     if (!fn) continue;
-    scopedGM[target] = fn;
-    if (name.startsWith('GM_') || name.startsWith('GM.')) scopedGM[name] = fn;
-    if (target.startsWith('GM_')) {
-      const short = target.slice(3);
-      if (GM4[short]) scopedGM4[short] = GM4[short];
-      if (target === 'GM_getResourceURL') {
-        scopedGM4.getResourceURL = GM4.getResourceURL;
-        scopedGM4.getResourceUrl = GM4.getResourceURL;
-      }
+    if (name.startsWith('GM.')) {
+      const short = (GM_ALIASES[name] ?? name).slice(3);
+      scopedGM4[short] = GM4[short] ?? ((...callArgs: unknown[]) => Promise.resolve(fn(...callArgs)));
+      continue;
     }
+    scopedGM[name] = fn;
   }
 
   if (
@@ -940,6 +1099,7 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
     handleMenuCommand,
     emitNotificationClick,
     emitNotificationClose,
+    emitXhrState,
     emitXhrProgress,
     emitDownloadProgress,
     emitDownloadResult,
@@ -948,6 +1108,10 @@ export function createGmApi(options: GmApiOptions): GmApiHandle {
       valueListeners.clear();
       notificationCallbacks.clear();
       xhrProgressCallbacks.clear();
+      xhrUploadCallbacks.clear();
+      xhrStateCallbacks.clear();
+      for (const url of resourceUrls.values()) URL.revokeObjectURL(url);
+      resourceUrls.clear();
       downloadCallbacks.clear();
       downloadResolvers.clear();
       openTabs.clear();

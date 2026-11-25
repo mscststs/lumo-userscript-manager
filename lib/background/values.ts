@@ -52,6 +52,47 @@ export async function setValueForScript(
   });
 }
 
+/**
+ * Batch write used by `GM_setValues` / `GM_deleteValues`.
+ *
+ * One storage read, concurrent writes, then one broadcast per changed key so
+ * listeners (including sibling scripts sharing `@storageName`) see the same
+ * `(key, oldValue, newValue)` shape as a single `GM_setValue`.
+ */
+export async function setValuesForScript(
+  uuid: string,
+  entries: Record<string, unknown>,
+  options: { originUuid?: string } = {},
+): Promise<void> {
+  const script = await getScript(uuid);
+  if (!script) throw new AppError('script.notFound', undefined, 'Script not found.');
+  const storageName = getStorageName({ ...script, metadata: mergeMetadata(script.metadata, script.selfMetadata) });
+  const values = await getValues(storageName);
+  const changes: { key: string; oldValue: unknown; newValue: unknown }[] = [];
+  await Promise.all(
+    Object.entries(entries ?? {}).map(async ([key, value]) => {
+      changes.push({ key, oldValue: values[key], newValue: value });
+      if (value === undefined) await deleteStoredValue(storageName, key);
+      else await setStoredValue(storageName, key, value);
+    }),
+  );
+  for (const change of changes) {
+    broadcastToHosts({
+      type: 'bg:event',
+      event: 'value-changed',
+      payload: {
+        uuid,
+        originUuid: options.originUuid ?? '',
+        storageName,
+        key: change.key,
+        oldValue: change.oldValue,
+        newValue: change.newValue,
+        remote: true,
+      },
+    });
+  }
+}
+
 export async function deleteValueForScript(
   uuid: string,
   key: string,

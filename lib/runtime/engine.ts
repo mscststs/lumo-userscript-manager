@@ -100,11 +100,18 @@ export function installEngine(options: EngineOptions): void {
       case 'notification-close':
         api.emitNotificationClose(String(payload.id ?? ''), Boolean(payload.byUser));
         break;
+      case 'xhr-state':
+        api.emitXhrState(
+          String(payload.requestId ?? ''),
+          payload as Record<string, unknown>,
+        );
+        break;
       case 'xhr-progress':
         api.emitXhrProgress(
           String(payload.requestId ?? ''),
           Number(payload.loaded ?? 0),
           Number(payload.total ?? 0),
+          Boolean(payload.upload),
         );
         break;
       case 'download-progress':
@@ -119,6 +126,7 @@ export function installEngine(options: EngineOptions): void {
           String(payload.requestId ?? ''),
           (payload.result as Record<string, unknown>) ?? {},
           payload.error ? String(payload.error) : undefined,
+          payload.errorKind ? String(payload.errorKind) : undefined,
         );
         break;
       case 'open-tab-closed':
@@ -135,14 +143,14 @@ export function installEngine(options: EngineOptions): void {
 
     return {
       call: (api, args) => {
-        if (api === 'GM_setClipboard') {
-          return copyToClipboard(String(args[0] ?? ''), String(args[1] ?? 'text'));
-        }
         if (api === 'GM_setValue') {
           return client.call('host:value:set', { uuid, token, key: args[0], value: args[1] });
         }
         if (api === 'GM_deleteValue') {
           return client.call('host:value:delete', { uuid, token, key: args[0] });
+        }
+        if (api === 'GM_setValues') {
+          return client.call('host:value:setMany', { uuid, token, entries: args[0] });
         }
         return client.call('host:gm', { uuid, token, api, args });
       },
@@ -292,34 +300,4 @@ export function installEngine(options: EngineOptions): void {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function copyToClipboard(text: string, type = 'text'): Promise<void> {
-  const mime = type === 'text' ? 'text/plain' : type === 'html' ? 'text/html' : type;
-  if (mime !== 'text/plain' && navigator.clipboard?.write) {
-    try {
-      await navigator.clipboard.write([
-        new ClipboardItem({ [mime]: new Blob([text], { type: mime }) }),
-      ]);
-      return;
-    } catch {
-      // Fall through to the text fallback.
-    }
-  }
-  try {
-    await navigator.clipboard.writeText(text);
-    return;
-  } catch {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    (document.body ?? document.documentElement).appendChild(textarea);
-    textarea.select();
-    document.execCommand('copy');
-    textarea.remove();
-  }
-  if (mime !== 'text/plain') {
-    console.warn(`[Lumo Userscripts] Clipboard type ${mime} is not supported; copied as text.`);
-  }
 }

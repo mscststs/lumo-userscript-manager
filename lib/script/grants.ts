@@ -90,8 +90,45 @@ export function unsupportedGrants(grants: string[] | undefined): string[] {
   return [...new Set((grants ?? []).map(canonicalGrant).filter((grant) => !isSupportedGrant(grant)))];
 }
 
+/**
+ * Grants that actually apply, including the implicit ones derived from
+ * `@run-at context-menu` (the only way such a script can be started).
+ * Shared by the registration and the runtime authorization check so the two
+ * can never disagree.
+ */
+export function effectiveGrants(
+  metadata: { grant?: string[]; 'run-at'?: string[] },
+): string[] {
+  const grants = metadata.grant?.length ? [...metadata.grant] : ['none'];
+  if (metadata['run-at']?.[0] !== 'context-menu') return grants;
+  if (grants.includes('none')) return ['GM_registerMenuCommand'];
+  if (!grants.includes('GM_registerMenuCommand')) grants.push('GM_registerMenuCommand');
+  return grants;
+}
+
+/**
+ * Does `grant` cover the API name the background is about to run?
+ *
+ * Both spellings are accepted (`GM_xmlhttpRequest` / `GM.xmlHttpRequest`), the
+ * same way the runtime exposes them.
+ */
+export function isApiGranted(api: string, grants: string[] | undefined): boolean {
+  const normalized = new Set((grants ?? ['none']).map(canonicalGrant));
+  const candidates = api.startsWith('GM_') ? [api, `GM.${api.slice(3)}`] : [api];
+  return candidates.some((candidate) => normalized.has(canonicalGrant(candidate)));
+}
+
 export function hasWriteGrant(grants: string[] | undefined): boolean {
   return (grants ?? []).some((grant) =>
-    ['GM_setValue', 'GM.setValue', 'GM_deleteValue', 'GM.deleteValue'].includes(grant),
+    [
+      'GM_setValue',
+      'GM.setValue',
+      'GM_setValues',
+      'GM.setValues',
+      'GM_deleteValue',
+      'GM.deleteValue',
+      'GM_deleteValues',
+      'GM.deleteValues',
+    ].includes(grant),
   );
 }

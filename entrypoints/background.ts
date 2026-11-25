@@ -93,6 +93,7 @@ import { AppError, serializeError } from '@/lib/errors';
 import { formatDiagnostics } from '@/lib/diagnostics';
 import { openOptionsTab } from '@/lib/options-tab';
 import { lookupInstalledScript } from '@/lib/background/site-lookup';
+import { reclaimXhrRules } from '@/lib/background/xhr/header-rules';
 
 const INSTALL_RULE_ID = 1;
 
@@ -125,6 +126,9 @@ async function installRedirectRules(): Promise<void> {
 
 async function bootstrapRuntime(): Promise<void> {
   await installRedirectRules();
+  // Rules from a previous worker instance can never be released (the requests
+  // died with it), so clear the XHR id range before accepting new requests.
+  await reclaimXhrRules();
   await cleanupDrafts();
   // Retention is maintenance, not a prerequisite for serving the UI. Do not
   // make a cold service-worker start wait for a large log/version trim.

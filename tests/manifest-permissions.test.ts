@@ -37,6 +37,8 @@ const EVIDENCE: Record<string, RegExp[]> = {
   notifications: [/chrome\.notifications\./],
   // Background update checks.
   alarms: [/chrome\.alarms\./],
+  // DOM XHR + clipboard for GM APIs (`lib/background/offscreen.ts`).
+  offscreen: [/chrome\.offscreen/],
   // `GM_setClipboard` and copying the extension id from settings.
   clipboardWrite: [/\.clipboard\.(?:write|writeText)/],
 };

@@ -29,14 +29,18 @@ export default defineConfig({
       'webNavigation',
       // Redirect `.user.js` navigations to the installer page (`entrypoints/background.ts`).
       'declarativeNetRequest',
-      // `GM_cookie` (`lib/background/gm.ts`).
+      // `GM_cookie` (`lib/background/cookie.ts`).
       'cookies',
-      // `GM_download` (`lib/background/gm.ts`).
+      // `GM_download` (`lib/background/download.ts`).
       'downloads',
-      // `GM_notification` (`lib/background/gm.ts`).
+      // `GM_notification` (`lib/background/notification.ts`).
       'notifications',
       // Background update checks (`lib/background/updates.ts`).
       'alarms',
+      // DOM XHR for `GM_xmlhttpRequest` (readyState/responseXML/upload progress)
+      // and clipboard writes that need a focused document
+      // (`lib/background/offscreen.ts`, `entrypoints/offscreen`).
+      'offscreen',
       // `GM_setClipboard` and copying the extension id from settings.
       'clipboardWrite',
     ],

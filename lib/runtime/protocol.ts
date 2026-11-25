@@ -94,6 +94,7 @@ export type HostErrorCode =
   | 'INVALID_TOKEN'
   | 'SCRIPT_NOT_ACTIVE'
   | 'NOT_MATCHED'
+  | 'NOT_GRANTED'
   | 'UNSUPPORTED'
   | 'HOST_FAILED'
   | 'BACKGROUND_UNAVAILABLE'
@@ -105,6 +106,7 @@ export const HOST_RPC_TYPES = new Set([
   'host:bootstrap',
   'host:gm',
   'host:value:set',
+  'host:value:setMany',
   'host:value:delete',
   'host:run',
   'host:log',
@@ -119,6 +121,7 @@ export type RuntimeEventName =
   | 'menu-command'
   | 'notification-click'
   | 'notification-close'
+  | 'xhr-state'
   | 'xhr-progress'
   | 'download-progress'
   | 'download-result'

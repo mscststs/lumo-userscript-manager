@@ -36,15 +36,26 @@ function makeContext(grant: string[]) {
 }
 
 describe('GM API scoping', () => {
-  it('exposes only granted legacy and GM4 APIs', () => {
-    const { api } = makeContext(['GM_getValue', 'GM_setValue']);
-    expect(api.GM.GM_getValue).toBeTypeOf('function');
-    expect(api.GM.GM_setValue).toBeTypeOf('function');
-    expect(api.GM.GM_deleteValue).toBeUndefined();
-    expect(api.GM.GM.getValue).toBeTypeOf('function');
-    expect(api.GM.GM.setValue).toBeTypeOf('function');
-    expect(api.GM.GM.deleteValue).toBeUndefined();
-    expect(api.GM.GM_info.scriptHandler).toBe('Lumo Userscripts');
+  it('exposes exactly the granted spelling, like Tampermonkey and Violentmonkey', () => {
+    const legacy = makeContext(['GM_getValue', 'GM_setValue']).api;
+    expect(legacy.GM.GM_getValue).toBeTypeOf('function');
+    expect(legacy.GM.GM_setValue).toBeTypeOf('function');
+    expect(legacy.GM.GM_deleteValue).toBeUndefined();
+    // `@grant GM_getValue` must not leak the GM4 spelling.
+    expect(legacy.GM.GM.getValue).toBeUndefined();
+    expect(legacy.GM.GM_info.scriptHandler).toBe('Lumo Userscripts');
+
+    const gm4 = makeContext(['GM.getValue', 'GM.setValue']).api;
+    expect(gm4.GM.GM.getValue).toBeTypeOf('function');
+    expect(gm4.GM.GM.setValue).toBeTypeOf('function');
+    // ...and the reverse holds for `@grant GM.getValue`.
+    expect(gm4.GM.GM_getValue).toBeUndefined();
+  });
+
+  it('exposes GM_info without any grant and reports TM-compatible sandboxMode', () => {
+    const { api } = makeContext(['none']);
+    expect(api.GM.GM_info.sandboxMode).toBe('raw');
+    expect(api.GM.GM_getValue).toBeUndefined();
   });
 
   it('reads and writes the local value snapshot', () => {

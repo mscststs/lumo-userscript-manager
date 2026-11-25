@@ -98,6 +98,7 @@ export class Cdp {
 export interface EchoRequest {
   method: string;
   headers: Record<string, string | string[] | undefined>;
+  body: string;
 }
 
 export interface TargetInfo {
@@ -174,11 +175,17 @@ export class ExtensionHarness {
     this.fixture = createServer((request, response) => {
       if (request.url?.startsWith('/echo')) {
         // GM_xmlhttpRequest header repair needs to see the headers Chrome
-        // actually put on the wire, including the ones DNR rewrote.
-        this.echoRequests.push({ method: request.method ?? '', headers: request.headers });
-        response.setHeader('content-type', 'application/json; charset=utf-8');
-        response.setHeader('cache-control', 'no-store');
-        response.end(JSON.stringify({ method: request.method, headers: request.headers }));
+        // actually put on the wire, including the ones DNR rewrote. The body is
+        // echoed too so tests can prove how `data` was encoded.
+        const chunks: Buffer[] = [];
+        request.on('data', (chunk: Buffer) => chunks.push(chunk));
+        request.on('end', () => {
+          const body = Buffer.concat(chunks).toString('utf8');
+          this.echoRequests.push({ method: request.method ?? '', headers: request.headers, body });
+          response.setHeader('content-type', 'application/json; charset=utf-8');
+          response.setHeader('cache-control', 'no-store');
+          response.end(JSON.stringify({ method: request.method, headers: request.headers, body }));
+        });
         return;
       }
       if (request.url?.startsWith('/require.js')) {
