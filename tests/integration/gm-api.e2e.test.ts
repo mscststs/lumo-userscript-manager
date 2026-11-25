@@ -57,6 +57,12 @@ const xhr = (details) => new Promise((resolve) => GM_xmlhttpRequest({
   const bufferResult = await xhr({ method: 'POST', url: origin + '/echo', data: buffer });
   results.binary = { ok: bufferResult.ok, echoed: String(bufferResult.text).includes('hi') };
 
+  // redirect: "error" must only fail on an actual redirect. The request URL
+  // carries the DNR marker fragment, so a naive responseURL comparison would
+  // reject every request.
+  const strict = await xhr({ method: 'GET', url: origin + '/', redirect: 'error' });
+  results.redirectError = { ok: strict.ok, status: strict.status };
+
   const htmlResult = await xhr({ method: 'GET', url: origin + '/', responseType: 'json' });
   results.invalidJson = { ok: htmlResult.ok, response: htmlResult.response };
 
@@ -97,6 +103,7 @@ const xhr = (details) => new Promise((resolve) => GM_xmlhttpRequest({
 
     expect(results.form).toEqual({ ok: true, echoed: true });
     expect(results.binary).toEqual({ ok: true, echoed: true });
+    expect(results.redirectError).toEqual({ ok: true, status: 200 });
     // Invalid JSON must resolve like a native XHR instead of failing the request.
     expect(results.invalidJson).toEqual({ ok: true, response: null });
     expect(results.valueIsolation).toEqual({ a: 1 });

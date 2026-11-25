@@ -82,17 +82,6 @@ async function collectResult(
     finalUrl: xhr.responseURL || request.url,
     contentType,
   };
-  // `redirect: "error"` means "fail when a redirect happened". Native XHR has
-  // no redirect mode, so compare the landed URL with the requested one.
-  if (request.redirect === 'error' && xhr.responseURL && xhr.responseURL !== request.url) {
-    return {
-      ...base,
-      status: 0,
-      error: 'Redirected request rejected (redirect: "error").',
-      errorKind: 'redirect',
-      redirectRejected: true,
-    };
-  }
 
   const type = request.responseType;
   if (type === 'arraybuffer') {
@@ -120,7 +109,11 @@ async function collectResult(
       return { ...base, json: null, responseText };
     }
   }
-  // `responseXML`/`response` HTML parsing happens on the page side, where a
+  // `redirect` is decided by the worker: the request URL carries the DNR
+  // marker fragment, so `responseURL` (which never includes a fragment) can
+  // never be compared here.
+  //
+  // `responseXML`/`response` parsing happens on the page side, where a
   // DOMParser belongs; shipping the text keeps the transport small.
   return { ...base, responseText };
 }

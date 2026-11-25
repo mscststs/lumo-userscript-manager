@@ -30,7 +30,10 @@ export interface OffscreenXhrRequest {
   overrideMimeType?: string;
   user?: string;
   password?: string;
-  /** `error` fails the request if a redirect happened; `manual` degrades to follow. */
+  /**
+   * Informational only: the worker compares the landed URL (fragment stripped)
+   * with the requested one, because the URL sent here carries the DNR marker.
+   */
   redirect: 'follow' | 'error';
   nocache: boolean;
   revalidate: boolean;
